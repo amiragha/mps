@@ -1,0 +1,22 @@
+* list of TODO things!
+** testing
+   - [-] lots of test need to be written! (by someone)
+
+** idmrg and dmrg stuff
+   - [-]  Best method for arnoldi and lanczos algorithms to make the process
+     as seemlessly as possible
+
+   - [-] code algorithm such as TDVP, etc. at least the general case
+     for undestanding and possible comparisons for later
+
+** symmetry stuff
+   - [-] the svd function needs revision, possibly the return value
+     could be an svd object to better integration with standard julia
+
+   - [-] implement the symmetry more general and also add the Z_2
+     symmetry as an example (it is also incredibly useful)
+
+   - [-] General clean-up
+
+   - [-] how would the symmetry and charges play out in the case of
+     infinte algorithms like iDMRG
