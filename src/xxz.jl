@@ -10,12 +10,6 @@ function xxz_hamiltonian(lx::Int64, delta::Float64=1.0;
     end
 end
 
-eye(n) = sparse(1.0I, n, n)
-sz_half = sparse(Float64[.5 0; 0 -.5])
-sp_half = sparse(Float64[ 0 1; 0  0])
-sm_half = sparse(Float64[ 0 0; 1  0])
-I2 = eye(2)
-
 function xxz_explicit(lx::Int64, delta::Float64, boundary::Symbol)
 
     heis_term = 0.5 * (kron(sp_half, sm_half) + kron(sm_half, sp_half)) +
