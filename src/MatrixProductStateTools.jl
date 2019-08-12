@@ -10,17 +10,20 @@ import Base: convert, size
 
 include("mpo.jl")
 include("mps.jl")
+include("imps.jl")
 include("symmps.jl")
 
 export MatrixProductOperator
 export MatrixProductState
 export SymMatrixProductState
+export InfiniteMatrixProductState
 
 export xxz_mpo
 
 export canonicalize_at!, move_center!
 
 export measure_1point, measure_2point
+export measure_bond
 export half_measurement_index
 export measure_mpo
 export apply_2siteoperator!
@@ -30,5 +33,7 @@ export display_matrices
 export mps_dims_are_consistent
 
 export mps2ketstate
+
+export ketstate2imps
 
 end
