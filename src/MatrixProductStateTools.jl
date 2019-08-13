@@ -18,6 +18,7 @@ export MatrixProductState
 export SymMatrixProductState
 export InfiniteMatrixProductState
 
+export svdtrunc
 export randmps
 
 export canonicalize_at!, move_center!

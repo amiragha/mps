@@ -14,6 +14,7 @@ include("idmrg.jl")
 export initialenv
 
 export dmrg1sitesweep!
+export dmrg2sitesweep!
 export runiDMRG
 
 end

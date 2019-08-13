@@ -1,3 +1,10 @@
+function svdtrunc(A::Matrix{T}; maxdim::Int=200, tol::Float64=1.e-8) where{T<:Number}
+    fact = svd(A, full=false)
+    n = min(maxdim, sum(fact.S .> fact.S[1]*tol))
+
+    fact.U[:, 1:n], Diagonal(fact.S[1:n]), fact.Vt[1:n, :]
+end
+
 """
 
 `lx` is the length of the MPS or the number of sites.  `d` is the
