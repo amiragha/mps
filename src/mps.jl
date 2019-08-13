@@ -98,6 +98,33 @@ function MatrixProductState(lx::Int64, d::Int64,
     return MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
 
+randisometry(T, d1, d2) =
+    d1 >= d2 ? Matrix(qr!(randn(T, d1, d2)).Q) : Matrix(lq!(randn(T, d1, d2)).Q)
+randisometry(d1, d2) = randisometry(Float64, d1, d2)
+
+function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int)
+    dims = Vector{Int}(undef, lx+1)
+    dims[1] = 1
+    dims[lx+1] = 1
+
+    ### this can be wrapped into a function itself
+    for l = 2:lx
+        dims[l] = min(maxdim, dims[l-1]*d)
+    end
+    for l = lx:-1:1
+        dims[l] = min(dims[l], dims[l+1]*d)
+    end
+    ### till here!
+
+    matrices = Vector{Array{T, 3}}(undef, lx)
+    for l = 1:lx
+        Dr = dims[l+1]
+        Dl = dims[l]
+        matrices[l] = reshape(randisometry(T, Dl, d*Dr), Dl, d, Dr)
+    end
+    return MatrixProductState{T}(lx, d, dims, matrices, lx)
+end
+
 ### conversions
 ###############
 

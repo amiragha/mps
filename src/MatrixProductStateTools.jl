@@ -18,7 +18,7 @@ export MatrixProductState
 export SymMatrixProductState
 export InfiniteMatrixProductState
 
-export xxz_mpo
+export randmps
 
 export canonicalize_at!, move_center!
 
@@ -35,5 +35,7 @@ export mps_dims_are_consistent
 export mps2ketstate
 
 export ketstate2imps
+
+export xxz_mpo
 
 end
