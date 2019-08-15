@@ -2,6 +2,7 @@ module MatrixProductStateTools
 
 using SymTensors
 
+using Random
 using LinearAlgebra
 using TensorOperations
 RLorCX = Union{Float64, ComplexF64}
@@ -38,5 +39,6 @@ export mps2ketstate
 export ketstate2imps
 
 export xxz_mpo
+export qitf_mpo
 
 end

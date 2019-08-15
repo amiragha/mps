@@ -52,6 +52,39 @@ function xxz_mpo(T::DataType, lx::Int64, d::Int64, delta::Float64=1.0) #where {T
     MatrixProductOperator{T}(lx, d, dims, tensors)
 end
 
+function qitf_mpo(T::DataType, lx::Int64, d::Int64,
+                  g::Float64=1.0, J::Float64=-1.0) #where {T<:RLorCX}
+
+    Sp = T[0.  1.; 0.  0.]
+    Sm = T[0.  0.; 1.  0.]
+    Sz = T[1.  0.; 0. -1]
+    Sx = Sp + Sm
+    I2 = Matrix{T}(I, 2, 2)
+
+    mat = zeros(T, 3, d, 3, d)
+    mat[1,:,1,:] = I2
+    mat[2,:,1,:] = J * Sz
+    mat[3,:,1,:] = g * Sx
+
+    mat[3,:,2,:] = Sz
+    mat[3,:,3,:] = I2
+
+    tensors = Array{T,4}[]
+    dims = zeros(Int64, lx+1)
+
+    dims[1] = 1
+    push!(tensors, mat[3:3,:,:,:])
+    dims[2] = 3
+    for site=2:lx-1
+        push!(tensors, mat)
+        dims[site+1] = 3
+    end
+    push!(tensors, mat[:,:,1:1,:])
+    dims[lx+1] = 1
+
+    MatrixProductOperator{T}(lx, d, dims, tensors)
+end
+
 function j1j2_mpo(Lx::Int64, j1::T, j2::T, d::Int64=2) where {T<:RLorCX}
     Id = Matrix{T}(I, d, d)
     mat = zeros(T, 8, d, 8, d)
