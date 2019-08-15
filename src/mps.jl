@@ -1,10 +1,3 @@
-function svdtrunc(A::Matrix{T}; maxdim::Int=200, tol::Float64=1.e-8) where{T<:Number}
-    fact = svd(A, full=false)
-    n = min(maxdim, sum(fact.S .> fact.S[1]*tol))
-
-    fact.U[:, 1:n], Diagonal(fact.S[1:n]), fact.Vt[1:n, :]
-end
-
 """
 
 `lx` is the length of the MPS or the number of sites.  `d` is the
@@ -447,6 +440,32 @@ function measure_mpo(mps::MatrixProductState{T},
             ten[lm, d, rm, d'] * conj(mat)[ld,d,rd]
     end
     left[1,1,1]
+end
+
+"""
+    entanglemententropy(A)
+
+Measure the entanglement entropy for an MPS at a given cut `l` or if
+ommited at every bond of the MPS.
+
+"""
+function entanglemententropy(mps::MatrixProductState{T};
+                             alpha::Int=1) where{T}
+
+    result = Vector{Float64}(undef, mps.lx-1)
+    move_center!(mps, 1)
+    A = mps.matrices[1]
+
+    for l = 1:mps.lx-1
+        U, S, Vt = svd(reshape(A, size(A, 1)*size(A,2), size(A,3)))
+        mps.matrices[l] = reshape(U, size(mat))
+        result[l] = entropy(S, alpha=alpha)
+        @tensor A[l,o,r] := (S*Vt)[l,m] * mps.matrices[l+1][m,o,r]
+    end
+
+    mps.matrices[lx] = mat
+    mps.center = lx
+    return
 end
 
 
