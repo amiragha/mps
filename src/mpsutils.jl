@@ -1,3 +1,7 @@
+randisometry(T, d1, d2; rng::AbstractRNG=GLOBAL_RNG) =
+    d1 >= d2 ? Matrix(qr!(randn(rng, T, d1, d2)).Q) : Matrix(lq!(randn(rng, T, d1, d2)).Q)
+randisometry(d1, d2; rng=rng) = randisometry(Float64, d1, d2, rng=rng)
+
 """
     svdtrunc(A [;maxdim, tol])
 

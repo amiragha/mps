@@ -98,10 +98,6 @@ function MatrixProductState(lx::Int64, d::Int64,
     return MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
 
-randisometry(T, d1, d2; rng::AbstractRNG=GLOBAL_RNG) =
-    d1 >= d2 ? Matrix(qr!(randn(rng, T, d1, d2)).Q) : Matrix(lq!(randn(rng, T, d1, d2)).Q)
-randisometry(d1, d2; rng=rng) = randisometry(Float64, d1, d2, rng=rng)
-
 function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int;
                  rng::AbstractRNG=GLOBAL_RNG)
     dims = Vector{Int}(undef, lx+1)
