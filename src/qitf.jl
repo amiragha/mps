@@ -38,3 +38,8 @@ function qitf_bondtensor(g::Float64=1.0, J::Float64=-1.0)
     bond_term = Matrix(J * kron(sz, sz) + g/2. * (kron(sx, I2) + kron(I2, sx)))
     return reshape(bond_term, 2,2,2,2)
 end
+
+function qitf_energy_exact(g::Float64=1.0, J::Float64=-1.0)
+        e_exact, e_exact_err = quadgk(k -> -sqrt(1+g^2-2*g*cos(k))/pi, 0, pi)
+    e_exact
+end

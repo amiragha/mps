@@ -3,6 +3,7 @@ module ExactDiagonalizationTools
 using LinearAlgebra
 using SparseArrays
 using SymTensors
+using QuadGK
 RLorCX = Union{Float64, ComplexF64}
 
 include("spin_definitions.jl")
@@ -16,6 +17,7 @@ export sz_half_U1sym
 
 export xxz_hamiltonian
 export qitf_hamiltonian, qitf_bondtensor
+export qitf_energy_exact
 export hopping_chain
 export correlationmatrix
 
