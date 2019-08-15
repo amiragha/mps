@@ -105,11 +105,12 @@ function MatrixProductState(lx::Int64, d::Int64,
     return MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
 
-randisometry(T, d1, d2) =
-    d1 >= d2 ? Matrix(qr!(randn(T, d1, d2)).Q) : Matrix(lq!(randn(T, d1, d2)).Q)
-randisometry(d1, d2) = randisometry(Float64, d1, d2)
+randisometry(T, d1, d2; rng::AbstractRNG=GLOBAL_RNG) =
+    d1 >= d2 ? Matrix(qr!(randn(rng, T, d1, d2)).Q) : Matrix(lq!(randn(rng, T, d1, d2)).Q)
+randisometry(d1, d2; rng=rng) = randisometry(Float64, d1, d2, rng=rng)
 
-function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int)
+function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int;
+                 rng::AbstractRNG=GLOBAL_RNG)
     dims = Vector{Int}(undef, lx+1)
     dims[1] = 1
     dims[lx+1] = 1
@@ -127,7 +128,7 @@ function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int)
     for l = 1:lx
         Dr = dims[l+1]
         Dl = dims[l]
-        matrices[l] = reshape(randisometry(T, Dl, d*Dr), Dl, d, Dr)
+        matrices[l] = reshape(randisometry(T, Dl, d*Dr, rng=rng), Dl, d, Dr)
     end
     return MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
