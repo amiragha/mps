@@ -92,6 +92,7 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
 
         ##NOTE: the matrix function here is needed to return the thin Q!
         Q = transpose(Matrix(Q))
+        Λ = transpose(Λ)
 
         mps.matrices[l+1] = reshape(Q, size(mat))
         env[l+2] = _dmrgupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
