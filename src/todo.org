@@ -3,8 +3,9 @@
    - [-] lots of test need to be written! (by someone)
 
 ** idmrg and dmrg stuff
-   - [-]  Best method for arnoldi and lanczos algorithms to make the process
-     as seemlessly as possible
+   - [-]  Best method for arnoldi and lanczos algorithms to make the
+     process as seemlessly as possible (done with KrylovKit for now!
+     but explore and test other choices)
 
    - [-] code algorithm such as TDVP, etc. at least the general case
      for undestanding and possible comparisons for later
@@ -20,3 +21,19 @@
 
    - [-] how would the symmetry and charges play out in the case of
      infinte algorithms like iDMRG
+
+** cools stuff
+   - [-] code a general Model class so that you can use it to define
+     models, what is the best approach and how can you make it better!
+
+   - [-] MPO generator! This is very important.
+
+** performance
+   - [-] Read and think about Julia parallelization!
+   - [-] performance improvements in getindex, etc ... using modifiers!
+
+** General clean-ups
+   - [-] name change and move all application operators for dmrg and
+     related algorithms to some file for example "mpsapply.jl"
+
+** Fix complex real issues in a systematic fashion. HOW?
