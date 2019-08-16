@@ -31,6 +31,7 @@ export measure_bond
 export half_measurement_index
 export measure_mpo
 export apply_2siteoperator!
+export apply_1siteoperator!
 export twosite_tensor
 export overlap, norm2
 export display_matrices

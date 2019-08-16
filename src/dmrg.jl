@@ -17,6 +17,10 @@ function initialenv(mps::MatrixProductState{T},
     return env
 end
 
+function initialenv(mps::MatrixProductState{ComplexF64},
+                    mpo::MatrixProductOperator{Float64})
+    initialenv(mps, convert(MatrixProductOperator{ComplexF64}, mpo))
+end
 """
     dmrg1sitesweep!(mps, mpo, env, maxdim [; verbose])
 
@@ -84,17 +88,6 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
     mps.matrices[1] = mat
 
     return e
-end
-
-function _dmrg2sitematvec(v,
-                          envL::Array{T,3},
-                          envR::Array{T,3},
-                          hmpoL::Array{T,4},
-                          hmpoR::Array{T,4}) where {T<:Number}
-
-    @tensor v[l,o1,o2,r] := (((envL[l',ml,l] * v[l',o1',o2',r']) *
-                              hmpoL[ml,o1,mm,o1']) * hmpoR[mm,o2,mr,o2']) * envR[r',mr,r]
-    v
 end
 
 """

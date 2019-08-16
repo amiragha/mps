@@ -330,6 +330,13 @@ function measure_1point(mps::MatrixProductState{T},
     result
 end
 
+## TODO: make these conversions more general -- learn more about the type system
+function measure_1point(mps::MatrixProductState{ComplexF64},
+                        op::Matrix{Float64})
+
+    measure_1point(mps, convert(Matrix{ComplexF64}, op))
+end
+
 """
     measure_2point(mps, op1, op2, site1, site2)
 
@@ -564,11 +571,11 @@ end
 
 function apply_2siteoperator!(mps      ::MatrixProductState{ComplexF64},
                               l        ::Int64,
-                              operator ::Array{Float64, 4};
+                              op ::Array{Float64, 4};
                               max_dim  ::Int64=mps.dims[l+1],
                               push_to  ::Symbol=:R)
 
-    apply_2siteoperator!(mps, l, convert(Array{ComplexF64, 4}, operator),
+    apply_2siteoperator!(mps, l, convert(Array{ComplexF64, 4}, op),
                          max_dim, push_to)
 end
 
@@ -577,6 +584,28 @@ function twosite_tensor(op1::Matrix{T}, op2::Matrix{T}) where {T<:RLorCX}
     c, d = size(op2)
     @assert a == b && c == d
     permutedims(reshape(kron(op1, op2),a,c,a,c), [1,2,4,3])
+end
+
+"""
+    apply_1siteoperator!(mps, l, op)
+
+applies the `op` which is `d x d` tensor to site `l` of the `mps`. The
+order of indeces are bottom, top.
+
+"""
+function apply_1siteoperator!(mps      ::MatrixProductState{T},
+                              l        ::Int64,
+                              op       ::Matrix{T}) where {T<:RLorCX}
+
+    @assert 0 < l <= mps.lx
+
+    d = mps.d
+    move_center!(mps, l)
+    A = mps.matrices[l]
+    @tensor A[l,o,r] := A[l,o',r] * op[o,o']
+    mps.matrices[l] = A
+
+    nothing
 end
 
 ### Multi-MPS functions

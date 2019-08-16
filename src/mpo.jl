@@ -64,7 +64,7 @@ function qitf_mpo(T::DataType, lx::Int64, d::Int64,
     mat = zeros(T, 3, d, 3, d)
     mat[1,:,1,:] = I2
     mat[2,:,1,:] = J * Sz
-    mat[3,:,1,:] = g * Sx
+    mat[3,:,1,:] = g/2. * Sx
 
     mat[3,:,2,:] = Sz
     mat[3,:,3,:] = I2
@@ -120,4 +120,13 @@ function j1j2_mpo(Lx::Int64, j1::T, j2::T, d::Int64=2) where {T<:RLorCX}
     dims[lx+1] = 1
 
     return MatrixProductOperator{T}(lx, d, dims, tensors)
+end
+
+### conversions
+###############
+
+function convert(::Type{MatrixProductOperator{ComplexF64}},
+                 mpo::MatrixProductOperator{Float64})
+    MatrixProductOperator{ComplexF64}(mpo.lx, mpo.d, mpo.dims,
+                                      convert(Vector{Array{ComplexF64,4}}, mpo.tensors))
 end

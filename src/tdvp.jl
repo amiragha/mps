@@ -14,6 +14,10 @@ function tdvp1sitesweep!(dt::Float64,
                          mpo::MatrixProductOperator{T},
                          env::Vector{Array{T, 3}};
                          verbose::Bool=false) where {T<:Number}
+
+    if !(T <: Complex)
+        error("TDVP only accpets complex MPSs. Convert first!")
+    end
     lx = mps.lx
     d = mps.d
 
@@ -25,7 +29,7 @@ function tdvp1sitesweep!(dt::Float64,
     for l = 1:lx-1
         # forward evolution of mps at site l
         A, info = exponentiate(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
-                               -im*dt, mat, ishermitian=true)
+                               -im*dt, A, ishermitian=true)
 
         if verbose
             e = dot(A, _dmrg1sitematvec(A, env[l], env[l+2], mpo.tensors[l]))
@@ -45,12 +49,12 @@ function tdvp1sitesweep!(dt::Float64,
             println("Sweep L2R: Λ between  site $l and $(l+1) -> energy $e")
         end
 
-        @tensor A[l,o,r] := Λ[l,r] * maps.matrices[l+1][m,o,r]
+        @tensor A[l,o,r] := Λ[l,m] * mps.matrices[l+1][m,o,r]
     end
 
-    l = N
+    l = lx
     A, info = exponentiate(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
-                           -im*dt, mat, ishermitian=true)
+                           -im*dt, A, ishermitian=true)
 
     if verbose
         e = dot(A, _dmrg1sitematvec(A, env[l], env[l+2], mpo.tensors[l]))
@@ -58,11 +62,11 @@ function tdvp1sitesweep!(dt::Float64,
     end
 
     for l = lx-1:-1:1
-        Q, Λ = qr(transpose(A, size(A, 1), size(A,2)*size(A,3)))
-        Λ = transpose(Λ)
+        Q, Λ = qr(transpose(reshape(A, size(A, 1), size(A,2)*size(A,3))))
+        Λ = Matrix(transpose(Λ))
 
         mps.matrices[l+1] = reshape(transpose(Matrix(Q)), size(A))
-        env[l+2] = _dmrgupdateleft(env[l+1], mps.matrices[l+1], mpo.tensors[l+1])
+        env[l+2] = _dmrgupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
         # backward evolution of Λ
         Λ, info = exponentiate(v->_applymps0site(v, env[l+1], env[l+2]),
@@ -75,7 +79,7 @@ function tdvp1sitesweep!(dt::Float64,
         @tensor A[l,o,r] := mps.matrices[l][l,o,m] * Λ[m,r]
 
         # forward evolution of mps at site l
-        A, info = exponentiate(v->_dmrg1sitematvec(v, env[l], env[l+2], mps.tensors[l]),
+        A, info = exponentiate(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
                                -im*dt, A; ishermitian = true)
 
         if verbose
