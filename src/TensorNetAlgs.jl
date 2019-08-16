@@ -8,6 +8,7 @@ using KrylovKit
 #using SparseArrays
 RLorCX = Union{Float64, ComplexF64}
 
+include("apply.jl")
 include("dmrg.jl")
 include("idmrg.jl")
 include("tdvp.jl")

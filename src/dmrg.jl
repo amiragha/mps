@@ -1,29 +1,3 @@
-function _dmrgupdateright(renv::Array{T, 3},
-                          mat::Array{T, 3},
-                          hmpo::Array{T,4}) where {T<:Number}
-    @tensor R[u,m,d] :=
-        ((renv[u',m',d'] * mat[u,o,u']) * hmpo[m,o',m',o]) * conj(mat)[d,o',d']
-    R
-end
-
-function _dmrgupdateleft(lenv::Array{T, 3},
-                         mat::Array{T, 3},
-                         hmpo::Array{T,4}) where {T<:Number}
-    @tensor L[u,m,d] :=
-        ((lenv[u',m',d'] * mat[u',o,u]) * hmpo[m',o',m,o]) * conj(mat)[d',o',d]
-    L
-end
-
-function _dmrg1sitematvec(v,
-                          envL::Array{T,3},
-                          envR::Array{T,3},
-                          hmpo::Array{T,4}) where {T<:Number}
-
-    @tensor v[l,o,r] := ((envL[l',ml,l] * v[l',o',r']) *
-                         hmpo[ml,o,mr,o']) * envR[r',mr,r]
-    v
-end
-
 """
     initialenv(mps, mpo)
 
@@ -78,8 +52,9 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
         mps.matrices[l] = reshape(Matrix(Q), size(mat))
         env[l+1] = _dmrgupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
 
-        @tensor mat[-1,-2,-3] := Λ[-1,1] * mps.matrices[l+1][1,-2,-3]
+        @tensor mat[l,o,r] := Λ[l,r] * mps.matrices[l+1][m,o,r]
     end
+
     l = lx
     es, vs, info = eigsolve(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
                             mat, 1, :SR, ishermitian=true)
