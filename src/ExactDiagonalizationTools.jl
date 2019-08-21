@@ -18,6 +18,8 @@ include("correlationmatrix.jl")
 
 export sz_half, sp_half, sm_half
 export sz_half_U1sym
+export sp_half_U1sym
+export sm_half_U1sym
 export spinoperators
 
 export KetState
