@@ -25,6 +25,20 @@ const sm_half = sparse(Float64[ 0 0; 1  0])
 const I2 = eye(2)
 
 # U1 symmetric spin_half
-const sz_half_U1sym = SymTensor(0, (STLeg(+1, [0, 1], [1, 1]), STLeg(-1, [0, 1], [1, 1])),
+const sz_half_U1sym = SymTensor(0,
+                                (STLeg(+1, [0, 1], [1, 1]),
+                                 STLeg(-1, [0, 1], [1, 1])),
                                 [(0, 0), (1, 1)],
                                 [-.5*ones(1,1), .5*ones(1,1)])
+
+const sp_half_U1sym = SymTensor(+1,
+                                (STLeg(+1, [0, 1], [1, 1]),
+                                 STLeg(-1, [0, 1], [1, 1])),
+                                [(1, 0)],
+                                [ones(1,1)])
+
+const sm_half_U1sym = SymTensor(-1,
+                                (STLeg(+1, [0, 1], [1, 1]),
+                                 STLeg(-1, [0, 1], [1, 1])),
+                                [(1, 0)],
+                                [ones(1,1)])
