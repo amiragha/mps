@@ -31,6 +31,7 @@
 ** performance
    - [-] Read and think about Julia parallelization!
    - [-] performance improvements in getindex, etc ... using modifiers!
+   - [-] compare different approached in making Hamiltonians for ED2imps
 
 ** General clean-ups
    - [-] name change and move all application operators for dmrg and

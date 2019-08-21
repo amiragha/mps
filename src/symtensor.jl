@@ -1,68 +1,3 @@
-mutable struct FusedCharge{N}
-    charge :: Int # total charge
-    dim :: Int # total dimension
-    #signs :: NTuple{N, Int}
-    pats :: Dict{NTuple{N, Int}, UnitRange{Int}} # patterns and positions
-
-    function FusedCharge(charge, dim, pats::Dict{NTuple{N, Int}, UnitRange{Int}}) where {N}
-        all(sum.(keys(pats)) .== charge) || error("oops", pats, charge)
-        #all(abs.(signs) .== 1) || error("oops")
-        new{N}(charge, dim, pats)
-    end
-end
-
-# struct DefusedCharge{N}
-#     charge :: Int
-#     dim :: Int
-
-# end
-struct STLeg
-    sign :: Int    # +1 for ket (ingoing) or -1 for bra (outgoing)
-    chrs :: Vector{Int}    # set of possible charges
-    dims :: Vector{Int}    # set of dimensions for possible charges
-
-    function STLeg(sign, chrs, dims)
-        abs(sign) == 1 || error("unacceptable sign : ", sign)
-        all(dims .> 0) || error("space dimensions can only be positive!")
-        length(chrs) == length(dims) ||
-            error("Number of charges and dimensions don't match!")
-        issorted(chrs) || error("charges are not sorted")
-        new(sign, chrs, dims)
-    end
-end
-
-function isequal(l1::STLeg, l2::STLeg)
-    l1.sign == l2.sign && l1.chrs == l2.chrs && l1.dims == l2.dims
-end
-
-==(l1::STLeg, l2::STLeg) = isequal(l1, l2)
-
-# This function assumes that charge definitely exists!
-function getdim(leg::STLeg, charge::Int)
-    leg.dims[searchsortedfirst(leg.chrs, charge)]
-end
-
-@inline charges(legs::NTuple{N, STLeg}) where {N} =
-    Tuple(legs[n].chrs for n in eachindex(legs))
-
-@inline signs(legs::NTuple{N, STLeg}) where {N} =
-    Tuple(legs[n].sign for n in eachindex(legs))
-
-@inline alldims(legs::NTuple{N, STLeg}) where {N} =
-    Tuple(legs[n].dims for n in eachindex(legs))
-
-@inline accdims(legs::NTuple{N, STLeg}) where {N} =
-    Tuple(cumsum(legs[n].dims) for n in eachindex(legs))
-
-@inline fulldims(leg::STLeg) = sum(leg.dims)
-@inline fulldims(legs::NTuple{N, STLeg}) where {N} =
-    prod([fulldims(legs[n]) for n in eachindex(legs)])
-
-function change_sign(leg::STLeg)
-    perm = sortperm(leg.chrs, by=x -> -x)
-    STLeg(-leg.sign, -1 .*(leg.chrs[perm]), leg.dims[perm])
-end
-
 struct SymTensor{Tv<:Number, N}
     charge :: Int     # total charge of the tensor
     legs :: NTuple{N, STLeg}
@@ -74,13 +9,16 @@ struct SymTensor{Tv<:Number, N}
                        sects::Vector{NTuple{N, Int}},
                        nzblks::Vector{<:AbstractArray{Tv, N}}) where{Tv<:Number, N}
         issorted(sects, lt=_sector_less_than) ||  error("sectors not sorted!")
-        legs = _trimlegs(legs, sects)
+        #legs = _trimlegs(legs, sects)
         new{Tv, N}(charge, legs, sects, nzblks)
     end
 end
 
 const SymMatrix{Tv} = SymTensor{Tv, 2} where {Tv<:Number}
 @inline numoflegs(s::SymTensor{Tv, N}) where{Tv<:Number, N} = N
+
+@inline size(s::SymTensor) = Tuple(fulldims(l) for l in s.legs)
+@inline size(s::SymTensor, l::Int) = fulldims(s.legs[l])
 
 #struct SymDiagonal{Tv} =
 """
@@ -92,14 +30,14 @@ sector. Find the dimensions from that.
 """
 function SymTensor(signs::NTuple{N, Int},
                    sector::NTuple{N, Int},
-                   nzblock::Array{Tv, N},
-                   charge::Int=0) where {Tv<:Number, N}
+                   nzblock::Array{Tv, N}) where {Tv<:Number, N}
 
     chrs = [0, 1]
+    charge = sum(signs .* sector)
     _sector_is_allowed(charge, signs, sector) ||
         error("sector is not allowed ", sector)
     legs = STLeg[]
-    legs = Tuple([STLeg(signs[n], sector[n], size(nzblock, n))
+    legs = Tuple([STLeg(signs[n], [sector[n]], [size(nzblock, n)])
                   for n in eachindex(sector)])
     SymTensor(charge, Tuple(legs), [sector], [nzblock])
 end
@@ -127,6 +65,11 @@ function _trimlegs(legs::NTuple{N, STLeg}, sects::Vector{NTuple{N, Int}}) where{
     # println(legs)
     # println(trimmedlegs)
     Tuple(trimmedlegs)
+end
+
+function convert(::Type{SymTensor{ComplexF64, N}},
+                 A::SymTensor{Float64, N}) where {N}
+    SymTensor(A.charge, A.legs, A.sects, convert.(Array{ComplexF64, N}, A.nzblks))
 end
 
 """
@@ -225,6 +168,24 @@ function fillSymTensor(value::Tv, charge::Int, legs::NTuple{N, STLeg}) where{Tv<
     SymTensor(charge, legs, sects, nzblks)
 end
 
+function eye(Tv::Type,
+             charge::Int,
+             chrs::Vector{Int},
+             dims::Vector{Int})
+    l1 = STLeg(+1, chrs, dims)
+    l2 = STLeg(-1, chrs.-charge, dims)
+    sects = Tuple{Int, Int}[]
+    nzblks = Matrix{Tv}[]
+    pats, patdims = _possible_fuse_patterns(charge, (l1,l2))
+    perm = _sectors_sortperm(pats)
+    pats, patdims = pats[perm], patdims[perm]
+    for patidx in eachindex(pats)
+        push!(sects, pats[patidx])
+        push!(nzblks, Matrix{Tv}(I, patdims[patidx]...))
+    end
+    SymTensor(charge, (l1,l2), sects, nzblks)
+end
+
 function isequal(sten1::SymTensor{Tv, N}, sten2::SymTensor{Tv, N}) where{Tv<:Number, N}
     sten1.charge == sten2.charge && sten1.legs == sten2.legs &&
         sten1.sects == sten2.sects && sten1.nzblks == sten2.nzblks
@@ -235,8 +196,8 @@ end
 @inline _sector_is_allowed(total::Int, signs::NTuple{N}, sector::NTuple{N, Int}) where {N} =
     sum(signs .* sector) == total
 
-@inline size(sten::SymTensor) =
-    Tuple(sum(sten.legs[n].dims) for n in eachindex(sten.legs))
+# @inline size(sten::SymTensor) =
+#     Tuple(sum(sten.legs[n].dims) for n in eachindex(sten.legs))
 
 
 # we always sort sectors based on charges (ignore signs)
@@ -266,6 +227,29 @@ end
 function conj(sten::SymTensor{Tv}) where {Tv<:Number}
     SymTensor(sten.charge, sten.legs, sten.sects,
               [conj(blk) for blk in sten.nzblks])
+end
+
+function change_nzblk!(sten::SymTensor{Tv, N},
+                       sect::NTuple{N, Int},
+                       nzblk::Array{Tv, N}) where {Tv<:Number, N}
+
+    # should I use a different search fn?
+    index, = searchsorted(sten.sects, sect, lt=_sector_less_than)
+    length(index) == 0 && error("sector not found!")
+
+    size(nzblk) != size(sten.nzblks[index]) &&
+        error("non-zero block size doesn't match",
+              size(nzblk), " == ", size(sten.nzblks[index]))
+
+    sten.nzblks[index] = nzblk
+    nothing
+end
+
+function mapcharges(f::Function, A::SymTensor{Tv, N}) where{Tv<:Number, N}
+    SymTensor(f(A.charge),
+              mapcharges.(f, A.legs),
+              [f.(s) for s in A.sects],
+              A.nzblks)
 end
 
 function array_representation(sten::SymTensor{Tv}) where {Tv<:Number}

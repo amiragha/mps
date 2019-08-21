@@ -1,6 +1,7 @@
 module GutzwillerMPS
 
 using MatrixProductStateTools
+using SymTensors
 using LinearAlgebra
 using TensorOperations
 

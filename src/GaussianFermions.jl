@@ -1,6 +1,7 @@
 module GaussianFermions
 
 using MatrixProductStateTools
+using SymTensors
 using LinearAlgebra
 
 RLorCX = Union{Float64, ComplexF64}

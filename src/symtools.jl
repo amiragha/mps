@@ -1,5 +1,7 @@
-function svdsym(smat::SymMatrix{Tv}) where {Tv<:Number}
+function svdsym(smat::SymMatrix{Tv}; debug::Bool=false) where {Tv<:Number}
     @assert signs(smat.legs) == (+1, -1)
+
+    debug && println(smat)
 
     sects_U = Tuple{Int, Int}[]
     nzblks_U = Matrix{Tv}[]
@@ -24,10 +26,20 @@ function svdsym(smat::SymMatrix{Tv}) where {Tv<:Number}
         push!(middle_dims, length(fact.S))
     end
 
-    Uleg2 = STLeg(-1, smat.legs[1].chrs, middle_dims)
-    Sleg1 = STLeg(+1, smat.legs[1].chrs, middle_dims)
-    Sleg2 = STLeg(-1, smat.legs[2].chrs, middle_dims)
-    Vtleg1 = STLeg(+1, smat.legs[2].chrs, middle_dims)
+    ls, rs = zip(sects_S...)
+    lchrs = [ls...]
+    rchrs = [rs...]
+
+    if debug
+        println(middle_dims)
+        println(lchrs)
+        println(rchrs)
+    end
+
+    Uleg2 = STLeg(-1, lchrs, middle_dims)
+    Sleg1 = STLeg(+1, lchrs, middle_dims)
+    Sleg2 = STLeg(-1, rchrs, middle_dims)
+    Vtleg1 = STLeg(+1, rchrs, middle_dims)
 
     U = SymTensor(0, (smat.legs[1], Uleg2), sects_U, nzblks_U)
     S = SymTensor(smat.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])

@@ -1,16 +1,30 @@
 @testset "fuse, defuse" begin
 
-    legs = STLeg(+1, [0,1], [2,3]), STLeg(+1, [0,1], [1,1]), STLeg(-1, [0,1], [3,4])
+    @testset "generic" begin
+        legs = STLeg(+1, [0,1], [2,3]), STLeg(+1, [0,1], [1,1]), STLeg(-1, [0,1], [3,4])
 
-    sects = [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0)]
-    nzblks = [rand(1:9, 2,1,3), rand(1:9, 2,1,4), rand(1:9, 3,1,4), rand(1:9, 3,1,3)]
+        sects = [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0)]
+        nzblks = [rand(1:9, 2,1,3), rand(1:9, 2,1,4), rand(1:9, 3,1,4), rand(1:9, 3,1,3)]
 
-    perm = _sectors_sortperm(sects)
+        perm = _sectors_sortperm(sects)
 
-    test = SymTensor(0, legs, sects[perm], nzblks[perm])
-    ftest = fuse_conseqlegs(test, +1, 1, 2)
-    dftest = defuse_leg(ftest, 1, legs[1:2])
-    @test dftest == test
+        test = SymTensor(0, legs, sects[perm], nzblks[perm])
+        ftest = fuselegs(test, +1, 1, 2)
+        dftest = defuse_leg(ftest, 1, legs[1:2])
+        @test dftest == test
+    end
+
+    @testset "2siteop s=1/2" begin
+        smat = eye(Float64, 0, [0,1,2], [1,2,1])
+        change_nzblk!(smat, (1,1), [2. 3;4 5])
+        rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
+        clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
+        smat2 = defuse_leg(defuse_leg(smat, 2, clegs), 1, rlegs)
+        @test smat2.sects == [(0,0,0,0), (1,0,1,0), (0,1,1,0),
+                              (1,0,0,1), (0,1,0,1), (1,1,1,1)]
+        i = ones(1,1,1,1)
+        @test smat2.nzblks == [i,2*i, 4*i, 3*i, 5*i, 1*i]
+    end
 end
 
 @testset "contract" begin

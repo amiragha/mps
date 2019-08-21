@@ -1,25 +1,37 @@
 mutable struct SymMatrixProductState{Tv<:RLorCX}
-    lx       :: Int64
-    d        :: Int64
-    dims     :: Vector{Int64}
+    lx       :: Int
+    d        :: Int
+    dims     :: Vector{Int}
     matrices :: Vector{SymTensor{Tv, 3}}
     center   :: Int64
 end
 
 # constructor with intial configuration vector
-function SymMatrixProductState{Tv}(lx::Int64,
-                                   initconf::Vector{Int64}) where{Tv<:RLorCX}
+function SymMatrixProductState{Tv}(lx::Int,
+                                   d::Int, initconf::Vector{Int}) where{Tv<:RLorCX}
     @assert all((0 .<= initconf) .& (initconf .< 2))
     matrices = SymTensor{Tv,3}[]
     lchr = 0    # lchr is the "left charge"
+    #legex = STLeg(+1, [0], [1])
     for site=1:lx
+        legl = STLeg(+1, [lchr], [1])
+        #legl = STLeg(-1, collect(0:lchr+1), [zeros(Int, lchr+1)...,1])
+        legd = STLeg(+1, [0, 1], [1,1])
         if initconf[site] == 0
-            push!(matrices, SymTensor((+1,+1,-1), (lchr,0,lchr), ones(Tv,1,1,1)))
+            legr = STLeg(-1, [lchr], [1])
+            #A = fillSymTensor(one(Tv), 0, (legex,legd,legl))
+            A = fillSymTensor(one(Tv), 0, (legl,legd,legr))
+            #change_nzblk!(A, (lchr,0,lchr), ones(Tv,1,1,1))
+            push!(matrices, A)
         else
-            newlchr = lchr + 1
-            push!(matrices, SymTensor((+1,+1,-1), (lchr,1,newlchr), ones(Tv,1,1,1)))
-            lchr = newlchr
+            legr = STLeg(-1, [lchr+1], [1])
+            #A = fillSymTensor(one(Tv), 0, (legex,legd,legl))
+            A = fillSymTensor(one(Tv), 0, (legl,legd,legr))
+            #change_nzblk!(A, (lchr,0,lchr+1), ones(Tv,1,1,1))
+            push!(matrices, A)
+            lchr += 1
         end
+        #legex = STLeg(+1, legl.chrs, legl.dims)
     end
     dims = ones(Int64, lx+1)
     #canonicalize_at!(matrices, lx)
@@ -62,7 +74,7 @@ function SymMatrixProductState(lx::Int64, d::Int64,
         charge_range = min(charge, lx-ℓ):-1:max(0, charge-ℓ)
         smleg_ℓ = STLeg(-1, -1*charge_range, [binomial(lx-ℓ, c) for c in charge_range])
         legs = (STLeg(1, [0, 1], [1, 1]), smleg_ℓ)
-        statematrix = fuse_conseqlegs(defuse_leg(S*Vt, 2, legs), 1, 1, 2)
+        statematrix = fuselegs(defuse_leg(S*Vt, 2, legs), 1, 1, 2)
         U, S, Vt = svdsym(statematrix)
         dims[ℓ+1] = fulldims(U.legs[2])
 
@@ -87,9 +99,9 @@ function isometrize_push_right!(matrices::Vector{SymTensor{Tv, 3}},
                                 svtruncation::Bool=false) where {Tv<:RLorCX}
     lx = length(matrices)
     if site < lx
-        a = matrices[site]
-        dims = size(a)
-        U, S, Vt = svdsym(fuse_conseqlegs(a, +1, 1, 2))
+        A = matrices[site]
+        dims = size(A)
+        U, S, Vt = svdsym(fuselegs(A, +1, 1, 2))
 
         if svtruncation
             ## TODO
@@ -100,7 +112,7 @@ function isometrize_push_right!(matrices::Vector{SymTensor{Tv, 3}},
             S, n, ratio = S, size(S)[1], 1.
         end
 
-        legs = a.legs[1:2]
+        legs = A.legs[1:2]
         matrices[site] = defuse_leg(U, 1, legs)
 
         matrices[site+1] = contract(S*Vt, (1, -1), matrices[site+1], (-1, 2, 3))
@@ -112,9 +124,9 @@ function isometrize_push_left!(matrices::Vector{SymTensor{Tv, 3}},
                                site::Int64;
                                svtruncation::Bool=false) where {Tv<:RLorCX}
     if site > 0
-        a = matrices[site]
-        dims = size(a)
-        U, S, Vt = svdsym(fuse_conseqlegs(a, -1, 2, 2))
+        A = matrices[site]
+        dims = size(A)
+        U, S, Vt = svdsym(fuselegs(A, -1, 2, 2))
 
         if svtruncation
             ### TODO
@@ -125,7 +137,7 @@ function isometrize_push_left!(matrices::Vector{SymTensor{Tv, 3}},
             S, n, ratio = S, size(S)[1], 1.
         end
 
-        legs = a.legs[2:3]
+        legs = A.legs[2:3]
         matrices[site] = defuse_leg(Vt, 2, legs)
 
         matrices[site-1] = contract(matrices[site-1], (1, 2, -1), U*S, (-1, 3))
@@ -257,7 +269,7 @@ function measure_2point(mps::SymMatrixProductState{Tv},
         for site=site1+1:lx-1
             mat = mps.matrices[site]
             v = contract(contract(contract(left, (-1, 1), invlegs(conj(mat)), (-1, 2, 3)),
-                              (1, -1, 3), op2, (-1, 2)),
+                                  (1, -1, 3), op2, (-1, 2)),
                          (-1,-2,-3), mat, (-1,-2,-3))
             push!(result, v)
             left = contract(contract(left, (-1, 1), invlegs(conj(mat)), (-1, 2, 3)),
@@ -270,4 +282,156 @@ function measure_2point(mps::SymMatrixProductState{Tv},
         push!(result,v)
     end
     result
+end
+
+function measure_2point(mps::SymMatrixProductState{ComplexF64},
+                        op1::SymTensor{Float64,2},
+                        op2::SymTensor{Float64,2}) where {Tv<:RLorCX}
+    measure_2point(mps,
+                   convert(SymTensor{ComplexF64, 2}, op1),
+                   convert(SymTensor{ComplexF64, 2}, op1))
+end
+
+"""
+    apply_2siteoperator!(mps, l, operator, maxdim, pushto)
+
+applies the `operator` which is `d x d x d x d` sym tensor to site `l`
+and `l+1` of the `mps`. The order of indeces start from the bottom
+left, bottom right, top left, top right. So the counterclockwise
+convention is not assumed here!
+
+The `maxdim` operator chooses the max possible size of dimension of
+the new mps at bond between `l` and `l+1`, The singular values are
+push to either left `:L` or right `:R` (default) matrices using the
+argument `pushto`.
+
+"""
+function apply_2siteoperator!(mps     ::SymMatrixProductState{Tv},
+                              l       ::Int,
+                              op      ::SymTensor{Tv, 4};
+                              maxdim  ::Int=mps.dims[l+1],
+                              pushto  ::Symbol=:R) where {Tv<:RLorCX}
+
+    #@assert mps_dims_are_consistent(mps)
+    @assert 0 < l < mps.lx
+
+    d = mps.d
+
+    if mps.center < l
+        move_center!(mps, l)
+    elseif mps.center > l+1
+        move_center!(mps, l+1)
+    end
+
+    one = mps.matrices[l]
+    two = mps.matrices[l+1]
+
+    dim_l = mps.dims[l]
+    dim_m = mps.dims[l+1]
+    dim_r = mps.dims[l+2]
+
+    #display(one)
+    #display(two)
+    RR = contract(one, (1,2,-1), two, (-1,3,4))
+    #display(RR)
+    #display(op)
+    R = contract(RR,
+                 (1,-1,-2,4), op, (2,3,-1,-2))
+
+    #display(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2))
+    U, S, Vt = svdtrunc(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2),
+                        maxdim=maxdim, tol=1.e-14)
+
+    mps.dims[l+1] = size(U, 2)
+
+    if (pushto == :R)
+        mps.matrices[l] = defuse_leg(U, 1, (R.legs[1], R.legs[2]))
+        mps.matrices[l+1] = defuse_leg(S * Vt, 2, (R.legs[3], R.legs[4]))
+        mps.center = l+1
+    elseif (pushto == :L)
+        mps.matrices[l] = defuse_leg(U * S, 1, (R.legs[1], R.legs[2]))
+        mps.matrices[l+1] = defuse_leg(Vt, 2, (R.legs[3], R.legs[4]))
+        mps.center = l
+    else
+        error("invalid push_to :", pushto)
+    end
+    nothing
+end
+
+function apply_2siteoperator!(mps      ::SymMatrixProductState{ComplexF64},
+                              l        ::Int64,
+                              op       ::SymTensor{Float64, 4};
+                              maxdim   ::Int64=mps.dims[l+1],
+                              pushto  ::Symbol=:R)
+
+    apply_2siteoperator!(mps, l, convert(SymTensor{ComplexF64, 4}, op),
+                         maxdim=maxdim, pushto=pushto)
+end
+
+"""
+    overlap(mps1, mps2)
+
+calculates the overlap between two matrix product states `mps1` and
+`mps2` that is to run the tensor contraction corresponding to
+``⟨ψ_2|ψ_1⟩``. Note that it is not divided by the norm of the two
+MPSs, so it returned value is the overlap of the two states multiplied
+by the norm of each.
+
+"""
+function overlap(mps1::SymMatrixProductState{Tv},
+                 mps2::SymMatrixProductState{Tv}) where {Tv<:RLorCX}
+
+    lx = mps1.lx
+    @assert mps1.d == mps2.d && mps2.lx == lx
+
+    A = mps1.matrices[1]
+    B = mps2.matrices[1]
+    L = contract(A, (-1, -2, 1), conj(invlegs(B)), (-1, -2, 2))
+
+    for l=2:lx-1
+        A = mps1.matrices[l]
+        B = mps2.matrices[l]
+        L = contract(contract(L, (-1, 1), A, (-1, 2, 3)),
+                     (-1,-2,1), conj(invlegs(B)), (-1,-2,2))
+    end
+    A = mps1.matrices[lx]
+    B = mps2.matrices[lx]
+    v = contract(contract(L, (-1, 1), A, (-1, 2, 3)),
+                 (-1,-2,-3), conj(invlegs(B)), (-1,-2,-3))
+    v
+end
+
+overlap(mps1::SymMatrixProductState{ComplexF64}, mps2::SymMatrixProductState{Float64}) =
+    overlap(mps1, convert(SymMatrixProductState{ComplexF64}, mps2))
+overlap(mps1::SymMatrixProductState{Float64}, mps2::SymMatrixProductState{ComplexF64}) =
+    overlap(convert(SymMatrixProductState{ComplexF64}, mps1), mps2)
+
+"""
+    norm2(mps)
+
+calculates the norm of a matrix product state `mps` that is to
+calculate the tensor contraction corresponding to ``⟨ψ|ψ⟩``.
+
+"""
+norm2(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX} =
+    real(overlap(mps, mps))
+
+
+"""
+    mps_dims_are_consistent(mps)
+
+check if are dimensions are consistent in an mps. This is made for
+testing and double checks; in principle all operations must not break
+the consistency of the bond dimensions of MPS.
+
+"""
+function mps_dims_are_consistent(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX}
+    for n=1:mps.lx-1
+        dim1 = size(mps.matrices[n], 3)
+        dim2 = size(mps.matrices[n+1], 1)
+        if dim1 != dim2 || dim1 != mps.dims[n+1]
+            return false
+        end
+    end
+    return size(mps.matrices[mps.lx], 3) == mps.dims[mps.lx+1]
 end

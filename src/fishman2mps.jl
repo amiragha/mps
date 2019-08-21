@@ -15,32 +15,74 @@ function fishman2mps(fsmset::FishmanGateSet,
                      maxdim::Int64;
                      symmetry::Symbol=:NONE)
 
+    ##TODO: why are these defined complex here?!
     if symmetry == :NONE
         mps = MatrixProductState{ComplexF64}(fsmset.lx, 2, fsmset.initconf)
-    elseif symmetry == :Z2
-        mps = MatrixProductState{ComplexF64}(fsmset.lx, 2, fsmset.initconf)
+        _applyfishmangates!(mps, fsmset, maxdim)
+
+    elseif symmetry == :U1
+        mps = SymMatrixProductState{ComplexF64}(fsmset.lx, 2, fsmset.initconf)
+        _applyfishmangates!(mps, fsmset, maxdim)
+    else
+        error( "Symmetry $symmetry is not defined!")
     end
+    mps
+end
 
+function _applyfishmangates!(mps::MatrixProductState{Tv},
+                             fsmset::FishmanGateSet,
+                             maxdim::Int) where{Tv}
     twobodyugate = Matrix{ComplexF64}(I, 4, 4)
-
     ## NOTE: the gates are applies in reverse order
     for n=length(fsmset.positions):-1:1
         site = fsmset.positions[n]
         θ = fsmset.θs[n]
-        twobodyugate[2:3, 2:3] =
-            [
-                cos(θ) sin(θ);
-                -sin(θ) cos(θ)
-            ]
+        twobodyugate[2:3, 2:3] = rotationmat(θ)
 
         ugatetensor = reshape(twobodyugate, 2, 2, 2, 2)
 
         # produce the counterclockwise convention starting from bottom left
+        ##NOTE: this is needed just because I followed the convention,
+        ##probably best to avoid id, but need to remain consistant
         operator = permutedims(ugatetensor, [1,2,4,3])
 
         ## TODO: choose a better order of site or site+1 and push_to!
         move_center!(mps, site)
         apply_2siteoperator!(mps, site, operator, maxdim=maxdim, pushto=:R)
     end
-    return mps
+    nothing
+end
+
+function _applyfishmangates!(mps::SymMatrixProductState{Tv},
+                             fsmset::FishmanGateSet,
+                             maxdim::Int) where{Tv}
+
+    # u is the two-body U gate matrix
+    u = eye(Float64, 0, [0,1,2], [1,2,1])
+
+    #   twobodyugate = Matrix{ComplexF64}(I, 4, 4)
+    ## NOTE: the gates are applies in reverse order
+    rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
+    clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
+
+    for n=length(fsmset.positions):-1:1
+        site = fsmset.positions[n]
+        θ = fsmset.θs[n]
+        change_nzblk!(u, (1,1), rotationmat(θ))
+
+        uten = defuse_leg(defuse_leg(u, 2, clegs), 1, rlegs)
+
+        ## TODO: choose a better order of site or site+1 and push_to!
+        move_center!(mps, site)
+        apply_2siteoperator!(mps, site, uten, maxdim=maxdim, pushto=:R)
+    end
+    nothing
+end
+
+function rotationmat(θ::Float64)
+    R = [
+        cos(θ) sin(θ);
+        -sin(θ) cos(θ)
+    ]
+    R
 end

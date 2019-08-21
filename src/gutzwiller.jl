@@ -88,3 +88,148 @@ function zipandgutzwiller!(mps1::MatrixProductState{T},
 
     return MatrixProductState{T}(lx, 2, dims, matrices, lx)
 end
+
+function zipandgutzwiller!(mps1::SymMatrixProductState{Tv},
+                           mps2::SymMatrixProductState{Tv};
+                           mode::Symbol=:B14,
+                           maxdim::Int64=200) where {Tv<:RLorCX}
+    if mode==:B14
+        return _zipandgutzwiller_B14!(mps1, mps2, maxdim=maxdim)
+    elseif mode==:F23
+        error("not fully functional yet!")
+    else
+        error("mode not defined : ", mode)
+    end
+end
+
+#bosonic version
+function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
+                                mps2::SymMatrixProductState{Tv};
+                                maxdim::Int64=200) where {Tv<:RLorCX}
+    @assert mps1.d == mps2.d == 2
+    lx = mps1.lx
+    @assert mps2.lx == lx
+
+    if mps1.center == 1
+        move_center!(mps1, 1)
+    end
+    if mps2.center == 1
+        move_center!(mps2, 1)
+    end
+
+    dims = ones(Int64, lx+1)
+    matrices = SymTensor{Tv, 3}[]
+
+    ## NOTE: in order to make the gutzwiller projector respect the U1
+    ## symmetry we need to do the follwoing. Assume that ↑↑
+    ## corresponds to ↑ or 2 and ↓↓ corresponds or ↓ or 0.
+    G = fillSymTensor(one(Tv), 0,
+                      (STLeg(+1, [0,2], [1,1]),
+                       STLeg(-1, [0,1], [1,1]),
+                       STLeg(-1, [0,1], [1,1])))
+
+    E = fillSymTensor(one(Tv), 0, (STLeg(+1, [0], [1]),
+                                   STLeg(-1, [0], [1]),
+                                   STLeg(-1, [0], [1])))
+    for l=1:lx-1
+        A = mps1.matrices[l]
+        B = mps2.matrices[l]
+
+        # diml1, dimr1 = size(mat1, 1), size(mat1, 3)
+        # diml2, dimr2 = size(mat2, 1), size(mat2, 3)
+        # dimle = size(E, 1)
+
+        ##NOTE:
+        # contracting (E2, A1)
+        # First tensor has EA = E1 E3 A2 A3
+        # contracting (A2, G2)
+        # Scond tensor has EAG = E1 E3 G1 A3 G3
+        # contracting (E3, B1) and (G3, B2)
+        # Final tensor has E1 G1 A3 B3
+        C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                              (1, 2, -1, 4), G, (3, -1, 5)),
+                     (1,-1, 2, 3,-2), B, (-1,-2, 4))
+
+
+        U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+        dims[l+1] = size(S, 1)
+        push!(matrices,
+              mapcharges(x->div(x,2),
+                                   defuse_leg(U, 1, (E.legs[1], G.legs[1]))))
+        E = defuse_leg(S * Vt, 2, (A.legs[3], B.legs[3]))
+    end
+    A = mps1.matrices[lx]
+    B = mps2.matrices[lx]
+    C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                          (1, 2, -1, 4), G, (3, -1, 5)),
+                 (1,-1, 2, 3,-2), B, (-1,-2, 4))
+
+    push!(matrices, mapcharges(x->div(x,2), fuselegs(C, -1, 3, 2)))
+
+    return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
+end
+
+#fermionic version (have to yet implement the minus sign and charge transform)
+function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
+                                mps2::SymMatrixProductState{Tv};
+                                maxdim::Int64=200) where {Tv<:RLorCX}
+    @assert mps1.d == mps2.d == 2
+    lx = mps1.lx
+    @assert mps2.lx == lx
+
+    if mps1.center == 1
+        move_center!(mps1, 1)
+    end
+    if mps2.center == 1
+        move_center!(mps2, 1)
+    end
+
+    dims = ones(Int64, lx+1)
+    matrices = SymTensor{Tv, 3}[]
+
+    ## NOTE: in order to make the gutzwiller projector respect the U1
+    ## symmetry we need to do the follwoing. Assume the first mps
+    ## corresponds to ↑ or 1 and second mps to ↓ or -1.
+    G = fillSymTensor(one(Tv), 0,
+                          (STLeg(+1, [-1,1], [1,1]),
+                           STLeg(+1, [0,1], [1,1]),
+                           STLeg(-1, [0,1], [1,1])))
+
+    E = fillSymTensor(one(Tv), 0, (STLeg(+1, [0], [1]),
+                                   STLeg(-1, [0], [1]),
+                                   STLeg(+1, [0], [1])))
+    for l=1:lx-1
+        A = mps1.matrices[l]
+        B = mps2.matrices[l]
+
+        # diml1, dimr1 = size(mat1, 1), size(mat1, 3)
+        # diml2, dimr2 = size(mat2, 1), size(mat2, 3)
+        # dimle = size(E, 1)
+
+        ##NOTE:
+        # contracting (E2, A1)
+        # First tensor has EA = E1 E3 A2 A3
+        # contracting (A2, G2)
+        # Scond tensor has EAG = E1 E3 G1 A3 G3
+        # contracting (E3, B1) and (G3, B2)
+        # Final tensor has E1 G1 A3 B3
+        C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                              (1, 2, -1, 4), G, (3, -1, 5)),
+                     (1,-1, 2, 3,-2), B, (-1,-2, 4))
+
+
+        U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+        dims[l+1] = size(S, 1)
+        push!(matrices, defuse_leg(U, 1, (E.legs[1], G.legs[1])))
+        E = defuse_leg(S * Vt, 2, (A.legs[3], B.legs[3]))
+    end
+    A = mps1.matrices[lx]
+    B = mps2.matrices[lx]
+    C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                          (1, 2, -1, 4), G, (3, -1, 5)),
+                 (1,-1, 2, 3,-2), B, (-1,-2, 4))
+
+    push!(matrices, fuselegs(C, -1, 3, 2))
+
+    return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
+end
