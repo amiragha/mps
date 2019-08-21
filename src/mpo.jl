@@ -1,4 +1,5 @@
 """
+    MatrixProductOperator
 
 `lx` is the length of the MPO or the number of sites.  `d` is the
 physical on-site dimension, `dims` is the dimenions of bonds, starting
