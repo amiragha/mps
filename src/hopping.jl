@@ -29,8 +29,8 @@ function nnhoppingchain(lx::Int, t1::T, t2::T, mu::T=0.0;
     hopmatrix = diagm(0 => mu .* ones(T, lx)) +
         diagm(1 => -t1 .* ones(T, lx-1)) +
         diagm(-1 => conj(-t1) .* ones(T, lx-1)) +
-        diagm(2 => -t2 .* ones(T, lx-1)) +
-        diagm(-2 => conj(-t2) .* ones(T, lx-1))
+        diagm(2 => -t2 .* ones(T, lx-2)) +
+        diagm(-2 => conj(-t2) .* ones(T, lx-2))
 
     if boundary == :OBC
         return hopmatrix
