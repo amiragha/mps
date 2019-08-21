@@ -27,9 +27,9 @@ function xxz_explicit(lx::Int64, delta::Float64, boundary::Symbol)
         return Hmat
     elseif boundary == :PBC
         Hmat = Hmat +
-            0.5 * kron(kron(sp_half, eye(2^(Lx-2))), sm_half) +
-            0.5 * kron(kron(sm_half, eye(2^(Lx-2))), sp_half) +
-            delta * kron(kron(sz_half, eye(2^(Lx-2))), sz_half)
+            0.5 * kron(kron(sp_half, eye(2^(lx-2))), sm_half) +
+            0.5 * kron(kron(sm_half, eye(2^(lx-2))), sp_half) +
+            delta * kron(kron(sz_half, eye(2^(lx-2))), sz_half)
         return Hmat
     else
         error("unrecognized boundary condition :", boundary)
