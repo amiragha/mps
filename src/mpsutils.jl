@@ -150,7 +150,7 @@ function entropy(spectrums::Vector{Vector{T}};
                  alpha::Int=1) where {T<:Number}
     result = Vector{T}(undef, length(spectrums))
     for i in eachindex(spectrums)
-        result[n] =  entropy(spectrums[i], alpha=alpha)
+        result[i] =  entropy(spectrums[i], alpha=alpha)
     end
     return result
 end
