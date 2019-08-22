@@ -26,6 +26,7 @@ export randmps
 
 export canonicalize_at!, move_center!
 
+export entanglemententropy
 export measure_1point, measure_2point
 export measure_bond
 export half_measurement_index
