@@ -140,9 +140,9 @@ function entropy(spectrum::Vector{T};
 
     s = spectrum ./ sum(spectrum)
     if alpha == 1
-        return - sum(s .* log2.(s))
+        return - sum(s .* log.(s))
     else
-        return log2(sum(s.^alpha))/(1-alpha)
+        return log(sum(s.^alpha))/(1-alpha)
     end
 end
 
