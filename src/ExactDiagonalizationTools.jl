@@ -23,7 +23,11 @@ export sm_half_U1sym
 export spinoperators
 
 export KetState
+export opextend
+export normalize!
 export randket
+export apply1site
+export measure1point
 
 export xxz_hamiltonian
 export xxz_longrange

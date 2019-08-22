@@ -125,8 +125,7 @@ function MatrixProductState(lx::Int64, d::Int64,
     return MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
 
-function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int;
-                 rng::AbstractRNG=GLOBAL_RNG)
+function randmps(T::Type{<:RLorCX}, rng::AbstractRNG, lx::Int, d::Int, maxdim::Int)
     dims = Vector{Int}(undef, lx+1)
     dims[1] = 1
     dims[lx+1] = 1
@@ -144,7 +143,7 @@ function randmps(T::Type{<:RLorCX}, lx::Int, d::Int, maxdim::Int;
     for l = 1:lx
         Dr = dims[l+1]
         Dl = dims[l]
-        matrices[l] = reshape(randisometry(T, Dl, d*Dr, rng=rng), Dl, d, Dr)
+        matrices[l] = reshape(randisometry(T,rng, Dl, d*Dr), Dl, d, Dr)
     end
     return MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
