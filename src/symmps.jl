@@ -185,21 +185,23 @@ end
 function entanglemententropy(mps::SymMatrixProductState{Tv};
                              alpha::Int=1) where{Tv}
 
-    result = Vector{Float64}(undef, mps.lx-1)
+    lx = mps.lx
+    result = Vector{Float64}(undef, lx-1)
     move_center!(mps, 1)
     A = mps.matrices[1]
 
-    for l = 1:mps.lx-1
+    for l = 1:lx-1
         U, S, Vt = svdsym(fuselegs(A, +1, 1, 2))
         mps.matrices[l] = defuse_leg(U, 1, A.legs[1:2])
-        spectrum_unsorted = vcat([diag(blk) for blk in S.nzblks])
+        spectrum_unsorted = vcat([diag(blk) for blk in S.nzblks]...)
         result[l] = entropy(spectrum_unsorted, alpha=alpha)
         A = contract(S*Vt, (1, -1), mps.matrices[l+1], (-1,2,3))
     end
 
     mps.matrices[lx] = A
     mps.center = lx
-    return
+
+    result
 end
 
 function measure_1point(mps::SymMatrixProductState{Tv}, op::SymTensor{Tv,2},
