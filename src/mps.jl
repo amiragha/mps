@@ -41,6 +41,33 @@ function MatrixProductState{T}(lx::Int64, d::Int64,
     MatrixProductState{T}(lx, d, dims, matrices, lx)
 end
 
+# constructor with intial configuration vector and noise
+function MatrixProductState{T}(lx::Int64, d::Int64,
+                               initconf::Vector{Int64},
+                               maxdim::Int,
+                               noise::Float64) where{T<:RLorCX}
+    @assert all((0 .<= initconf) .& (initconf .< d))
+
+    dims = ones(Int, lx+1)
+    ### this can be wrapped into a function itself
+    for l = 2:lx
+        dims[l] = min(maxdim, dims[l-1]*d)
+    end
+    for l = lx:-1:1
+        dims[l] = min(dims[l], dims[l+1]*d)
+    end
+    ### till here!
+
+    matrices = [ noise * randn(T, dims[i], d, dims[i+1]) for i=1:lx ]
+
+    for site=1:lx
+        matrices[site][1, initconf[site]+1, 1] = 1.
+    end
+
+    canonicalize_at!(matrices, lx)
+    MatrixProductState{T}(lx, d, dims, matrices, lx)
+end
+
 #constructor from a ketstate given in Ising basis
 function MatrixProductState(lx::Int64, d::Int64,
                             ketstate::Vector{T};

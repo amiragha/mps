@@ -1,4 +1,4 @@
-function xxz_longrange(lx::Int, delta::Float64=1.0, r::Float64=0.0)
+function xxz_longrange(lx::Int, delta::Float64=1.0, r::Float64=0.5)
     (lx < 2) && error("The system size is too small : ", lx)
 
     sz, sp, sm = sz_half, sp_half, sm_half

@@ -43,6 +43,7 @@ export mps2ketstate
 export ketstate2imps
 
 export xxz_mpo
+export xxzlong_mpo
 export qitf_mpo
 
 end
