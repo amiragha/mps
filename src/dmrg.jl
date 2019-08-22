@@ -12,7 +12,7 @@ function initialenv(mps::MatrixProductState{T},
     env[1] = ones(T, 1,1,1)
     env[lx+2] = ones(T, 1,1,1)
     for l = lx:-1:1
-        env[l+1] = _dmrgupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
+        env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
     end
     return env
 end
@@ -30,6 +30,7 @@ for each step are stored in `env`.
 
 Returns the energy and updates, `mps` and `env`
 """
+
 function dmrg1sitesweep!(mps::MatrixProductState{T},
                          mpo::MatrixProductOperator{T},
                          env::Vector{Array{T, 3}};
@@ -43,7 +44,7 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
 
     mat = mps.matrices[1]
     for l = 1:lx-1
-        es, vs, info = eigsolve(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
+        es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
                                 mat, 1, :SR, ishermitian=true)
         v = vs[1]
         e = es[1]
@@ -54,13 +55,13 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
 
         ##NOTE: the Matrix function here is needed to return the thin Q!
         mps.matrices[l] = reshape(Matrix(Q), size(mat))
-        env[l+1] = _dmrgupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
+        env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
 
         @tensor mat[l,o,r] := Λ[l,r] * mps.matrices[l+1][m,o,r]
     end
 
     l = lx
-    es, vs, info = eigsolve(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
+    es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
                             mat, 1, :SR, ishermitian=true)
     e=es[1]
     verbose && println("Sweep L2R: site $l -> energy $e")
@@ -74,10 +75,10 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
         Λ = transpose(Λ)
 
         mps.matrices[l+1] = reshape(Q, size(mat))
-        env[l+2] = _dmrgupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+        env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
         @tensor mat[-1,-2,-3] := mps.matrices[l][-1,-2, 1] * Λ[1,-3]
 
-        es, vs, info = eigsolve(v->_dmrg1sitematvec(v, env[l], env[l+2], mpo.tensors[l]),
+        es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
                                 mat, 1, :SR, ishermitian=true)
 
         v = vs[1]
@@ -116,7 +117,7 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
     mat = mps.matrices[1]
     for l = 1:lx-2
         @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
-        es, vs, info = eigsolve(v->_dmrg2sitematvec(v, env[l], env[l+3],
+        es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                     mpo.tensors[l], mpo.tensors[l+1]),
                                 vmat, 1, :SR, ishermitian=true)
         v = vs[1]
@@ -129,14 +130,14 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
         mps.matrices[l] = reshape(U, size(mat,1), d, :)
         mps.dims[l+1] = size(S, 1)
 
-        env[l+1] = _dmrgupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
+        env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
 
         mat = reshape(S*Vt, size(S,1), d, size(mps.matrices[l+1],3))
     end
 
     l = lx-1
     @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
-    es, vs, info = eigsolve(v->_dmrg2sitematvec(v, env[l], env[l+3],
+    es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                 mpo.tensors[l], mpo.tensors[l+1]),
                             vmat, 1, :SR, ishermitian=true)
     v = vs[1]
@@ -150,12 +151,12 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
         mps.matrices[l+1] = reshape(Vt, size(Vt, 1), d, size(v,4))
         mps.dims[l+1] = size(S, 1)
 
-        env[l+2] = _dmrgupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+        env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
         mat = reshape(U*S, size(v, 1), d, size(S, 2))
         @tensor vmat[-1,-2,-3,-4] := mps.matrices[l-1][-1,-2,1] * mat[1,-3,-4]
 
-        es, vs, info = eigsolve(v->_dmrg2sitematvec(v, env[l-1], env[l+2],
+        es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
                                                     mpo.tensors[l-1], mpo.tensors[l]),
                                 vmat, 1, :SR, ishermitian=true)
         v = vs[1]
@@ -168,7 +169,7 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
 
     mps.matrices[l+1] = reshape(Vt, size(Vt, 1), d, size(v,4))
     mps.dims[l+1] = size(S, 1)
-    env[l+2] = _dmrgupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+    env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
     mps.matrices[l] = reshape(U*S, size(v, 1), d, size(S, 2))
 

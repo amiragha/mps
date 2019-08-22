@@ -1,4 +1,4 @@
-### A bunch of helper functions to apply things to mps
+### A bunch of helper functions to apply stuff with environments to mps
 function _applymps0site(Λ::Matrix{T},
                         envL::Array{T, 3},
                         envR::Array{T, 3}) where {T<:Number}
@@ -6,37 +6,37 @@ function _applymps0site(Λ::Matrix{T},
     A
 end
 
-function _dmrgupdateright(renv::Array{T, 3},
-                          mat::Array{T, 3},
-                          hmpo::Array{T,4}) where {T<:Number}
+function _mpsupdateright(renv::Array{T, 3},
+                         mat::Array{T, 3},
+                         hmpo::Array{T,4}) where {T<:Number}
     @tensor R[u,m,d] :=
         ((renv[u',m',d'] * mat[u,o,u']) * hmpo[m,o',m',o]) * conj(mat)[d,o',d']
     R
 end
 
-function _dmrgupdateleft(lenv::Array{T, 3},
-                         mat::Array{T, 3},
-                         hmpo::Array{T,4}) where {T<:Number}
+function _mpsupdateleft(lenv::Array{T, 3},
+                        mat::Array{T, 3},
+                        hmpo::Array{T,4}) where {T<:Number}
     @tensor L[u,m,d] :=
         ((lenv[u',m',d'] * mat[u',o,u]) * hmpo[m',o',m,o]) * conj(mat)[d',o',d]
     L
 end
 
-function _dmrg1sitematvec(v,
-                          envL::Array{T,3},
-                          envR::Array{T,3},
-                          hmpo::Array{T,4}) where {T<:Number}
+function _applymps1site(v,
+                        envL::Array{T,3},
+                        envR::Array{T,3},
+                        hmpo::Array{T,4}) where {T<:Number}
 
     @tensor v[l,o,r] := ((envL[l',ml,l] * v[l',o',r']) *
                          hmpo[ml,o,mr,o']) * envR[r',mr,r]
     v
 end
 
-function _dmrg2sitematvec(v,
-                          envL::Array{T,3},
-                          envR::Array{T,3},
-                          hmpoL::Array{T,4},
-                          hmpoR::Array{T,4}) where {T<:Number}
+function _applymps2site(v,
+                        envL::Array{T,3},
+                        envR::Array{T,3},
+                        hmpoL::Array{T,4},
+                        hmpoR::Array{T,4}) where {T<:Number}
 
     @tensor v[l,o1,o2,r] := (((envL[l',ml,l] * v[l',o1',o2',r']) *
                               hmpoL[ml,o1,mm,o1']) * hmpoR[mm,o2,mr,o2']) * envR[r',mr,r]

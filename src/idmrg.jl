@@ -109,7 +109,7 @@ function idmrg2site(mpo::MatrixProductOperator{T},
 
         ## 5. use the trial as the initial guess and eigensolve to get
         ## the wavefunction A_n+1 Λ_n+1 B_n+1
-        es, vs, info = eigsolve(v->_dmrg2sitematvec(v, envL, envR,
+        es, vs, info = eigsolve(v->_applymps2site(v, envL, envR,
                                                     mpo.tensors[2], mpo.tensors[3]),
                                 guess, 1, :SR, ishermitian=true)
 
