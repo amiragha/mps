@@ -466,7 +466,7 @@ function entanglemententropy(mps::MatrixProductState{T};
         @tensor A[l,o,r] := (S*Vt)[l,m] * mps.matrices[l+1][m,o,r]
     end
 
-    mps.matrices[lx] = mat
+    mps.matrices[lx] = A
     mps.center = lx
     return
 end

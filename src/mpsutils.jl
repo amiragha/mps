@@ -136,7 +136,7 @@ individual vector is calculated.
 
 """
 function entropy(spectrum::Vector{T};
-                 alpha::Int64=1) where {T<:Number}
+                 alpha::Int=1) where {T<:Number}
 
     s = spectrum ./ sum(spectrum)
     if alpha == 1
@@ -147,7 +147,7 @@ function entropy(spectrum::Vector{T};
 end
 
 function entropy(spectrums::Vector{Vector{T}};
-                 alpha::Int64=1) where {T<:Number}
+                 alpha::Int=1) where {T<:Number}
     result = Vector{T}(undef, length(spectrums))
     for i in eachindex(spectrums)
         result[n] =  entropy(spectrums[i], alpha=alpha)
