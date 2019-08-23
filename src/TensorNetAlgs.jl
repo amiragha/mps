@@ -19,5 +19,6 @@ export dmrg1sitesweep!
 export dmrg2sitesweep!
 export idmrg2site
 export tdvp1sitesweep!
+export tdvp2sitesweep!
 
 end

@@ -15,9 +15,8 @@ function tdvp1sitesweep!(dt::Float64,
                          env::Vector{Array{T, 3}};
                          verbose::Bool=false) where {T<:Number}
 
-    if !(T <: Complex)
-        error("TDVP only accpets complex MPSs. Convert first!")
-    end
+    !(T <: Complex) && error("TDVP only accpets complex MPSs. Convert first!")
+
     lx = mps.lx
     d = mps.d
 
@@ -88,6 +87,7 @@ function tdvp1sitesweep!(dt::Float64,
         end
     end
     mps.matrices[1] = A
+    mps.center = 1
     return nothing
 end
 
@@ -113,9 +113,7 @@ function tdvp2sitesweep!(dt::Float64,
                          tol::Float64=1.e-14,
                          verbose::Bool=false) where {T<:Number}
 
-    if !(T <: Complex)
-        error("TDVP only accpets complex MPSs. Convert first!")
-    end
+    !(T <: Complex) && error("TDVP only accpets complex MPSs. Convert first!")
     lx = mps.lx
     d = mps.d
 
@@ -128,7 +126,7 @@ function tdvp2sitesweep!(dt::Float64,
         # forward evolution of mps at site l and site l+1
         @tensor AA[-1,-2,-3,-4] := A[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
         AA, info = exponentiate(v->_applymps2site(v, env[l], env[l+3],
-                                                  mpo.tensors[l], mpo.tensor[l+1]),
+                                                  mpo.tensors[l], mpo.tensors[l+1]),
                                 -im*dt, AA, ishermitian=true)
 
         if verbose
@@ -137,13 +135,13 @@ function tdvp2sitesweep!(dt::Float64,
             println("Sweep L2R: mps site $l, $(l+1) -> energy $e")
         end
 
-        U, S, Vt = svdtrun(reshape(AA, size(AA,1)*size(A,2), size(AA,3)*size(AA,4)),
-                           maxdim=maxdim, tol=tol)
+        U, S, Vt = svdtrunc(reshape(AA, size(AA,1)*d, d*size(AA,4)),
+                            maxdim=maxdim, tol=tol)
         mps.matrices[l] = reshape(Matrix(U), (size(AA)[1:2]..., size(S,1)))
         env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
 
         # backward evolution of Λ at site l+1
-        Λ = S*Vt
+        Λ = reshape(S*Vt, (size(S,1), size(AA)[3:4]...))
         Λ, info = exponentiate(v->_applymps1site(v, env[l+1], env[l+3], mpo.tensors[l+1]),
                                +im*dt, Λ)
 
@@ -152,57 +150,68 @@ function tdvp2sitesweep!(dt::Float64,
             println("Sweep L2R: Λ on site $(l+1) -> energy $e")
         end
 
-        @tensor A[l,o,r] := Λ[l,m] * mps.matrices[l+1][m,o,r]
+        A = Λ
+        #@tensor A[l,o,r] := Λ[l,m] * mps.matrices[l+1][m,o,r]
     end
 
     l = lx-1
     @tensor AA[-1,-2,-3,-4] := A[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
-    A, info = exponentiate(v->_applymps2site(v, env[l], env[l+3],
-                                             mpo.tensors[l], mpo.tensor[l+1]),
-                           -im*dt, A, ishermitian=true)
+    AA, info = exponentiate(v->_applymps2site(v, env[l], env[l+3],
+                                              mpo.tensors[l], mpo.tensors[l+1]),
+                            -im*dt, AA, ishermitian=true)
 
     if verbose
-        e = dot(A, _applymps2site(A, env[l], env[l+3],
-                                  mpo.tensors[l], mpo.tensor[l+1]))
+        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                                   mpo.tensors[l], mpo.tensors[l+1]))
         println("Sweep L2R: mps site $l, $(l+1) -> energy $e")
     end
 
     for l = lx-1:-1:2
 
-        U, S, Vt = svdtrun(reshape(AA, size(AA,1)*size(A,2), size(AA,3)*size(AA,4)),
-                           maxdim=maxdim, tol=tol)
-        mps.matrices[l+1] = reshape(Matrix(Vt), (size(S,1),size(AA)[2:3]...,))
-        env[l+2] = _mpsupdateleft(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+        U, S, Vt = svdtrunc(reshape(AA, size(AA,1)*d, d*size(AA,4)),
+                            maxdim=maxdim, tol=tol)
+        mps.matrices[l+1] = reshape(Vt, (size(S,1),size(AA)[3:4]...))
+        env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
         # backward evolution of Λ at site l
-        Λ = U*S
+        Λ = reshape(U*S, (size(AA)[1:2]...,size(S,2)))
         Λ, info = exponentiate(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
                                +im*dt, Λ)
         if verbose
             e = dot(Λ, _applymps1site(Λ, env[l], env[l+2], mpo.tensors[l]))
-            println("Sweep L2R: Λ on site $l -> energy $e")
+            println("Sweep R2L: Λ on site $l -> energy $e")
         end
 
-        @tensor A[l,o,r] := mps.matrices[l][l,o,m] * Λ[m,r]
+        A = Λ
+        #@tensor A[l,o,r] := mps.matrices[l-1][l,o,m] * Λ[m,r]
         @tensor AA[-1,-2,-3,-4] := mps.matrices[l-1][-1,-2,1] * A[1,-3,-4]
 
         # forward evolution of mps at site l
-        AA, info = exponentiate(v->_applymps2site(v, env[l], env[l+3],
-                                                  mpo.tensors[l], mpo.tensor[l+1]),
+        AA, info = exponentiate(v->_applymps2site(v, env[l-1], env[l+2],
+                                                  mpo.tensors[l-1], mpo.tensors[l]),
                                 -im*dt, AA; ishermitian = true)
 
         if verbose
-            e = dot(AA, _applymps2site(AA, env[l], env[l+3],
-                                       mpo.tensors[l], mpo.tensor[l+1]))
-            println("Sweep R2L: mps site $l, $(l+1) -> energy $e")
+            e = dot(AA, _applymps2site(AA, env[l-1], env[l+2],
+                                       mpo.tensors[l-1], mpo.tensors[l]))
+            println("Sweep R2L: mps site $(l-1), $(l) -> energy $e")
         end
     end
     l=1
-    U, S, Vt = svdtrun(reshape(AA, size(AA,1)*size(A,2), size(AA,3)*size(AA,4)),
-                       maxdim=maxdim, tol=tol)
-    mps.matrices[l+1] = reshape(Matrix(Vt), (size(S,1),size(AA)[2:3]...,))
-    env[l+2] = _mpsupdateleft(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+    U, S, Vt = svdtrunc(reshape(AA, size(AA,1)*d, d*size(AA,4)),
+                        maxdim=maxdim, tol=tol)
+    mps.matrices[l+1] = reshape(Vt, (size(S,1),size(AA)[3:4]...))
+    env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
-    mps.matrices[1] = A
+
+    Λ = reshape(U*S, (size(AA)[1:2]...,size(S,2)))
+    ### (IMPORTANT) QUESTION? do I need a final backward evolution on site 1?
+    # Λ, info = exponentiate(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
+    #                        +im*dt, Λ)
+
+    mps.matrices[1] = Λ
+
+    mps.center = 1
+
     return nothing
 end
