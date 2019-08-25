@@ -4,6 +4,7 @@ struct SymTensor{Tv<:Number, N}
     sects :: Vector{NTuple{N, Int}}    # possible nonzero sectors
     nzblks :: Vector{AbstractArray{Tv, N}}     # stored nonzero blocks
 
+    # TODO: add a full sanity check for tests!
     function SymTensor(charge::Int,
                        legs::NTuple{N, STLeg},
                        sects::Vector{NTuple{N, Int}},

@@ -40,5 +40,5 @@ const sp_half_U1sym = SymTensor(+1,
 const sm_half_U1sym = SymTensor(-1,
                                 (STLeg(+1, [0, 1], [1, 1]),
                                  STLeg(-1, [0, 1], [1, 1])),
-                                [(1, 0)],
+                                [(0, 1)],
                                 [ones(1,1)])

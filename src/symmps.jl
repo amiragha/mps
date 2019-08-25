@@ -281,7 +281,8 @@ function measure_2point(mps::SymMatrixProductState{Tv},
     @assert (site1 <= lx) && (site1 > 0)
     @assert (site2 <= lx) && (site2 > site1)
     @assert signs(op1.legs) == signs(op2.legs) == (+1, -1)
-    (op1.charge + op2.charge != 0) && error("operator charges don't add up to zero!")
+    (op1.charge + op2.charge != 0) &&
+        error("operator charges don't add up to zero! $(op1.charge), $(op2.charge)")
 
     move_center!(mps, site1)
     mat = mps.matrices[site1]
@@ -305,7 +306,8 @@ function measure_2point(mps::SymMatrixProductState{Tv},
     d = mps.d
     lx = mps.lx
     @assert signs(op1.legs) == signs(op2.legs) == (+1, -1)
-    (op1.charge + op2.charge != 0) && error("operator charges don't add up to zero!")
+    (op1.charge + op2.charge != 0) &&
+        error("operator charges don't add up to zero! $(op1.charge), $(op2.charge)")
 
     result = Tv[]
     for site1=1:lx-1
@@ -337,7 +339,7 @@ function measure_2point(mps::SymMatrixProductState{ComplexF64},
                         op2::SymTensor{Float64,2}) where {Tv<:RLorCX}
     measure_2point(mps,
                    convert(SymTensor{ComplexF64, 2}, op1),
-                   convert(SymTensor{ComplexF64, 2}, op1))
+                   convert(SymTensor{ComplexF64, 2}, op2))
 end
 
 """
