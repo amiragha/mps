@@ -501,7 +501,7 @@ function entanglemententropy(mps::MatrixProductState{T};
         U, S, Vt = svd(reshape(A, size(A, 1)*size(A,2), size(A,3)))
         mps.matrices[l] = reshape(U, size(A))
         result[l] = entropy(S, alpha=alpha)
-        @tensor A[l,o,r] := (S*Vt)[l,m] * mps.matrices[l+1][m,o,r]
+        @tensor A[l,o,r] := (Diagonal(S)*Vt)[l,m] * mps.matrices[l+1][m,o,r]
     end
 
     mps.matrices[lx] = A
