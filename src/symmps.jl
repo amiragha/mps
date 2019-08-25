@@ -100,17 +100,19 @@ function normalize!(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX}
         U,S,Vt = svdsym(fuselegs(A, +1, 1, 2))
         ss = vcat(diag.(S.nzblks)...)
         n = norm(ss)
-        for i in eachindex(S.nzblks)
-            S.nzblks = S.nzblks ./ n
-        end
+
+        S_nzblks = S.nzblks ./ n
+        S = SymTensor(S.charge, S.legs, S.sects, S_nzblks)
+
         mps.matrices[mps.center] = defuse_leg(U * S * Vt, 1, A.legs[1:2])
     else
         U,S,Vt = svdsym(fuselegs(A, -1, 2, 2))
         ss = vcat(diag.(S.nzblks)...)
         n = norm(ss)
-        for i in eachindex(S.nzblks)
-            S.nzblks = S.nzblks ./ n
-        end
+
+        S_nzblks = S.nzblks ./ n
+        S = SymTensor(S.charge, S.legs, S.sects, S_nzblks)
+
         mps.matrices[mps.center] = defuse_leg(U * S * Vt, 2, A.legs[2:3])
     end
     sort(ss./n, rev=true)
