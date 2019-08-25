@@ -94,6 +94,28 @@ end
 ### TOOLS
 #########
 
+function normalize!(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX}
+    A = mps.matrices[mps.center]
+    if mps.center > div(mps.lx, 2)
+        U,S,Vt = svdsym(fuselegs(A, +1, 1, 2))
+        ss = vcat(diag.(S.nzblks)...)
+        n = norm(ss)
+        for i in eachindex(S.nzblks)
+            S.nzblks = S.nzblks ./ n
+        end
+        mps.matrices[mps.center] = defuse_leg(U * S * Vt, 1, A.legs[1:2])
+    else
+        U,S,Vt = svdsym(fuselegs(A, -1, 2, 2))
+        ss = vcat(diag.(S.nzblks)...)
+        n = norm(ss)
+        for i in eachindex(S.nzblks)
+            S.nzblks = S.nzblks ./ n
+        end
+        mps.matrices[mps.center] = defuse_leg(U * S * Vt, 2, A.legs[2:3])
+    end
+    sort(ss./n, rev=true)
+end
+
 function isometrize_push_right!(matrices::Vector{SymTensor{Tv, 3}},
                                 site::Int64;
                                 svtruncation::Bool=false) where {Tv<:RLorCX}
