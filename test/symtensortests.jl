@@ -1,4 +1,4 @@
-@testset "fuse, defuse" begin
+@testset "releg" begin
 
     @testset "generic" begin
         legs = STLeg(+1, [0,1], [2,3]), STLeg(+1, [0,1], [1,1]), STLeg(-1, [0,1], [3,4])

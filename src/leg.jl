@@ -105,3 +105,5 @@ end
 function mapcharges(f::Function, l::STLeg)
     STLeg(l.sign, f.(l.chrs), l.dims)
 end
+
+isdummy(l::STLeg) = l.chrs == [0] && l.dims == [1]

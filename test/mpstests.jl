@@ -1,5 +1,5 @@
 sz_half = [0.5 0.0; 0.0 -.5]
-@testset " MPS stuff" begin
+@testset "MPS" begin
     d, lx = 2, 8
 
     # A uniformly chosen random state as MPS
@@ -42,18 +42,20 @@ sz_half = [0.5 0.0; 0.0 -.5]
 
 end
 
-@testset "apply twosite" begin
-    lx, l = 8, 3
+@testset "apply" begin
+    @testset "twosite" begin
+        lx, l = 8, 3
 
-    H = xxz_hamiltonian(lx)
-    eheis, vheis = eigsolve(H, 1, :SR)
-    mps = MatrixProductState(lx, 2, vheis[1])
+        H = xxz_hamiltonian(lx)
+        eheis, vheis = eigsolve(H, 1, :SR)
+        mps = MatrixProductState(lx, 2, vheis[1])
 
-    mpscopy = deepcopy(mps)
-    move_center!(mps, l)
-    M = twosite_tensor(sz_half, sz_half)
-    apply_2siteoperator!(mps, l, M)
+        mpscopy = deepcopy(mps)
+        move_center!(mps, l)
+        M = twosite_tensor(sz_half, sz_half)
+        apply_2siteoperator!(mps, l, M)
 
-    @test mps_dims_are_consistent(mps)
-    @test overlap(mpscopy, mps) ≈ measure_2point(mpscopy, sz_half, sz_half, l, l+1)
+        @test mps_dims_are_consistent(mps)
+        @test overlap(mpscopy, mps) ≈ measure_2point(mpscopy, sz_half, sz_half, l, l+1)
+    end
 end

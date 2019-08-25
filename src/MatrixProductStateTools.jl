@@ -16,6 +16,7 @@ include("mpo.jl")
 include("mps.jl")
 include("imps.jl")
 include("symmps.jl")
+include("symmpo.jl")
 
 export MatrixProductOperator
 export MatrixProductState
@@ -45,6 +46,7 @@ export mps2ketstate
 export ketstate2imps
 
 export xxz_mpo
+export xxz_symmpo
 export xxzlong_mpo
 export qitf_mpo
 

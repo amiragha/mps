@@ -29,6 +29,7 @@ export fuse_conseqlegs
 export fuselegs
 export defuse_leg
 export permutelegs
+export removedummyleg
 export contract
 
 export change_sign, change_legsign

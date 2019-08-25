@@ -320,3 +320,13 @@ function permutelegs(sten::SymTensor{T, N}, perm) where{T, N}
     end
     SymTensor(sten.charge, sten.legs[perm], sects, nzblks)
 end
+
+function removedummyleg(sten::SymTensor{Tv, N}, l::Int) where {Tv,N}
+    !isdummy(sten.legs[l]) && error("leg is not dummy!")
+
+    SymTensor(sten.charge,
+              (sten.legs[1:l-1]..., sten.legs[l+1:N]...),
+              [(s[1:l-1]...,s[l+1:N]...) for s in sten.sects],
+              [reshape(blk, size(blk)[1:l-1]...,size(blk)[l+1:N]...) for blk in sten.nzblks])
+
+end

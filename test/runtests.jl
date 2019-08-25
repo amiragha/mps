@@ -5,5 +5,6 @@ using TensorOperations
 using ExactDiagonalizationTools
 using KrylovKit
 
-include("stuff.jl")
+include("mpstests.jl")
+include("mpotests.jl")
 include("symtensortests.jl")
