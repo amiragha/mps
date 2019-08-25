@@ -6,32 +6,77 @@ mutable struct SymMatrixProductState{Tv<:RLorCX}
     center   :: Int64
 end
 
+# equal probability constructor
+function SymMatrixProductState{Tv}(
+    lx::Int,
+    d::Int,
+    m::Int;
+    noise::Float64=0.0) where{Tv <:RLorCX}
+
+    matrices = SymTensor{Tv, 3}[]
+    dims = zeros(Int, lx+1)
+
+    # Just find all the possible sectors for each tensor at each site
+    # and fill them with one(1,1,1). This gives an MPS with a norm of
+    # binomial(lx,m). How to make it unit?
+    ##TODO: there sure is a better way to the following!
+    lchrs = [0]
+    rvals = [1]
+    dims[1] = 1
+    for site in 1:lx
+        legl = STLeg(+1, lchrs, ones(Int, length(lchrs)))
+        legd = STLeg(+1, collect(0:d-1), ones(Int, d))
+        cmin = max(0, m-(d-1)*(lx-site))
+        cmax = min(m, (d-1)*site)
+        rchrs = collect(cmin:cmax)
+        dims[site+1] = length(rchrs)
+        legr = STLeg(-1, rchrs, ones(Int, length(rchrs)))
+        sects = NTuple{3, Int}[]
+        for c in lchrs
+            for n in 0:d-1
+                if cmax >= c+n >= cmin
+                    push!(sects, (c, n, c+n))
+                end
+            end
+        end
+        sects = sort(sects, lt=SymTensors._sector_less_than)
+        l = length(sects)
+        A = SymTensor(0,
+                      (legl,legd,legr),
+                      sects,
+                      #[1/sqrt(length(rchrs)) .*
+                       [(ones(Tv,1,1,1) + noise * ones(Tv,1,1,1)) for n in 1:l])
+        push!(matrices, A)
+        lchrs = rchrs
+    end
+
+    canonicalize_at!(matrices, lx)
+    mps = SymMatrixProductState{Tv}(lx,d,dims,matrices,lx)
+    mps
+end
+
 # constructor with intial configuration vector
-function SymMatrixProductState{Tv}(lx::Int,
-                                   d::Int, initconf::Vector{Int}) where{Tv<:RLorCX}
+function SymMatrixProductState{Tv}(
+    lx::Int,
+    d::Int,
+    initconf::Vector{Int}) where{Tv<:RLorCX}
+
     @assert all((0 .<= initconf) .& (initconf .< 2))
     matrices = SymTensor{Tv,3}[]
-    lchr = 0    # lchr is the "left charge"
-    #legex = STLeg(+1, [0], [1])
+    lchr = 0
     for site=1:lx
         legl = STLeg(+1, [lchr], [1])
-        #legl = STLeg(-1, collect(0:lchr+1), [zeros(Int, lchr+1)...,1])
         legd = STLeg(+1, [0, 1], [1,1])
         if initconf[site] == 0
             legr = STLeg(-1, [lchr], [1])
-            #A = fillSymTensor(one(Tv), 0, (legex,legd,legl))
             A = fillSymTensor(one(Tv), 0, (legl,legd,legr))
-            #change_nzblk!(A, (lchr,0,lchr), ones(Tv,1,1,1))
             push!(matrices, A)
         else
             legr = STLeg(-1, [lchr+1], [1])
-            #A = fillSymTensor(one(Tv), 0, (legex,legd,legl))
             A = fillSymTensor(one(Tv), 0, (legl,legd,legr))
-            #change_nzblk!(A, (lchr,0,lchr+1), ones(Tv,1,1,1))
             push!(matrices, A)
             lchr += 1
         end
-        #legex = STLeg(+1, legl.chrs, legl.dims)
     end
     dims = ones(Int64, lx+1)
     #canonicalize_at!(matrices, lx)
@@ -39,9 +84,10 @@ function SymMatrixProductState{Tv}(lx::Int,
 end
 
 #constructor from a ketstate given in Ising basis
-function SymMatrixProductState(lx::Int64, d::Int64,
-                               ketstate::Vector{Tv};
-                               svtruncation::Bool=false) where {Tv<:RLorCX}
+function SymMatrixProductState(
+    lx::Int64, d::Int64,
+    ketstate::Vector{Tv};
+    svtruncation::Bool=false) where {Tv<:RLorCX}
 
     @assert length(ketstate) == binomial(lx, div(lx,2))
     charge = div(lx,2)
@@ -116,6 +162,20 @@ function normalize!(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX}
         mps.matrices[mps.center] = defuse_leg(U * S * Vt, 2, A.legs[2:3])
     end
     sort(ss./n, rev=true)
+end
+
+function canonicalize_at!(matrices::Vector{SymTensor{Tv, 3}},
+                          center::Int) where {Tv<:RLorCX}
+    lx = length(matrices)
+    @assert center > 0 && center < lx + 1
+
+    for site=1:center-1
+        isometrize_push_right!(matrices, site, svtruncation=false)
+    end
+
+    for site=lx:-1:center+1
+        isometrize_push_left!(matrices, site, svtruncation=false)
+    end
 end
 
 function isometrize_push_right!(matrices::Vector{SymTensor{Tv, 3}},

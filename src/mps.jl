@@ -17,7 +17,7 @@ end
 
 ### CONSTRUCTORS
 
-# x-direction! constructor
+# equal probability constructor
 function MatrixProductState{T}(lx::Int64, d::Int64=2;
                                noise::Float64=0.0) where {T<:RLorCX}
 

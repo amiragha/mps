@@ -1,5 +1,6 @@
 function svdsym(smat::SymMatrix{Tv}; debug::Bool=false) where {Tv<:Number}
-    @assert signs(smat.legs) == (+1, -1)
+    signs(smat.legs) != (+1, -1) &&
+        error("svdsym only accespts a SymMatrix (+1,-1) but ", signs(smat.legs))
 
     debug && println(smat)
 
