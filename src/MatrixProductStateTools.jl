@@ -9,6 +9,7 @@ using TensorOperations
 RLorCX = Union{Float64, ComplexF64}
 
 import Base: convert, size
+import LinearAlgebra: normalize!
 
 include("mpsutils.jl")
 include("mpo.jl")
@@ -24,6 +25,7 @@ export InfiniteMatrixProductState
 export svdtrunc
 export randmps
 
+export normalize!
 export canonicalize_at!, move_center!
 
 export entanglemententropy

@@ -8,6 +8,8 @@ using QuadGK
 RLorCX = Union{Float64, ComplexF64}
 ⊗ = kron
 
+import LinearAlgebra: normalize!
+
 include("spin_definitions.jl")
 include("ket.jl")
 include("xxz.jl")

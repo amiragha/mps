@@ -171,6 +171,17 @@ function truncate(svector::Vector{Float64};
     return svector[1:n], n, sum(svector[1:n])/sum(svector)
 end
 
+function normalize!(mps::MatrixProductState{T}) where{T<:RLorCX}
+    A = mps.matrices[mps.center]
+    if mps.center > div(mps.lx, 2)
+        U,S,Vt = svd(reshape(A, prod(size(A)[1:2]), size(A,3)))
+    else
+        U,S,Vt = svd(reshape(A, size(A,1), prod(size(A)[2:3])))
+    end
+    normalize!(S)
+    mps.matrices[mps.center] = reshape(U * S * Vt, size(A))
+    S
+end
 
 """
     canonicalize_at!(matrices, center)

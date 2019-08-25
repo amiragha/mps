@@ -11,10 +11,7 @@ end
 
 randket(rng::AbstractRNG, lx::Int, d::Int) = randket(Float64, rng, lx, d)
 
-function normalize!(v::KetState{T}) where {T<:RLorCX}
-    v.v = v.v ./ norm(v.v)
-    nothing
-end
+normalize!(v::KetState{T}) where {T<:RLorCX} = normalize!(v.v)
 
 @inline opextend(op, lx::Int, l::Int) = eye(2^(l-1)) ⊗ op ⊗ eye(2^(lx-l))
 

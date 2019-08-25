@@ -70,9 +70,9 @@ function xxzlong_mpo(T::DataType, lx::Int64, d::Int64, delta::Float64=1.0, r::Fl
     mat[5,:,4,:] = Sz
     mat[5,:,5,:] = I2
 
-    mat[2,:,2,:] = r*I2
-    mat[3,:,3,:] = r*I2
-    mat[4,:,4,:] = r*I2
+    mat[2,:,2,:] = r.*I2
+    mat[3,:,3,:] = r.*I2
+    mat[4,:,4,:] = r.*I2
 
     tensors = Array{T,4}[]
     dims = zeros(Int64, lx+1)
