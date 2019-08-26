@@ -88,7 +88,6 @@ function xxzlong_mpo(T::DataType, lx::Int64, d::Int64, delta::Float64=1.0, r::Fl
     dims[lx+1] = 1
 
     MatrixProductOperator{T}(lx, d, dims, tensors)
-
 end
 
 function qitf_mpo(T::DataType, lx::Int64, d::Int64,
