@@ -3,6 +3,9 @@ module SymTensors
 using LinearAlgebra
 
 import Base: convert, size, show, isequal, ==, *, conj
+import Base: eltype, similar, copyto!
+import Base: fill, fill!
+import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm
 import Base.intersect
 
 include("leg.jl")
@@ -40,5 +43,9 @@ export change_nzblk!
 export inv_perm
 
 export svdsym
+
+export eltype, similar, copyto!
+export mul!, rmul!, axpy!, axpby!, dot, norm
+export fill, fill!
 
 end

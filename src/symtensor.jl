@@ -1,4 +1,4 @@
-struct SymTensor{Tv<:Number, N}
+mutable struct SymTensor{Tv<:Number, N}
     charge :: Int     # total charge of the tensor
     legs :: NTuple{N, STLeg}
     sects :: Vector{NTuple{N, Int}}    # possible nonzero sectors
@@ -156,7 +156,9 @@ function randSymTensor(Tv::Type, charge::Int, legs::NTuple{N, STLeg}) where{N}
     SymTensor(charge, legs, sects, nzblks)
 end
 
-function fillSymTensor(value::Tv, charge::Int, legs::NTuple{N, STLeg}) where{Tv<:Number, N}
+function fill(x::Tv,
+              charge::Int,
+              legs::NTuple{N, STLeg}) where {Tv<:Number, N}
     sects = NTuple{N, Int}[]
     nzblks = Array{Tv, N}[]
     pats, patdims = _possible_fuse_patterns(charge, legs)
@@ -164,9 +166,18 @@ function fillSymTensor(value::Tv, charge::Int, legs::NTuple{N, STLeg}) where{Tv<
     pats, patdims = pats[perm], patdims[perm]
     for patidx in eachindex(pats)
         push!(sects, pats[patidx])
-        push!(nzblks, fill(value, patdims[patidx]...))
+        push!(nzblks, fill(x, patdims[patidx]...))
     end
     SymTensor(charge, legs, sects, nzblks)
+end
+
+fillSymTensor(x, charge, legs) = fill(x, charge, legs)
+
+function fill!(A::SymTensor{Tv, N}, x::Tv) where {Tv<:Number, N}
+    for i in eachindex(A.nzblks)
+        fill!(A.nzblks[i], x)
+    end
+    A
 end
 
 function eye(Tv::Type,
@@ -283,42 +294,8 @@ function show(ten::SymTensor)
     nothing
 end
 
-
-################################
-#### RELEG #####################
-################################
-
-"""
-    fuse_set(sect, parts)
-
-fuse the values in the `sect` using the binary operation `op` by to
-the partitions given by `parts`
-
-"""
-function fuse_set(op,
-                  sect::NTuple{N, Tc},
-                  partsizes::Vector{Int}) where {N, Tc<:Number}
-    ###TODO: I should be able to code this nicer, probably using some
-    ###functional stuff like map, fold, etc
-    result = Tc[]
-    p = 0
-    for n in partsizes
-        push!(result, foldl(op, sect[p+1:p+n]))
-        p += n
-    end
-    Tuple(result)
-end
-
-function permutelegs(sten::SymTensor{T, N}, perm) where{T, N}
-    @assert sort(perm) == collect(1:N)
-    sectperm = _sectors_sortperm(sten.sects,  by=x->x[perm])
-    nzblks = Array{T, N}[]
-    sects = [sect[perm] for sect in sten.sects[sectperm]]
-    for nzblk in sten.nzblks[sectperm]
-        #println(size(nzblk), " ", perm)
-        push!(nzblks, permutedims(nzblk, perm))
-    end
-    SymTensor(sten.charge, sten.legs[perm], sects, nzblks)
+function *(A::SymTensor, a::T) where {T<:Number}
+    SymTensor(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
 end
 
 function removedummyleg(sten::SymTensor{Tv, N}, l::Int) where {Tv,N}
@@ -329,4 +306,57 @@ function removedummyleg(sten::SymTensor{Tv, N}, l::Int) where {Tv,N}
               [(s[1:l-1]...,s[l+1:N]...) for s in sten.sects],
               [reshape(blk, size(blk)[1:l-1]...,size(blk)[l+1:N]...) for blk in sten.nzblks])
 
+end
+
+"the scalar type (i.e. <:Number) of the data in v"
+eltype(v::SymTensor{Tv}) where {Tv<:Number} = Tv
+
+"a way to construct additional similar vectors, possibly with a
+different scalar type T."
+function similar(v::SymTensor{Tv, N}, T::Type=Tv) where {Tv<:Number, N}
+    nzblks = [similar(blk) for blk in v.nzblks]
+    SymTensor(v.charge, v.legs, v.sects, nzblks)
+end
+
+"copy the contents of v to a preallocated vector w"
+function copyto!(w::SymTensor, v::SymTensor)
+    w.nzblks = v.nzblks
+    w
+end
+
+"out of place scalar multiplication; multiply vector v with scalar α
+and store the result in w"
+function mul!(w::SymTensor, v::SymTensor, α)
+    w = similar(v)
+    w.nzblks = [α .* blk for blk in v.nzblks]
+    w
+end
+
+"in-place scalar multiplication of v with α; in particular with α =
+false, v is initialized with all zeros"
+function rmul!(v::SymTensor, α)
+    v.nzblks .*= α
+    v
+end
+
+" store in w the result of α*v + w"
+function axpy!(α, v::SymTensor, w::SymTensor)
+    w.nzblks = [α .* v.nzblks[i] + w.nzblks[i] for i in eachindex(w.nzblks)]
+    w
+end
+
+" store in w the result of α*v + β*w"
+function axpby!(α, v::SymTensor, β, w::SymTensor)
+    w.nzblks = [α .* v.nzblks[i] + β .* w.nzblks[i] for i in eachindex(w.nzblks)]
+    w
+end
+
+" compute the inner product of two vectors"
+function dot(v::SymTensor{Tv, N}, w::SymTensor{Tv, N}) where{Tv<:Number,N}
+    contract(v, .-Tuple(1:N), invlegs(conj(w)), .-Tuple(1:N))
+end
+
+" compute the 2-norm of a vector"
+function norm(v::SymTensor)
+    sqrt(dot(v,v))
 end

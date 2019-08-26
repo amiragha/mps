@@ -1,6 +1,7 @@
 module TensorNetAlgs
 
 using MatrixProductStateTools
+using SymTensors
 using LinearAlgebra
 using TensorOperations
 using KrylovKit
@@ -12,6 +13,7 @@ include("apply.jl")
 include("dmrg.jl")
 include("idmrg.jl")
 include("tdvp.jl")
+include("symdmrg.jl")
 
 export initialenv
 

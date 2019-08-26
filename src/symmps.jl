@@ -45,7 +45,7 @@ function SymMatrixProductState{Tv}(
                       (legl,legd,legr),
                       sects,
                       #[1/sqrt(length(rchrs)) .*
-                       [(ones(Tv,1,1,1) + noise * ones(Tv,1,1,1)) for n in 1:l])
+                      [(ones(Tv,1,1,1) + noise * ones(Tv,1,1,1)) for n in 1:l])
         push!(matrices, A)
         lchrs = rchrs
     end
@@ -400,6 +400,25 @@ function measure_2point(mps::SymMatrixProductState{ComplexF64},
     measure_2point(mps,
                    convert(SymTensor{ComplexF64, 2}, op1),
                    convert(SymTensor{ComplexF64, 2}, op2))
+end
+
+function measure_mpo(mps::SymMatrixProductState{Tv},
+                     mpo::SymMatrixProductOperator{Tv}) where{Tv<:RLorCX}
+    @assert mps.d == mpo.d && mps.lx == mpo.lx
+
+    L = fill(one(Tv), 0, (STLeg(-1, [0], [1]),
+                          STLeg(-1, [0], [1]),
+                          STLeg(+1, [0], [1])))
+
+    for site=1:mps.lx
+        A = mps.matrices[site]
+        W = mpo.tensors[site]
+        L = contract(contract(contract(
+            L, (-1,3,4), A, (-1,2,1)),
+                              (1, -1, -2, 4), W, (-2, 3, 2,-1)),
+                     (1,2,-1,-2), invlegs(conj(A)), (-2,-1,3))
+    end
+    L
 end
 
 """

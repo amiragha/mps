@@ -26,6 +26,45 @@ end
 
 unzip(a) = map(x->getfield.(a,x), fieldnames(eltype(a)))
 
+
+################################
+#### RELEG #####################
+################################
+
+"""
+    fuse_set(sect, parts)
+
+fuse the values in the `sect` using the binary operation `op` by to
+the partitions given by `parts`
+
+"""
+function fuse_set(op,
+                  sect::NTuple{N, Tc},
+                  partsizes::Vector{Int}) where {N, Tc<:Number}
+    ###TODO: I should be able to code this nicer, probably using some
+    ###functional stuff like map, fold, etc
+    result = Tc[]
+    p = 0
+    for n in partsizes
+        push!(result, foldl(op, sect[p+1:p+n]))
+        p += n
+    end
+    Tuple(result)
+end
+
+function permutelegs(sten::SymTensor{T, N}, perm) where{T, N}
+    @assert sort(perm) == collect(1:N)
+    sectperm = _sectors_sortperm(sten.sects,  by=x->x[perm])
+    nzblks = Array{T, N}[]
+    sects = [sect[perm] for sect in sten.sects[sectperm]]
+    for nzblk in sten.nzblks[sectperm]
+        #println(size(nzblk), " ", perm)
+        push!(nzblks, permutedims(nzblk, perm))
+    end
+    SymTensor(sten.charge, sten.legs[perm], sects, nzblks)
+end
+
+
 # fuse n consequative legs `l` and `l+n-1` to a new leg with sign `sign`
 # function fuse_conseqlegs(sten::SymTensor{T, N},
 #                          sign::Int, l::Int, n::Int=2; debug=false) where{T<:Number, N}

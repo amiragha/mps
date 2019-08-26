@@ -161,7 +161,7 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
                                 vmat, 1, :SR, ishermitian=true)
         v = vs[1]
         e = es[1]
-        verbose && println("Sweep L2R: site $l -> energy $e")
+        verbose && println("Sweep R2L: site $l -> energy $e")
         #push!(energies, e)
     end
     l = 1

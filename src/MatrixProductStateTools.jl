@@ -1,7 +1,6 @@
 module MatrixProductStateTools
 
 using SymTensors
-
 using Random
 using LinearAlgebra
 using KrylovKit
@@ -13,14 +12,15 @@ import LinearAlgebra: normalize!
 
 include("mpsutils.jl")
 include("mpo.jl")
+include("symmpo.jl")
 include("mps.jl")
 include("imps.jl")
 include("symmps.jl")
-include("symmpo.jl")
 
 export MatrixProductOperator
 export MatrixProductState
 export SymMatrixProductState
+export SymMatrixProductOperator
 export InfiniteMatrixProductState
 
 export svdtrunc
