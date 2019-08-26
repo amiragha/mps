@@ -6,7 +6,7 @@
 
         h2sym = contract(smpo.tensors[1], (1,2,-1,5),
                          smpo.tensors[4], (-1,3,4,6))
-        h2sym = fuselegs(fuselegs(h2ten,+1, 2, 2), -1, 4, 2)
+        h2sym = fuselegs(fuselegs(h2sym,+1, 2, 2), -1, 4, 2)
         h2sym = removedummyleg(h2sym, 3)
         h2sym = removedummyleg(h2sym, 1)
 
@@ -36,10 +36,10 @@
         h4 = reshape(h4,16,16)
 
         H2 = Matrix(xxz_hamiltonian(2, 1.0))
-        H3 = Matrix(xxz_hamiltonian(2, 1.0))
-        H4 = Matrix(xxz_hamiltonian(2, 1.0))
+        H3 = Matrix(xxz_hamiltonian(3, 1.0))
+        H4 = Matrix(xxz_hamiltonian(4, 1.0))
 
-        @test h2 ≈ H4
+        @test h2 ≈ H2
         @test h3 ≈ H3
         @test h4 ≈ H4
 
