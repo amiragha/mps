@@ -418,7 +418,7 @@ function measure_mpo(mps::SymMatrixProductState{Tv},
                               (1, -1, -2, 4), W, (-2, 3, 2,-1)),
                      (1,2,-1,-2), invlegs(conj(A)), (-2,-1,3))
     end
-    L
+    L.nzblks[1][1,1,1]
 end
 
 """

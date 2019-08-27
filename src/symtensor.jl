@@ -327,7 +327,6 @@ end
 "out of place scalar multiplication; multiply vector v with scalar α
 and store the result in w"
 function mul!(w::SymTensor, v::SymTensor, α)
-    w = similar(v)
     w.nzblks = [α .* blk for blk in v.nzblks]
     w
 end
@@ -339,15 +338,66 @@ function rmul!(v::SymTensor, α)
     v
 end
 
+####TODO: I probably have to force allocation of all possbile sectors!
+####(in order to prevent recreation of the symtensor) but this
+####requires a bit of thinking and benchmarking to see which options works best.
+
+###NOTE: We assume that w has more sectors than v!  because all
+### possible sectors may not be used! (should I force this to happen!)
 " store in w the result of α*v + w"
-function axpy!(α, v::SymTensor, w::SymTensor)
-    w.nzblks = [α .* v.nzblks[i] + w.nzblks[i] for i in eachindex(w.nzblks)]
+function axpy!(α, v::SymTensor{T1, N}, w::SymTensor{T2, N}) where{T1,T2,N}
+    sects = NTuple{N, Int}[]
+    nzblks = Array{T2, N}[]
+
+    nv = length(v.sects)
+    nw = length(w.sects)
+    iv, iw = 1, 1
+    while (iv <= nv || iw <=nw)
+        if iv <= nv && iw <=nw && w.sects[iw] == v.sects[iv]
+            push!(sects, w.sects[iw])
+            push!(nzblks, α .* v.nzblks[iv] + w.nzblks[iw])
+            iv+=1
+            iw+=1
+        elseif iv > nw || _sector_less_than(w.sects[iw], v.sects[iv])
+            push!(sects, w.sects[iw])
+            push!(nzblks, w.nzblks[iw])
+            iw+=1
+        else
+            push!(sects, v.sects[iv])
+            push!(nzblks, α .* v.nzblks[iv])
+            iv+=1
+        end
+    end
+    w = SymTensor(w.charge, w.legs, sects, nzblks)
     w
 end
-
+###NOTE: We assume that w has more sectors than v!  because all
+### possible sectors may not be used! (should I force this to happen!)
 " store in w the result of α*v + β*w"
 function axpby!(α, v::SymTensor, β, w::SymTensor)
-    w.nzblks = [α .* v.nzblks[i] + β .* w.nzblks[i] for i in eachindex(w.nzblks)]
+        sects = NTuple{N, Int}[]
+    nzblks = Array{T2, N}[]
+
+    nv = length(v.sects)
+    nw = length(w.sects)
+    iv, iw = 1, 1
+    while (iv <= nv || iw <=nw)
+        if iv <= nv && iw <=nw && w.sects[iw] == v.sects[iv]
+            push!(sects, w.sects[iw])
+            push!(nzblks, α .* v.nzblks[iv] + β .* w.nzblks[iw])
+            iv+=1
+            iw+=1
+        elseif iv > nw || _sector_less_than(w.sects[iw], v.sects[iv])
+            push!(sects, w.sects[iw])
+            push!(nzblks, β .* w.nzblks[iw])
+            iw+=1
+        else
+            push!(sects, v.sects[iv])
+            push!(nzblks, α .* v.nzblks[iv])
+            iv+=1
+        end
+    end
+    w = SymTensor(w.charge, w.legs, sects, nzblks)
     w
 end
 

@@ -23,10 +23,6 @@ function *(sten1::SymTensor{Tv, 1}, sten2::SymTensor{Tv, 1}) where{Tv<:Number}
     bool = _are_contractible(sten1.legs[1], sten2.legs[1])
     bool ||
         error("not contractible!", sten1.legs[2], " and ", sten2.legs[1])
-    # println(idx1)
-    # println(idx2)
-    # println(sten1)
-    # println(sten2)
     # @assert length(idx1) == length(idx2) == 1
     @assert signs(sten1.legs) == (-1,)
     @assert signs(sten2.legs) == (+1,)
