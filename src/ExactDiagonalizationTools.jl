@@ -10,6 +10,8 @@ RLorCX = Union{Float64, ComplexF64}
 
 import LinearAlgebra: normalize!
 
+include("model.jl")
+
 include("spin_definitions.jl")
 include("ket.jl")
 include("xxz.jl")
@@ -39,5 +41,10 @@ export qitf_energy_exact
 export hopping_chain
 export nnhoppingchain
 export correlationmatrix
+
+# Model stuff to be separated
+export Point2D, Bond2D, UnitCell2D
+export triangular_unitcell
+export makemodel
 
 end

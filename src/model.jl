@@ -1,44 +1,53 @@
-"""
-    j1j2_explicit(Lx, j1, j2)
+struct Point2D
+    x :: Float64
+    y :: Float64
+end
 
-explicit construction of j1j2 sparse full Hamiltonian.
+struct Bond2D{T<:Number}
+    one :: Int
+    two :: Int
+    offx :: Int
+    offy :: Int
+    t   :: T
+end
 
-"""
-function j1j2_explicit(Lx::Int64,
-                       j1::Float64,
-                       j2::Float64;
-                       boundary::Symbol=:open)
-    @assert Lx > 2
-    Sz = sparse(sz_half)
-    Sp = sparse(sp_half)
-    Sm = sparse(sm_half)
-    I2 = speye(Float64,2)
+struct UnitCell2D{T<:Number}
+    n :: Int
+    sites :: Vector{Point2D}
+    vs :: Vector{Point2D}
+    bonds :: Vector{Bond2D{T}}
+    mus :: Vector{T}
+end
 
-    heis_term1 = j1 * 0.5 * (kron(Sp, Sm) + kron(Sm, Sp)) + j1 * kron(Sz,Sz)
-    heis_term2 = j2 * 0.5 * (kron(kron(Sp, I2), Sm) + kron(kron(Sm, I2), Sp)) +
-        j2 * kron(kron(Sz, I2), Sz)
+function triangular_unitcell(t1::T, t2::T, mu::T=zero(T)) where {T<:Number}
+    uc = UnitCell2D(
+    1,
+    [Point2D(0,0)],
+    [Point2D(0.5,sin(pi/3)), Point2D(1,0)],
+    [Bond2D(1, 1, +1, 0, t2), Bond2D(1, 1, 0, +1, t1), Bond2D(1, 1, -1, +1, t1)],
+    [mu])
+    uc
+end
 
-    Hmat = heis_term1
-    for i=3:Lx
-        Hmat = kron(Hmat, I2) + kron(eye(2^(i-2)), heis_term1) +
-            kron(eye(2^(i-3)), heis_term2)
+function makemodel(uc::UnitCell2D{T}, lx::Int, ly::Int; boundary::Symbol=:OBC) where{T<:Number}
+    nsites = uc.n*ly*lx
+    H = zeros(T, nsites, nsites)
+    for (y,x) in Iterators.product(1:ly,1:lx)
+        l = (x-1) * ly * uc.n + (y-1) * uc.n
+        for n in 1:uc.n
+            H[l+n,l+n] = uc.mus[n]
+        end
+        for b in uc.bonds
+            index1 = l+b.one
+            if 0 < y+b.offy <= ly && 0 < x+b.offx <= lx
+                index2 = l+b.two + (b.offx * uc.n * ly) + (b.offy * uc.n)
+                #println("$x, $y => ($index1, $index2)")
+                H[index1, index2] += -b.t
+                H[index2, index1] += -conj(b.t)
+            elseif boundary == :PBC
+                error("boundary not supported yet!")
+            end
+        end
     end
-
-    if boundary == :open
-        return Hmat
-    elseif boundary == :periodic
-        Hmat = Hmat +
-            j1 * 0.5 * kron(kron(Sp,eye(2^(Lx-2))), Sm) +
-            j1 * 0.5 * kron(kron(Sm,eye(2^(Lx-2))), Sp) +
-            j1 * kron(kron(Sz,eye(2^(Lx-2))), Sz) +
-            j2 * 0.5 * kron(I2, kron(kron(Sp,eye(2^(Lx-3))), Sm)) +
-            j2 * 0.5 * kron(I2, kron(kron(Sm,eye(2^(Lx-3))), Sp)) +
-            j2 * kron(I2, kron(kron(Sz,eye(2^(Lx-3))), Sz)) +
-            j2 * 0.5 * kron(kron(kron(Sp,eye(2^(Lx-3))), Sm), I2) +
-            j2 * 0.5 * kron(kron(kron(Sm,eye(2^(Lx-3))), Sp), I2) +
-            j2 * kron(kron(kron(Sz,eye(2^(Lx-3))), Sz), I2)
-        return Hmat
-    else
-        error("unrecognized boundary conditions :", boundary)
-    end
+    H
 end
