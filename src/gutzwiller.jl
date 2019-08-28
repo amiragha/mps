@@ -96,7 +96,7 @@ function zipandgutzwiller!(mps1::SymMatrixProductState{Tv},
     if mode==:B14
         return _zipandgutzwiller_B14!(mps1, mps2, maxdim=maxdim)
     elseif mode==:F23
-        error("not fully functional yet!")
+        return _zipandgutzwiller_F23!(mps1, mps2, maxdim=maxdim)
     else
         error("mode not defined : ", mode)
     end
@@ -135,10 +135,6 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
         A = mps1.matrices[l]
         B = mps2.matrices[l]
 
-        # diml1, dimr1 = size(mat1, 1), size(mat1, 3)
-        # diml2, dimr2 = size(mat2, 1), size(mat2, 3)
-        # dimle = size(E, 1)
-
         ##NOTE:
         # contracting (E2, A1)
         # First tensor has EA = E1 E3 A2 A3
@@ -155,7 +151,7 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
         dims[l+1] = size(S, 1)
         push!(matrices,
               mapcharges(x->div(x,2),
-                                   defuse_leg(U, 1, (E.legs[1], G.legs[1]))))
+                         defuse_leg(U, 1, (E.legs[1], G.legs[1]))))
         E = defuse_leg(S * Vt, 2, (A.legs[3], B.legs[3]))
     end
     A = mps1.matrices[lx]
@@ -191,20 +187,16 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     ## symmetry we need to do the follwoing. Assume the first mps
     ## corresponds to ↑ or 1 and second mps to ↓ or -1.
     G = fillSymTensor(one(Tv), 0,
-                          (STLeg(+1, [-1,1], [1,1]),
-                           STLeg(+1, [0,1], [1,1]),
-                           STLeg(-1, [0,1], [1,1])))
+                      (STLeg(+1, [-1,1], [1,1]),
+                       STLeg(-1, [0,1], [1,1]),
+                       STLeg(+1, [0,1], [1,1])))
 
     E = fillSymTensor(one(Tv), 0, (STLeg(+1, [0], [1]),
                                    STLeg(-1, [0], [1]),
                                    STLeg(+1, [0], [1])))
     for l=1:lx-1
         A = mps1.matrices[l]
-        B = mps2.matrices[l]
-
-        # diml1, dimr1 = size(mat1, 1), size(mat1, 3)
-        # diml2, dimr2 = size(mat2, 1), size(mat2, 3)
-        # dimle = size(E, 1)
+        B = invlegs(mps2.matrices[l])
 
         ##NOTE:
         # contracting (E2, A1)
@@ -220,16 +212,25 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
 
         U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
         dims[l+1] = size(S, 1)
-        push!(matrices, defuse_leg(U, 1, (E.legs[1], G.legs[1])))
+
+        fnl = x->div(x+l-1, 2)
+        fnd = x->div(x+1, 2)
+        fnr = x->div(x+l, 2)
+        push!(matrices,
+              mapcharges((fnl,fnd,fnr),
+                         defuse_leg(U, 1, (E.legs[1], G.legs[1]))))
         E = defuse_leg(S * Vt, 2, (A.legs[3], B.legs[3]))
     end
     A = mps1.matrices[lx]
-    B = mps2.matrices[lx]
+    B = invlegs(mps2.matrices[lx])
     C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
                           (1, 2, -1, 4), G, (3, -1, 5)),
                  (1,-1, 2, 3,-2), B, (-1,-2, 4))
 
-    push!(matrices, fuselegs(C, -1, 3, 2))
+    fnl = x->div(x+lx-1, 2)
+    fnd = x->div(x+1, 2)
+    fnr = x->div(x+lx, 2)
+    push!(matrices, mapcharges((fnl,fnd,fnr), fuselegs(C, -1, 3, 2)))
 
     return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
 end

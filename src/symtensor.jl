@@ -264,6 +264,15 @@ function mapcharges(f::Function, A::SymTensor{Tv, N}) where{Tv<:Number, N}
               A.nzblks)
 end
 
+function mapcharges(f::NTuple{N, Function}, A::SymTensor{Tv, N}) where{Tv<:Number, N}
+    legs = Tuple(mapcharges(f[i], A.legs[i]) for i in 1:N)
+    sects = [Tuple(f[i](s[i]) for i in 1:N) for s in A.sects]
+    sgns = signs(legs)
+    charges = [sum(sgns .* s) for s in sects]
+    !all(charges .== charges[1]) && error("mapcharges function is inconsistent!")
+    SymTensor(charges[1], legs, sects, A.nzblks)
+end
+
 function array_representation(sten::SymTensor{Tv}) where {Tv<:Number}
     arrep = zeros(sum.(alldims(sten.legs)))
     adims = Tuple([0;s] for s in accdims(sten.legs))
