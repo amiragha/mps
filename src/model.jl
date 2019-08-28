@@ -21,15 +21,20 @@ end
 
 function triangular_unitcell(t1::T, t2::T, mu::T=zero(T)) where {T<:Number}
     uc = UnitCell2D(
-    1,
-    [Point2D(0,0)],
-    [Point2D(0.5,sin(pi/3)), Point2D(1,0)],
-    [Bond2D(1, 1, +1, 0, t2), Bond2D(1, 1, 0, +1, t1), Bond2D(1, 1, -1, +1, t1)],
-    [mu])
+        1,
+        [Point2D(0,0)],
+        [Point2D(0.5,sin(pi/3)), Point2D(1,0)],
+        [Bond2D(1, 1, +1, 0, t2), Bond2D(1, 1, 0, +1, t1), Bond2D(1, 1, -1, +1, t1)],
+        [mu])
     uc
 end
 
-function makemodel(uc::UnitCell2D{T}, lx::Int, ly::Int; boundary::Symbol=:OBC) where{T<:Number}
+function makemodel(
+    uc::UnitCell2D{T},
+    lx::Int,
+    ly::Int;
+    boundary::Symbol=:OBC) where{T<:Number}
+
     nsites = uc.n*ly*lx
     H = zeros(T, nsites, nsites)
     for (y,x) in Iterators.product(1:ly,1:lx)
@@ -44,8 +49,14 @@ function makemodel(uc::UnitCell2D{T}, lx::Int, ly::Int; boundary::Symbol=:OBC) w
                 #println("$x, $y => ($index1, $index2)")
                 H[index1, index2] += -b.t
                 H[index2, index1] += -conj(b.t)
-            elseif boundary == :PBC
-                error("boundary not supported yet!")
+            elseif boundary == :PBCX && 0 < y+b.offy <= ly
+                x+b.offx > lx ? lnew = l - lx * ly * uc.n : lnew = l + lx * ly * uc.n
+                index2 = lnew + b.two + (b.offx * uc.n * ly) + (b.offy * uc.n)
+                #println("wrap x, $y => ($index1, $index2)")
+                H[index1, index2] += -b.t
+                H[index2, index1] += -conj(b.t)
+            elseif !(boundary in [:OBC, :PBCX])
+                error("unrecognized boundary condition : ", boundary)
             end
         end
     end
