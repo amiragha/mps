@@ -156,3 +156,8 @@ function contract(A::SymTensor{T, N}, idxA::NTuple{N, Int},
     permutelegs(defuse_leg(defuse_leg(matA * matB, 2, B.legs[remsB]), 1, A.legs[remsA]),
                 inv_perm([tofinalsA;tofinalsB]))
 end
+
+function contract(A::SymTensor{ComplexF64, N}, idxA::NTuple{N, Int},
+                  B::SymTensor{Float64, M}, idxB::NTuple{M, Int}) where{N, M}
+    contract(A, idxA, convert(SymTensor{ComplexF64, M}, B), idxB)
+end

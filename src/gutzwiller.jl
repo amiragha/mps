@@ -198,17 +198,20 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
         A = mps1.matrices[l]
         B = invlegs(mps2.matrices[l])
 
+        fswap = fermionswapgate(A.legs[2], B.legs[1])
         ##NOTE:
         # contracting (E2, A1)
         # First tensor has EA = E1 E3 A2 A3
+        # contracting with swap
+        # second tensor has EAX = E1 A2 E3 A3
         # contracting (A2, G2)
-        # Scond tensor has EAG = E1 E3 G1 A3 G3
+        # Third tensor has EAG = E1 G1 G3 E3 A3
         # contracting (E3, B1) and (G3, B2)
         # Final tensor has E1 G1 A3 B3
-        C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
-                              (1, 2, -1, 4), G, (3, -1, 5)),
-                     (1,-1, 2, 3,-2), B, (-1,-2, 4))
-
+        C = contract(contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                                       (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                              (1, -1, 4, 5), G, (2, -1, 3)),
+                     (1,2, -2, -1,3), B, (-1,-2, 4))
 
         U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
         dims[l+1] = size(S, 1)
@@ -223,9 +226,11 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     end
     A = mps1.matrices[lx]
     B = invlegs(mps2.matrices[lx])
-    C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
-                          (1, 2, -1, 4), G, (3, -1, 5)),
-                 (1,-1, 2, 3,-2), B, (-1,-2, 4))
+    fswap = fermionswapgate(A.legs[2], B.legs[1])
+    C = contract(contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                                   (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                          (1, -1, 4, 5), G, (2, -1, 3)),
+                 (1,2, -2, -1,3), B, (-1,-2, 4))
 
     fnl = x->div(x+lx-1, 2)
     fnd = x->div(x+1, 2)

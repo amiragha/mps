@@ -48,4 +48,5 @@ export eltype, similar, copyto!
 export mul!, rmul!, axpy!, axpby!, dot, norm
 export fill, fill!
 
+export fermionswapgate
 end
