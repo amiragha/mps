@@ -18,6 +18,7 @@ function svdtrunc(A::Matrix{T};
                   tol::Float64=1.e-14) where{T<:Number}
     fact = svd(A, full=false)
     n = min(maxdim, sum(fact.S .> fact.S[1]*tol))
+    n == 0 && error("The largest singular value is smaller than tol! $m < $tol")
 
     fact.U[:, 1:n], Diagonal(fact.S[1:n]), fact.Vt[1:n, :]
 end
@@ -41,7 +42,10 @@ function picklargests(Ss::Vector{Vector{Float64}},
     for n=1:min(maxdim, sum([length(s) for s in Ss]))
         #println(c, pointers)
         m, index = findmax(c)
-        (m < tol) && break
+        if (m < tol)
+            n==1 && error("The largest singular value is smaller than tol! $m < $tol")
+            break
+        end
         push!(vs[index], Ss[index][pointers[index]])
         if pointers[index] == length(Ss[index])
             #println("here")
