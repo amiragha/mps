@@ -1,6 +1,17 @@
+struct Point1D
+    x :: Float64
+end
+
 struct Point2D
     x :: Float64
     y :: Float64
+end
+
+struct Bond1D{T<:Number}
+    one :: Int
+    two :: Int
+    offx :: Int
+    t   :: T
 end
 
 struct Bond2D{T<:Number}
@@ -11,12 +22,40 @@ struct Bond2D{T<:Number}
     t   :: T
 end
 
+struct UnitCell1D{T<:Number}
+    n :: Int
+    sites :: Vector{Point1D}
+    vs :: Vector{Point1D}
+    bonds :: Vector{Bond1D{T}}
+    mus :: Vector{T}
+end
+
 struct UnitCell2D{T<:Number}
     n :: Int
     sites :: Vector{Point2D}
     vs :: Vector{Point2D}
     bonds :: Vector{Bond2D{T}}
     mus :: Vector{T}
+end
+
+function chainunitcell(t::T, mu::T=zero(T)) where {T<:Number}
+     uc = UnitCell1D(
+        1,
+        [Point1D(0,0)],
+        [Point1D(+1)],
+        [Bond2D(1, 1, +1, t)],
+        [mu])
+    uc
+end
+
+function squareunitcell(tx::T, ty::T, mu::T=zero(T)) where {T<:Number}
+    uc = UnitCell2D(
+        1,
+        [Point2D(0,0)],
+        [Point2D(0,1), Point2D(1,0)],
+        [Bond2D(1, 1, +1, 0, tx), Bond2D(1, 1, 0, +1, ty)],
+        [mu])
+    uc
 end
 
 function triangular_unitcell(t1::T, t2::T, mu::T=zero(T)) where {T<:Number}
@@ -29,6 +68,7 @@ function triangular_unitcell(t1::T, t2::T, mu::T=zero(T)) where {T<:Number}
     uc
 end
 
+##TODO: combine this stuff into a function that works for every dimension.
 function makemodel(
     uc::UnitCell2D{T},
     lx::Int,
