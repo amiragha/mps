@@ -11,17 +11,38 @@ spatial basis. So, a classical MPS from the configurations is made and
 then the gates are applied in reverse order.
 
 """
+
+##TODO: think about how to incorporate the complex gates (that may
+##come when the hoppings are complex numbers) into this type nicely!
+# function fishman2mps(fsmset::FishmanComplexGateSet,
+#                      maxdim::Int64;
+#                      symmetry::Symbol=:NONE)
+
+#     ##TODO: why are these defined complex here?!
+#     if symmetry == :NONE
+#         mps = MatrixProductState{Float64}(fsmset.lx, 2, fsmset.initconf)
+#         _applyfishmangates!(mps, fsmset, maxdim)
+
+#     elseif symmetry == :U1
+#         mps = SymMatrixProductState{Float64}(fsmset.lx, 2, fsmset.initconf)
+#         _applyfishmangates!(mps, fsmset, maxdim)
+#     else
+#         error( "Symmetry $symmetry is not defined!")
+#     end
+#     mps
+# end
+
 function fishman2mps(fsmset::FishmanGateSet,
                      maxdim::Int64;
                      symmetry::Symbol=:NONE)
 
     ##TODO: why are these defined complex here?!
     if symmetry == :NONE
-        mps = MatrixProductState{ComplexF64}(fsmset.lx, 2, fsmset.initconf)
+        mps = MatrixProductState{Float64}(fsmset.lx, 2, fsmset.initconf)
         _applyfishmangates!(mps, fsmset, maxdim)
 
     elseif symmetry == :U1
-        mps = SymMatrixProductState{ComplexF64}(fsmset.lx, 2, fsmset.initconf)
+        mps = SymMatrixProductState{Float64}(fsmset.lx, 2, fsmset.initconf)
         _applyfishmangates!(mps, fsmset, maxdim)
     else
         error( "Symmetry $symmetry is not defined!")
