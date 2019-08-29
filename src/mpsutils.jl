@@ -1,3 +1,20 @@
+"""
+    half_measurement_index(lx, m, n)
+
+Returns the index corresponding to the half_measurement of lattice
+size `lx`. That means the index in the vector When `n > m` for all `m` and
+`n`.
+
+"""
+# more readable version : div(lx*(lx-1),2) - div((lx-m+1)*(lx-m),2) + (n-m)
+half_measurement_index(lx::Int, m::Int, n::Int) =
+    1 <= m < n <= lx ? div((2*lx-m)*(m-1), 2) + (n-m) : error("1 <= $m < $n <= $lx")
+
+"""
+    randisometry(d1, d2)
+
+Returns a uniformly chosen random isometry matrix of size `d1` × `d2`
+"""
 randisometry(T,rng::AbstractRNG, d1, d2) =
     d1 >= d2 ? Matrix(qr!(randn(rng, T, d1, d2)).Q) : Matrix(lq!(randn(rng, T, d1, d2)).Q)
 randisometry(rng, d1, d2) = randisometry(Float64, rng, d1, d2)
@@ -5,12 +22,13 @@ randisometry(rng, d1, d2) = randisometry(Float64, rng, d1, d2)
 """
     svdtrunc(A [;maxdim, tol])
 
-Performs the singular value decomposition and truncated the singular
-values accoding to the tolerance `tol` or `maxdim` specified,
-whichever is lower.
+Performs the singular value decomposition (SVD) and truncated the
+singular values (SV) accoding to the tolerance `tol` or `maxdim`
+specified, whichever results in a lower number of SVs.
 
-Return value is the tuple of truncated U, S, Vt. Here S is a diagonal
-matrix instead of a vector.
+Return value is the tuple of truncated `U`, `S`, `Vt`. Where `U`, and
+`Vt` are left and right isometries and `S` is a Diagonal matrix
+containing the SVs.
 
 """
 function svdtrunc(A::Matrix{T};
@@ -142,7 +160,7 @@ individual vector is calculated.
 function entropy(spectrum::Vector{T};
                  alpha::Int=1) where {T<:Number}
 
-    s = spectrum ./ sum(spectrum)
+    s = spectrum ./ norm(spectrum)
     if alpha == 1
         return - sum(s .* log.(s))
     else

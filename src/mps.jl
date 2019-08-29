@@ -445,21 +445,6 @@ function measure_2point(mps::MatrixProductState{ComplexF64},
     measure_2point(mps, convert(Matrix{ComplexF64}, op1), convert(Matrix{ComplexF64}, op2))
 end
 
-
-"""
-    half_measurement_index(lx, m, n)
-
-Returns the index corresponding to the half_measurement of lattice
-size `lx`. That means the index in the vector When `n > m` for all `m` and
-`n`.
-
-"""
-function half_measurement_index(lx::Int64, m::Int64, n::Int64)
-    @assert 1 <= m < n <= lx
-    # more readable version : div(lx*(lx-1),2) - div((lx-m+1)*(lx-m),2) + (n-m)
-    div((2*lx-m)*(m-1), 2) + (n-m)
-end
-
 """
     measure_mpo(mps, mpo)
 
@@ -467,9 +452,12 @@ The output is the result of measurement of a full MPO that is a
 number.
 
 """
-function measure_mpo(mps::MatrixProductState{T},
-                     mpo::MatrixProductOperator{T}) where{T<:RLorCX}
-    @assert mps.d == mpo.d && mps.lx == mpo.lx
+function measure_mpo(
+    mps::MatrixProductState{T},
+    mpo::MatrixProductOperator{T}) where{T<:RLorCX}
+
+    (mps.d == mpo.d && mps.lx == mpo.lx) ||
+        error("MPS and MPO are non-compatible!")
 
     left = ones(T, 1, 1, 1)
 
