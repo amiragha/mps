@@ -475,6 +475,7 @@ function apply_2siteoperator!(mps     ::SymMatrixProductState{Tv},
     U, S, Vt = svdtrunc(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2),
                         maxdim=maxdim, tol=1.e-14)
 
+    makenormalize!(S)
     mps.dims[l+1] = size(U, 2)
 
     if (pushto == :R)

@@ -384,7 +384,7 @@ end
 ### possible sectors may not be used! (should I force this to happen!)
 " store in w the result of α*v + β*w"
 function axpby!(α, v::SymTensor, β, w::SymTensor)
-        sects = NTuple{N, Int}[]
+    sects = NTuple{N, Int}[]
     nzblks = Array{T2, N}[]
 
     nv = length(v.sects)
@@ -418,4 +418,13 @@ end
 " compute the 2-norm of a vector"
 function norm(v::SymTensor)
     sqrt(dot(v,v))
+end
+
+function makenormalize!(S::SymTensor)
+    #s = norm(vcat([diag(blk) for blk in S.nzblks]...))
+    s = norm(S)
+    for i in eachindex(S.nzblks)
+        S.nzblks[i] = S.nzblks[i] ./ s
+    end
+    S
 end
