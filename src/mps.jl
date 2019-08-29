@@ -496,25 +496,9 @@ Measure the entanglement entropy for an MPS at a given cut `l` or if
 ommited at every bond of the MPS.
 
 """
-function entanglemententropy(mps::MatrixProductState{T};
-                             alpha::Int=1) where{T}
-
-    lx = mps.lx
-    result = Vector{Float64}(undef, lx-1)
-    move_center!(mps, 1)
-    A = mps.matrices[1]
-
-    for l = 1:lx-1
-        U, S, Vt = svd(reshape(A, size(A, 1)*size(A,2), size(A,3)))
-        mps.matrices[l] = reshape(U, size(A))
-        result[l] = entropy(S, alpha=alpha)
-        @tensor A[l,o,r] := (Diagonal(S)*Vt)[l,m] * mps.matrices[l+1][m,o,r]
-    end
-
-    mps.matrices[lx] = A
-    mps.center = lx
-
-    result
+function entanglemententropy(mps::MatrixProductState;
+                             alpha::Int=1)
+   entropy.(entanglementspectrum(mps).^2)
 end
 
 

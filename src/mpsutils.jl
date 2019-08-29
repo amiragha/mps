@@ -145,26 +145,25 @@ function svdtrunc(A::SymTensor{Tv, 2};
 end
 
 """
-    entorpy(spectrum [; alpha])
+    entorpy(P [; alpha])
 
-calculate the entropy of a vector of numbers `spectrum`. The numbers
-are assumed to be probabilities which means they are positive. The
-numbers will be normalized so that they add up to 1. If `alpha=1` (the
-default) it calculates the usual Shannon (Von-Neumann) entropy and if
-`alpha > 1` calculates the Renyi entorpy.
+Calculate the entropy of a vector of numbers `P`. The numbers are
+assumed to form a probability distribution which means they add up to
+one.
 
-If the input is a vector of vectors, then the entropy of each
-individual vector is calculated.
+ If `alpha=1` (the default) it calculates the usual Shannon
+(Von-Neumann) entropy and if `alpha > 1` calculates the Renyi entorpy.
 
 """
-function entropy(spectrum::Vector{T};
+function entropy(P::Vector{T};
                  alpha::Int=1) where {T<:Number}
 
-    s = spectrum ./ norm(spectrum)
+    any(P .< 0.0) && error("Negative value in P vector ", P)
+    sum(P) ≈ 1 || error("P vector doesn't add up to one : $(sum(P))")
     if alpha == 1
-        return - sum(s .* log.(s))
+        return -sum(P .* log.(P))
     else
-        return log(sum(s.^alpha))/(1-alpha)
+        return log(sum(P.^alpha))/(1-alpha)
     end
 end
 
