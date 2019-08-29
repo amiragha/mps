@@ -266,6 +266,25 @@ end
 ### NOTE: end of exactly the same functions
 ###
 
+function entanglementspectrum(mps::SymMatrixProductState)
+    lx = mps.lx
+    result = Vector{Vector{Float64}}(undef, lx-1)
+    move_center!(mps, 1)
+    A = mps.matrices[1]
+
+    for l = 1:lx-1
+        U, S, Vt = svdsym(fuselegs(A, +1, 1, 2))
+        mps.matrices[l] = defuse_leg(U, 1, A.legs[1:2])
+        spectrum = sort(vcat([diag(blk) for blk in S.nzblks]...), rev=true)
+        result[l] = spectrum
+        A = contract(S*Vt, (1, -1), mps.matrices[l+1], (-1,2,3))
+    end
+
+    mps.matrices[lx] = A
+    mps.center = lx
+    result
+end
+
 function entanglemententropy(mps::SymMatrixProductState{Tv};
                              alpha::Int=1) where{Tv}
 
@@ -344,6 +363,7 @@ function measure_2point(mps::SymMatrixProductState{Tv},
     (op1.charge + op2.charge != 0) &&
         error("operator charges don't add up to zero! $(op1.charge), $(op2.charge)")
 
+    # why move mps center?
     move_center!(mps, site1)
     mat = mps.matrices[site1]
 
@@ -371,6 +391,7 @@ function measure_2point(mps::SymMatrixProductState{Tv},
 
     result = Tv[]
     for site1=1:lx-1
+        # why do I need to move the center to where my operator measures?
         move_center!(mps, site1)
         mat = mps.matrices[site1]
 
