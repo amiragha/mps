@@ -159,7 +159,7 @@ function entropy(P::Vector{T};
                  alpha::Int=1) where {T<:Number}
 
     any(P .< 0.0) && error("Negative value in P vector ", P)
-    sum(P) ≈ 1 || error("P vector doesn't add up to one : $(sum(P))")
+    sum(P) ≈ 1 || println("P vector doesn't add up to one : $(sum(P))")
     if alpha == 1
         return -sum(P .* log.(P))
     else

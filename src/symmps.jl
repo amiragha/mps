@@ -287,7 +287,7 @@ end
 
 function entanglemententropy(mps::SymMatrixProductState;
                              alpha::Int=1)
-    entropy.(entanglementspectrum(mps).^2)
+    [entropy(spectrum.^2) for spectrum in entanglementspectrum(mps)]
 end
 
 function measure_1point(mps::SymMatrixProductState{Tv}, op::SymTensor{Tv,2},

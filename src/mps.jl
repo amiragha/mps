@@ -498,7 +498,7 @@ ommited at every bond of the MPS.
 """
 function entanglemententropy(mps::MatrixProductState;
                              alpha::Int=1)
-   entropy.(entanglementspectrum(mps).^2)
+   [entropy(spectrum.^2) for spectrum in entanglementspectrum(mps)]
 end
 
 
