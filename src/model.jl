@@ -38,8 +38,38 @@ struct UnitCell2D{T<:Number}
     mus :: Vector{T}
 end
 
+function enlargeunitcell(uc::UnitCell2D{T}, lx::Int, ly::Int) where{T}
+
+    sites = Point2D[]
+    bonds = Point2D[]
+    for (y, x) in Iterators.product(1:ly, 1:lx)
+        for s in uc.sites
+            push!(sites, (y-1)*uc.vs[2] + (x-1)*uc.vs[1] + s)
+        end
+        for b in uc.bonds
+            index1 = l+b.one
+            if 0 < y+b.offy <= ly && 0 < x+b.offx <= lx
+                index2 = l+b.two + (b.offx * uc.n * ly) + (b.offy * uc.n)
+                push!(bonds, Bond2D(index1, index2))
+            elseif 0 < y+b.offy <= ly
+                # x wrap
+            elseif  0 < x+b.offx <= lx
+                # y wrap
+            else
+                # double wrap
+            end
+        end
+    end
+    UnitCell2D(
+        uc.n*ly*lx,
+        sites,
+        [multiply((lx,ly), uc.vs[1]), multiply((lx,ly), uc.vs[2])],
+        bonds
+    )
+end
+
 function chainunitcell(t::T, mu::T=zero(T)) where {T<:Number}
-     uc = UnitCell1D(
+    uc = UnitCell1D(
         1,
         [Point1D(0,0)],
         [Point1D(+1)],
