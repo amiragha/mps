@@ -473,7 +473,7 @@ end
 function entanglementspectrum(mps::MatrixProductState)
 
     lx = mps.lx
-    result = Vector{Float64}(undef, lx-1)
+    result = Vector{Vector{Float64}}(undef, lx-1)
     move_center!(mps, 1)
     A = mps.matrices[1]
 
