@@ -50,10 +50,10 @@ function fishman2mps(fsmset::FishmanGateSet,
     mps
 end
 
-function _applyfishmangates!(mps::MatrixProductState{Tv},
+function _applyfishmangates!(mps::MatrixProductState{T},
                              fsmset::FishmanGateSet,
-                             maxdim::Int) where{Tv}
-    twobodyugate = Matrix{ComplexF64}(I, 4, 4)
+                             maxdim::Int) where{T<:RLorCX}
+    twobodyugate = Matrix{T}(I, 4, 4)
     ## NOTE: the gates are applies in reverse order
     for n=length(fsmset.positions):-1:1
         site = fsmset.positions[n]
