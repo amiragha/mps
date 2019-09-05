@@ -583,6 +583,7 @@ function apply_2siteoperator!(mps      ::MatrixProductState{T},
     Vt = fact.Vt[1:n,:]
     ## QQQ? do we need to normalize S here?
 
+    normalize!(S)
     mps.dims[l+1] = n
 
     if (pushto == :R)
