@@ -7,6 +7,9 @@ struct Point2D
     y :: Float64
 end
 
+*(a, p::Point2D) = Point2D(a*p.x,a*p.y)
++(p::Point2D, q::Point2D) = Point2D(p.x+q.x, p.y+q.y)
+
 struct Bond1D{T<:Number}
     one :: Int
     two :: Int
@@ -41,30 +44,30 @@ end
 function enlargeunitcell(uc::UnitCell2D{T}, lx::Int, ly::Int) where{T}
 
     sites = Point2D[]
-    bonds = Point2D[]
+    bonds = Bond2D{T}[]
+    mus = T[]
     for (y, x) in Iterators.product(1:ly, 1:lx)
-        for s in uc.sites
-            push!(sites, (y-1)*uc.vs[2] + (x-1)*uc.vs[1] + s)
+        for idx in 1:uc.n
+            push!(sites, (y-1)*uc.vs[2] + (x-1)*uc.vs[1] + uc.sites[idx])
+            push!(mus, uc.mus[idx])
         end
+        l = (x-1) * ly * uc.n + (y-1) * uc.n
         for b in uc.bonds
-            index1 = l+b.one
-            if 0 < y+b.offy <= ly && 0 < x+b.offx <= lx
-                index2 = l+b.two + (b.offx * uc.n * ly) + (b.offy * uc.n)
-                push!(bonds, Bond2D(index1, index2))
-            elseif 0 < y+b.offy <= ly
-                # x wrap
-            elseif  0 < x+b.offx <= lx
-                # y wrap
-            else
-                # double wrap
-            end
+            one = l+b.one
+
+            offx, padx = fldmod(x+b.offx-1, lx)
+            offy, pady = fldmod(y+b.offy-1, ly)
+
+            two = b.two + (padx * uc.n * ly) + (pady * uc.n)
+            push!(bonds, Bond2D(one, two, offx, offy, b.t))
         end
     end
     UnitCell2D(
         uc.n*ly*lx,
         sites,
-        [multiply((lx,ly), uc.vs[1]), multiply((lx,ly), uc.vs[2])],
-        bonds
+        [lx * uc.vs[1], ly * uc.vs[2]],
+        bonds,
+        mus,
     )
 end
 
@@ -88,12 +91,12 @@ function squareunitcell(tx::T, ty::T, mu::T=zero(T)) where {T<:Number}
     uc
 end
 
-function triangular_unitcell(t1::T, t2::T, mu::T=zero(T)) where {T<:Number}
+function triangularunitcell(t1::T, t2::T, t3::T, mu::T=zero(T)) where {T<:Number}
     uc = UnitCell2D(
         1,
         [Point2D(0,0)],
-        [Point2D(0.5,sin(pi/3)), Point2D(1,0)],
-        [Bond2D(1, 1, +1, 0, t2), Bond2D(1, 1, 0, +1, t1), Bond2D(1, 1, -1, +1, t1)],
+        [Point2D(1,0), Point2D(0.5,sin(pi/3))],
+        [Bond2D(1, 1, +1, 0, t1), Bond2D(1, 1, 0, +1, t2), Bond2D(1, 1, -1, +1, t3)],
         [mu])
     uc
 end

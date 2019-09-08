@@ -10,6 +10,7 @@ RLorCX = Union{Float64, ComplexF64}
 
 import LinearAlgebra: normalize!
 
+import Base: +, *
 include("model.jl")
 
 include("spin_definitions.jl")
@@ -45,6 +46,7 @@ export correlationmatrix
 # Model stuff to be separated
 export Point2D, Bond2D, UnitCell2D
 export triangular_unitcell
+export enlargeunitcell
 export makehamiltonian
 export makemodel
 export makemodelJW
