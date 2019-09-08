@@ -16,7 +16,7 @@ function correlationmatrix(hopmatrix::Matrix{Float64},
     @assert 0 < n_occupied && n_occupied <= lx
 
     vecs = eigvecs(Symmetric(hopmatrix))[:, 1:n_occupied]
-    println(eigen(Symmetric(hopmatrix)))
+    #println(eigen(Symmetric(hopmatrix)))
     return vecs * transpose(vecs)
 end
 
