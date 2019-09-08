@@ -1,5 +1,5 @@
 """
-    correlationmatrix(lx, n_occupied)
+    correlationmatrix(hopmatrix, n_occupied)
 
 calculates the two-body correlation matrix lambda ``Λ = ⟨a^†_i a_j⟩``
 by full diagonalization of given Hamiltonian matrix.
@@ -16,6 +16,7 @@ function correlationmatrix(hopmatrix::Matrix{Float64},
     @assert 0 < n_occupied && n_occupied <= lx
 
     vecs = eigvecs(Symmetric(hopmatrix))[:, 1:n_occupied]
+    println(eigen(Symmetric(hopmatrix)))
     return vecs * transpose(vecs)
 end
 

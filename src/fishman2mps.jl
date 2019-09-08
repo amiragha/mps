@@ -4,11 +4,11 @@
 Construct a matrix product state with a maximum bond dimension
 `max_dim` from a set of Fishman gates `fsmset`.
 
-Since the unitary gates orthogonalize the unitary matrix, if they are
-applied in revese order to the configuration state (which is the state
-in the occupation basis) they will generate the state in the original
-spatial basis. So, a classical MPS from the configurations is made and
-then the gates are applied in reverse order.
+Since the unitary gates orthogonalize the correlation matrix, if they
+are applied in revese order to the configuration state (which is the
+state in the occupation basis) they will generate the state in the
+original spatial basis. So, a classical MPS from the configurations is
+made and then the gates are applied in reverse order.
 
 """
 

@@ -45,6 +45,10 @@ export correlationmatrix
 # Model stuff to be separated
 export Point2D, Bond2D, UnitCell2D
 export triangular_unitcell
+export makehamiltonian
 export makemodel
+export makemodelJW
+
+export makemodelJW_u1sym
 
 end
