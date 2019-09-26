@@ -16,7 +16,7 @@
 
     @testset "2siteop s=1/2" begin
         smat = eye(Float64, 0, [0,1,2], [1,2,1])
-        change_nzblk!(smat, (1,1), [2. 3;4 5])
+        set_sector!(smat, (1,1), [2. 3;4 5])
         rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
         clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
         smat2 = defuse_leg(defuse_leg(smat, 2, clegs), 1, rlegs)

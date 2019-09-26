@@ -1,10 +1,11 @@
 module SymTensors
 
 using LinearAlgebra
+using Random
 
 import Base: convert, size, show, isequal, ==, *, conj
 import Base: eltype, similar, copyto!
-import Base: fill, fill!
+import Base: fill, fill!, rand
 import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm
 import Base.intersect
 
@@ -14,13 +15,19 @@ include("symreleg.jl")
 include("contract.jl")
 include("symtools.jl")
 
-export STLeg, SymTensor, SymVector
+export +, *
+export isequal, ==
+export STLeg, SymTensor, SymMatrix, SymVector
 export eye
 export randSymTensor, fillSymTensor
 export FusedCharge
 
 export symMatrix
-export _possible_fuse_patterns
+export _allsectorsandsizes
+export _allsectorsandsizes2
+export _sectorlessthan
+export _sectorisallowed
+#export _possible_fuse_patterns
 
 export array_representation
 export alldims, accdims, getdim, fulldims, signs
@@ -39,8 +46,7 @@ export change_sign, change_legsign
 export mapcharges
 export invlegs
 
-export change_nzblk!
-export inv_perm
+export set_sector!
 
 export svdsym
 
@@ -48,6 +54,5 @@ export eltype, similar, copyto!
 export mul!, rmul!, axpy!, axpby!, dot, norm
 export fill, fill!
 
-export makenormalize!
 export fermionswapgate
 end

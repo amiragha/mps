@@ -1,9 +1,154 @@
+"""
+    contract(A, idxA, B, idxB)
+
+contract the symmetric tensor A, B. The to-be-contracted
+indexes are shown with negative integers while the remaining
+indexes for the result are shown with positive integers. For
+example if there are l negative numbers in both A and B (should
+be numbered from -1 to -l) then the rest of the indexes in A and B
+combined should be 1:N+M-2n.
+"""
+function contract(A     ::AbstractSymTensor{T1, N},
+                  idxA  ::NTuple{N, Int},
+                  B     ::AbstractSymTensor{T2, M},
+                  idxB  ::NTuple{M, Int};
+                  debug ::Bool=false) where{T1<:Number, T2<:Number, N, M}
+
+    remsA, consA, tofinalsA = _contract_index_perm(idxA)
+    remsB, consB, tofinalsB = _contract_index_perm(idxB)
+
+    # techniqually here the contraction vector space should be made
+    # once! But now is made twice, so fix this!
+
+    # TODO: check
+    # compatibility println(remsA, consA, remsB, consB)
+    if length(remsA) == 0
+        matA = SymVector(A, -1, consA)
+        if length(remsB) == 0
+            matB = SymVector(B, +1, consB)
+            return matA * matB
+        else
+            matB = SymMatrix(B, remsB, consB)
+            return permutelegs(defuse_leg(matA*matB, 2, B.legs[remsB]),
+                               invperm(tofinalsB))
+        end
+    end
+
+    matA = SymMatrix(A, remsA, consA)
+
+    if length(remsB) == 0
+        matB = SymVector(B, +1, consB)
+        return permutelegs(defuse_leg(matA*matB, 1, A.legs[remsA]),
+                           invperm(tofinalsA))
+
+    end
+
+    matB = SymMatrix(B, consB, remsB)
+    return permutelegs(
+        defuse_leg(defuse_leg(matA * matB, 1, A.legs[remsA]), 2, B.legs[remsB]),
+        invperm([tofinalsA;tofinalsB]))
+end
+
+
+function SymMatrix(A::AbstractSymTensor{T, N},
+                   rowidxs::Vector{Int},
+                   colidxs::Vector{Int}) where {T<:Number, N}
+
+    idxperm = [rowidxs; colidxs]
+    @assert sort(idxperm) == collect(1:N)
+    pA = permutelegs(A, idxperm)
+
+    length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
+    length(colidxs) == 0 && error("Zero col for matrix not allowed!")
+
+    fusedsectors = NTuple{Int, Int}[]
+    patranges = NTuple{UnitRange{Int}, UnitRange{Int}}[]
+
+#     csects = sten.sects
+#     fchrdict = Dict{Int, FusedCharge{n}}()
+#     signs = Tuple(sten.legs[c].sign for c in l:l+n-1)
+#     for i in eachindex(csects)
+#         sect = [csects[i]...]
+
+#         pat = Tuple(sect[l:l+n-1])
+#         spat = sign .* signs .* pat
+#         fchr = sign * sum(signs .* [sect[c] for c in l:l+n-1])
+#         patrange = UnitRange{Int}(1,1)
+#         if haskey(fchrdict, fchr)
+#             if haskey(fchrdict[fchr].pats, spat)
+#                 patrange = fchrdict[fchr].pats[spat]
+#             else
+#                 fdim = prod([getdim(sten.legs[c+l-1], pat[c]) for c in 1:n])
+#                 dim = fchrdict[fchr].dim
+#                 fchrdict[fchr].dim += fdim
+#                 patrange = dim+1:dim+fdim
+#                 fchrdict[fchr].pats[spat] = patrange
+#             end
+#         else
+#             fdim = prod([getdim(sten.legs[c+l-1], pat[c]) for c in 1:n])
+#             patrange = 1:fdim
+#             fchrdict[fchr] = FusedCharge(fchr, fdim, Dict(spat => patrange))
+#         end
+
+#         fsect = vcat( sect[1:l-1], fchr, sect[l+n:end])
+#         push!(fusedsectors, Tuple(fsect))
+#         push!(patranges, patrange)
+#     end
+
+#     fusedsectperm = _sectors_sortperm(fusedsectors)
+#     new_sectors, refs = uniquesorted(fusedsectors[fusedsectperm])
+#     refs = refs[invperm(fusedsectperm)]
+
+#     # the infos are: new_sectors, refs, patranges
+
+#     # make the new leg
+#     fleg = STLeg(sign, unzip([(k, fchrdict[k].dim) for k in sort(collect(keys(fchrdict)))])...)
+
+#     new_legs = Tuple(vcat([sten.legs[1:l-1]...], fleg, [sten.legs[l+n:end]...]))
+
+#     new_nzblks = Array{T, N-n+1}[]
+#     for sect in new_sectors
+#         push!(new_nzblks,Array{T, N-n+1}(undef, [getdim(new_legs[c], sect[c]) for c in 1:N-n+1]...))
+#     end
+#     #indexing = [1:end for i=1:N-n+1]...
+#     for i in eachindex(sten.nzblks)
+#         s = size(sten.nzblks[i])
+#         new_nzblks[refs[i]][[1:s[i] for i=1:l-1]..., patranges[i],[1:s[i] for i=l+n:N]...] =
+#             reshape(sten.nzblks[i], s[1:l-1]..., prod(s[l:l+n-1]), s[l+n:end]...)
+#     end
+
+#     SymTensor(sten.charge, new_legs, new_sectors, new_nzblks)
+
+
+    fuselegs(
+            fuselegs(psten, -1, length(rowidxs)+1, length(colidxs)),
+            +1, 1, length(rowidxs))
+
+end
+
+# if debug
+#         println(A)
+#         println(remsA, " ", consA)
+#         println(matA)
+#         println(B)
+#         println(remsB, " ", consB)
+#         println(matB)
+#         println(matA*matB)
+#     end
+
+# function contract(A::SymTensor{ComplexF64, N}, idxA::NTuple{N, Int},
+#                   B::SymTensor{Float64, M}, idxB::NTuple{M, Int}) where{N, M}
+#     contract(A, idxA, convert(SymTensor{ComplexF64, M}, B), idxB)
+# end
 # contract A and B using idxA and idxB. Note idxA and idxB are the
 # corresponding leg numbers in each tensor that are to be contracted
 
 ###TODO: probably give this function a better name!
-function symMatrix(sten::SymTensor{Tv, N},
-                   rowidxs::Vector{Int}, colidxs::Vector{Int}) where{Tv<:Number, N}
+###TODO: replace this function by a version of fuselegs (that fuses both of them at once!)
+function symMatrix(A::AbstractSymTensor{Tv, N},
+                   rowidxs::Vector{Int},
+                   colidxs::Vector{Int}) where{Tv<:Number, N}
+
     idxperm = [rowidxs; colidxs]
     @assert sort(idxperm) == collect(1:N)
     psten = permutelegs(sten, idxperm)
@@ -18,7 +163,7 @@ function symMatrix(sten::SymTensor{Tv, N},
     end
 end
 
-function *(sten1::SymTensor{Tv, 1}, sten2::SymTensor{Tv, 1}) where{Tv<:Number}
+function *(sten1::SymVector{Tv}, sten2::SymVector{Tv}) where {Tv<:Number}
     #bool, idx1, idx2 = _are_contractible(sten1.legs[1], sten2.legs[1])
     bool = _are_contractible(sten1.legs[1], sten2.legs[1])
     bool ||
@@ -97,7 +242,8 @@ end
 #     false, Int[], Int[]
 # end
 
-function _contract_index_perm(indexset)
+# This function returns the
+function _contract_index_perm(indexset; mode::Symbol=:MINUS)
     rems = Int[]
     cons = Int[]
     cons_order = Int[]
@@ -114,50 +260,4 @@ function _contract_index_perm(indexset)
     end
     perm = sortperm(tofinals)
     rems[perm], cons[sortperm(cons_order, by=x->abs(x))], tofinals[perm]
-end
-
-"""
-    contract(A, idxA, B, idxB)
-
-contract the symmetric tensor A, B. The to-be-contracted
-indexes are shown with negative integers while the remaining
-indexes for the result are shown with positive integers. For
-example if there are l negative numbers in both A and B (should
-be numbered from -1 to -l) then the rest of the indexes in A and B
-combined should be 1:N+M-2n.
-"""
-function contract(A::SymTensor{T, N}, idxA::NTuple{N, Int},
-                  B::SymTensor{T, M}, idxB::NTuple{M, Int};
-                  debug::Bool=false) where{T<:Number, N, M}
-    remsA, consA, tofinalsA = _contract_index_perm(idxA)
-    remsB, consB, tofinalsB = _contract_index_perm(idxB)
-
-    # TODO: check compatibility
-    #println(remsA, consA, remsB, consB)
-    matA = symMatrix(A, remsA, consA)
-    matB = symMatrix(B, consB, remsB)
-
-    if debug
-        println(A)
-        println(remsA, " ", consA)
-        println(matA)
-        println(B)
-        println(remsB, " ", consB)
-        println(matB)
-    end
-
-    if numoflegs(matA) == 1
-        @assert numoflegs(matB) == 1
-        return matA * matB
-    end
-    if debug
-        println(matA*matB)
-    end
-    permutelegs(defuse_leg(defuse_leg(matA * matB, 2, B.legs[remsB]), 1, A.legs[remsA]),
-                inv_perm([tofinalsA;tofinalsB]))
-end
-
-function contract(A::SymTensor{ComplexF64, N}, idxA::NTuple{N, Int},
-                  B::SymTensor{Float64, M}, idxB::NTuple{M, Int}) where{N, M}
-    contract(A, idxA, convert(SymTensor{ComplexF64, M}, B), idxB)
 end

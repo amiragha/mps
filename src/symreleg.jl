@@ -1,31 +1,30 @@
-function uniquesorted(vec::Vector{T}) where{T}
-    unqvec = T[]
+"""
+    uniquesorted(A)
+
+For a sorted vector `A` return the tuple of (unqA, refs) where unqA is
+the unique elements in A and refs are the indexes of unqA for each
+element of A
+
+"""
+function uniquesorted(A::Vector{T}) where{T}
+    unqA = T[]
     refs = Int[]
-    push!(unqvec, vec[1])
+    push!(unqA, A[1])
     idx = 1
     push!(refs, idx)
-    for i=2:length(vec)
-        if vec[i] != unqvec[end]
-            push!(unqvec, vec[i])
+    for i=2:length(A)
+        if A[i] != unqvec[end]
+            push!(unqA, A[i])
             idx += 1
             push!(refs, idx)
         else
             push!(refs, idx)
         end
     end
-    unqvec, refs
-end
-
-function inv_perm(perm::Vector{Int})
-    inv = zeros(Int, length(perm))
-    for i in eachindex(perm)
-        inv[perm[i]] = i
-    end
-    inv
+    unqA, refs
 end
 
 unzip(a) = map(x->getfield.(a,x), fieldnames(eltype(a)))
-
 
 ################################
 #### RELEG #####################
@@ -108,7 +107,7 @@ end
 
 #     fusedsectperm = _sectors_sortperm(fusedsectors)
 #     new_sectors, refs = uniquesorted(fusedsectors[fusedsectperm])
-#     refs = refs[inv_perm(fusedsectperm)]
+#     refs = refs[invperm(fusedsectperm)]
 
 #     # the infos are: new_sectors, refs, patranges
 
@@ -132,13 +131,23 @@ end
 # end
 
 # fuse n consequative legs `l` and `l+n-1` to a new leg with sign `sign`
+
+"""
+    fuselegs
+
+fuses two or `n` consequative legs of a SymTensor.
+
+The fuse operation works as follows: We have assumed the sectors are
+sorted, so they stay sorted even after the fusion is done!
+
+"""
 function fuselegs(sten::SymTensor{Tv, N},
                   sign::Int,
                   l::Int,
                   n::Int=2;
                   debug=false) where{Tv<:Number, N}
-    @assert abs(sign) == 1
-    @assert 0 < l < N+2-n
+    abs(sign) == 1 || "sign has to be ± 1!"
+    0 < l < N+2-n  || "fuselegs $(l+n-1) vs $N"
 
     fsects = NTuple{N-n+1, Int}[]
     patranges = UnitRange{Int}[]
@@ -159,14 +168,14 @@ function fuselegs(sten::SymTensor{Tv, N},
 
     fsectperm = _sectors_sortperm(fsects)
     newsects, refs = uniquesorted(fsects[fsectperm])
-    refs = refs[inv_perm(fsectperm)]
+    refs = refs[invperm(fsectperm)]
 
     newlegs = Tuple(vcat([sten.legs[1:l-1]...], fleg, [sten.legs[l+n:end]...]))
 
     newnzblks = Array{Tv, N-n+1}[]
     for sect in newsects
         push!(newnzblks,zeros(Tv, [getdim(newlegs[c], sect[c])
-                                  for c in 1:N-n+1]...))
+                                   for c in 1:N-n+1]...))
     end
 
     for i in eachindex(sten.nzblks)

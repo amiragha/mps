@@ -38,3 +38,6 @@
      related algorithms to some file for example "mpsapply.jl"
 
 ** Fix complex real issues in a systematic fashion. HOW?
+** revise
+   - discourage making SymTensors explicitely (how!) and don't check for stuff!
+   - fn _possible_fuse_patterns in leg.jl should return sorted!

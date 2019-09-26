@@ -107,3 +107,71 @@ function mapcharges(f::Function, l::STLeg)
 end
 
 isdummy(l::STLeg) = l.chrs == [0] && l.dims == [1]
+
+"""
+    _allsectorsandsizes(charge, legs)
+
+Generate all sectors for a tuple of legs that add up to a given
+`charge` and are thus sectors are the corresponding SymTensor. This is
+recursive function calling itself with legs[1:N-1], etc.
+
+since the legs have sorted charges, the output sectors are sorted
+"""
+function _allsectorsandsizes(charge::Int, legs::NTuple{N, STLeg}) where{N}
+    sects = NTuple{N, Int}[]
+    sizes = NTuple{N, Int}[]
+    if length(legs) > 1
+        s = legs[N].sign
+        for cidx in eachindex(legs[N].chrs)
+            c = legs[N].chrs[cidx]
+            d = legs[N].dims[cidx]
+            sect_head, size_head = _allsectorsandsizes(charge - s * c, legs[1:N-1])
+            for i in eachindex(sect_head)
+                push!(sects, (sect_head[i]..., c))
+                push!(sizes, (size_head[i]..., d))
+            end
+        end
+    else
+        i = searchsortedfirst(legs[1].chrs, legs[1].sign*charge)
+        if i <= length(legs[1].chrs) && legs[1].sign*legs[1].chrs[i] == charge
+            return (legs[1].chrs[i]) , (legs[1].dims[i])
+        end
+    end
+    sects, sizes
+end
+
+# interestingly the below method is singnificantly slower!
+function _allsectorsandsizes2(charge::Int, legs::NTuple{N, STLeg}) where{N}
+    sects = NTuple{N, Int}[]
+    sizes = NTuple{N, Int}[]
+    signs = [leg.sign for leg in legs]
+    for indeces in Iterators.product([eachindex(legs[i].chrs) for i=1:N]...)
+        sector = Tuple(legs[i].chrs[indeces[i]] for i in 1:N)
+        if sum(signs .* sector) == charge
+            push!(sects, sector)
+            push!(sizes, Tuple(legs[i].dims[indeces[i]] for i in 1:N))
+        end
+    end
+    sects, sizes
+end
+
+@inline _sectorisallowed(total::Int, signs::NTuple{N}, sector::NTuple{N, Int}) where {N} =
+    sum(signs .* sector) == total
+
+##TODO: this should move to the documentation of SymTensors!
+# we always sort sectors based on charges (ignore signs)
+### NOTE the sorting is column major. That means the leftmost (first)
+### leg changes charge faster (first)!
+
+function _sectorlessthan(s1::NTuple{N, Int},
+                         s2::NTuple{N, Int}) where {N}
+    for n in reverse(eachindex(s1))
+        a, b = s1[n], s2[n]
+        if a < b
+            return true
+        elseif a > b
+            return false
+        end
+    end
+    false
+end
