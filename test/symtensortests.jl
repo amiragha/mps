@@ -45,7 +45,7 @@ end
 
         C = contract(A, (1, -1), B, (-1, 2))
 
-        @test A_*B_ == array_representation(C)
+        @test A_*B_ == array(C)
     end
     @testset "multi leg tensors" begin
         leglist = (
@@ -58,15 +58,15 @@ end
             STLeg(+1, [0,1], [2,3]),
             STLeg(-1, [0,1,2], [3,4,5])
         )
-        sten1 = randSymTensor(Float64, 0, leglist[1:4]);
-        sten2 = randSymTensor(Float64, 0, leglist[5:8]);
+        A = rand(Float64, 0, leglist[1:4])
+        B = rand(Float64, 0, leglist[5:8])
 
-        arr1 = array_representation(sten1)
-        arr2 = array_representation(sten2)
+        A_ = array(A)
+        B_ = array(B)
 
-        contest = contract(sten1, (1,2,3,-1), sten2, (-1,4,5,6));
-        @tensor arr[a,b,c,e,f,g] := arr1[a,b,c,d] * arr2[d,e,f,g];
+        C = contract(A, (1,2,3,-1), B, (-1,4,5,6))
+        @tensor C_[a,b,c,e,f,g] := A_[a,b,c,d] * B_[d,e,f,g]
 
-        @test arr == array_representation(contest);
+        @test C_ == array(C);
     end
 end

@@ -49,20 +49,81 @@ function contract(A     ::AbstractSymTensor{T1, N},
         invperm([tofinalsA;tofinalsB]))
 end
 
-function symMatrix(A::AbstractSymTensor{Tv, N},
+# auxillary function to find indexes for contract
+function _contract_index_perm(indexset; mode::Symbol=:MINUS)
+    rems = Int[]
+    cons = Int[]
+    cons_order = Int[]
+    tofinals = Int[]
+    for i in eachindex(indexset)
+        idx = indexset[i]
+        if idx < 0
+            push!(cons, i)
+            push!(cons_order, idx)
+        else
+            push!(rems, i)
+            push!(tofinals, idx)
+        end
+    end
+    perm = sortperm(tofinals)
+    rems[perm], cons[sortperm(cons_order, by=x->abs(x))], tofinals[perm]
+end
+
+function SymMatrix(A::AbstractSymTensor{Tv, N},
                    rowidxs::Vector{Int},
                    colidxs::Vector{Int}) where{Tv<:Number, N}
 
     idxperm = [rowidxs; colidxs]
-    sort(idxperm) == collect(1:N) || error("Can't convert to SymMatrix!")
+    sort(idxperm) == collect(1:N) || error("Incorrect index set for convertion to SymMatrix!")
     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
     length(colidxs) == 0 && error("Zero col for matrix not allowed!")
 
     pA = permutelegs(A, idxperm)
-    return fuselegs(
-        fuselegs(psten, -1, length(rowidxs)+1, length(colidxs)),
-        +1, 1, length(rowidxs))
+    return SymMatrix(fuselegs(
+        fuselegs(pA, -1, length(rowidxs)+1, length(colidxs)),
+        +1, 1, length(rowidxs)))
 
+end
+
+function _are_contractible(l1::STLeg, l2::STLeg)
+    if l1.sign == -l2.sign
+        return l1.chrs == l2.chrs && l1.dims == l2.dims
+    end
+    false
+end
+
+function *(A::SymVector{T},
+           B::SymVector{T}) where {T<:Number}
+
+    _are_contractible(A.legs[1], B.legs[1]) ||
+        error("not contractible!", A.legs[1], " and ", B.legs[1])
+    signs(A.legs) == (-1,) && signs(B.legs) == (+1,) ||
+        error("* for SymVector only defined for contraction!")
+
+    return sum(A.nzblks[1] .* B.nzblks[1])
+end
+
+function *(A::SymMatrix{T},
+           B::SymMatrix{T}) where{T<:Number}
+
+    _are_contractible(A.legs[2], B.legs[1]) ||
+        error("not contractible! ", A.legs[2], " and ", B.legs[1])
+
+    n_sectors = length(A.sects)
+    sects = Vector{Tuple{Int, Int}}(undef, n_sectors)
+    nzblks = Vector{Matrix{T}}(undef, n_sectors)
+
+    ## NOTE: assume the set of charges for the vector space to be
+    ## contracted is {c1,..,ci,...,cn} then each sector in A is given
+    ## by (CA+ci, ci) and each sector in B by (ci, ci-CB) and since
+    ## both are sorted based on the last charge in sector, then they
+    ## are sorted the same. So we simply need to multiply them here
+    for i=1:n_sectors
+        sects[i]  = (A.sects[i][1], B.sects[i][2])
+        nzblks[i] = A.nzblks[i] * B.nzblks[i]
+    end
+
+    SymMatrix(A.charge+B.charge, (A.legs[1], B.legs[2]), sects, nzblks)
 end
 
 ###TODO: This is the above function with a version of fuselegs (that fuses both of them at once!)
@@ -159,72 +220,16 @@ end
 # contract A and B using idxA and idxB. Note idxA and idxB are the
 # corresponding leg numbers in each tensor that are to be contracted
 
-function *(sten1::SymVector{Tv}, sten2::SymVector{Tv}) where {Tv<:Number}
-    #bool, idx1, idx2 = _are_contractible(sten1.legs[1], sten2.legs[1])
-    bool = _are_contractible(sten1.legs[1], sten2.legs[1])
-    bool ||
-        error("not contractible!", sten1.legs[2], " and ", sten2.legs[1])
-    # @assert length(idx1) == length(idx2) == 1
-    @assert signs(sten1.legs) == (-1,)
-    @assert signs(sten2.legs) == (+1,)
-    return sum(sten1.nzblks[1] .* sten2.nzblks[1])
-end
+# ##TODO: make these conversion more sane!!!
+# function *(sten1::SymTensor{ComplexF64, 2},
+#            sten2::SymTensor{Float64, 2})
+#     *(sten1, convert(SymTensor{ComplexF64, 2}, sten2))
+# end
 
-function *(sten1::SymTensor{Tv, 2}, sten2::SymTensor{Tv, 2}) where{Tv<:Number}
-    #bool, idx1, idx2 = _are_contractible(sten1.legs[2], sten2.legs[1])
-    bool = _are_contractible(sten1.legs[2], sten2.legs[1])
-    bool ||
-        error("not contractible! ", sten1.legs[2], " and ", sten2.legs[1])
-    @assert length(sten1.nzblks) == length(sten1.nzblks)
-    sects = Tuple{Int, Int}[]
-    nzblks = Matrix{Tv}[]
-
-    @assert signs(sten1.legs) == (+1, -1)
-    @assert signs(sten2.legs) == (+1, -1)
-    # perm1 = _sectors_sortperm(sten1.sects, by=x->(x[2],))
-    # perm2 = _sectors_sortperm(sten2.sects, by=x->(-x[1],))
-
-    #println(idx1)
-    #println(idx2)
-    ##TODO: make the below better and explain!
-    i=1
-    j=1
-    while i <= length(sten1.sects) && j <= length(sten2.sects)
-        if sten1.sects[i][2] == sten2.sects[j][1]
-            push!(sects, (sten1.sects[i][1],sten2.sects[j][2]))
-            push!(nzblks, sten1.nzblks[i]*sten2.nzblks[j])
-            i+=1
-            j+=1
-        elseif sten1.sects[i][2] > sten2.sects[i][1]
-            j+=1
-        else
-            i+=1
-        end
-    end
-
-    perm = _sectors_sortperm(sects)
-    matC = SymTensor(sten1.charge+sten2.charge, (sten1.legs[1], sten2.legs[2]),
-                     sects[perm], nzblks[perm])
-    return matC
-end
-
-##TODO: make these conversion more sane!!!
-function *(sten1::SymTensor{ComplexF64, 2},
-           sten2::SymTensor{Float64, 2})
-    *(sten1, convert(SymTensor{ComplexF64, 2}, sten2))
-end
-
-function *(sten1::SymTensor{Float64, 2},
-           sten2::SymTensor{ComplexF64, 2})
-    *(convert(SymTensor{ComplexF64, 2}, sten1), sten2)
-end
-
-function _are_contractible(l1::STLeg, l2::STLeg)
-    if l1.sign == -l2.sign
-        return l1.chrs == l2.chrs && l1.dims == l2.dims
-    end
-    false
-end
+# function *(sten1::SymTensor{Float64, 2},
+#            sten2::SymTensor{ComplexF64, 2})
+#     *(convert(SymTensor{ComplexF64, 2}, sten1), sten2)
+# end
 
 # function _are_contractible(l1::STLeg, l2::STLeg)
 #     if l1.sign == -l2.sign
@@ -239,21 +244,3 @@ end
 # end
 
 # This function returns the
-function _contract_index_perm(indexset; mode::Symbol=:MINUS)
-    rems = Int[]
-    cons = Int[]
-    cons_order = Int[]
-    tofinals = Int[]
-    for i in eachindex(indexset)
-        idx = indexset[i]
-        if idx < 0
-            push!(cons, i)
-            push!(cons_order, idx)
-        else
-            push!(rems, i)
-            push!(tofinals, idx)
-        end
-    end
-    perm = sortperm(tofinals)
-    rems[perm], cons[sortperm(cons_order, by=x->abs(x))], tofinals[perm]
-end

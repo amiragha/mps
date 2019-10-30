@@ -7,7 +7,7 @@ abstract type AbstractSymMatrix{T<:Number} <: AbstractSymTensor{T, 2} end
 @inline size(A::AbstractSymTensor) = Tuple(fulldims(l) for l in A.legs)
 @inline size(A::AbstractSymTensor, l::Int) = size(A)[l]
 
-##TODO: should the below methos be "!inline" ?
+##TODO: should the below methods be "@inline" ?
 @inline issimilar(A::T, B::T) where {T<:AbstractSymTensor} =
     A.charge == B.charge && A.legs == B.legs
 
@@ -21,18 +21,17 @@ mutable struct SymTensor{T<:Number, N} <: AbstractSymTensor{T, N}
     legs   :: NTuple{N, STLeg}
     sects  :: Vector{NTuple{N, Int}}
     nzblks :: Vector{Array{T, N}}
+end
 
-    # TODO: add a full sanity check for tests!
-    function SymTensor(charge :: Int,
-                       legs   :: NTuple{N, STLeg},
-                       sects  :: Vector{NTuple{N, Int}},
-                       nzblks :: Vector{<:AbstractArray{T, N}}) where{T<:Number, N}
-        #issorted(sects, lt=_sectorlessthan) ||  error("sectors not sorted!")
-        _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-            error("The given sectors and block-sizes do not match legs!")
-        #length(sects) == length(nzblks) || error("sects don't match nzblks!")
-        new{T, N}(charge, legs, sects, nzblks)
-    end
+function SymTensor(charge :: Int,
+                   legs   :: NTuple{N, STLeg},
+                   sects  :: Vector{NTuple{N, Int}},
+                   nzblks :: Vector{<:AbstractArray{T, N}}) where{T<:Number, N}
+    #issorted(sects, lt=_sectorlessthan) ||  error("sectors not sorted!")
+    _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
+        error("The given sectors and block-sizes do not match legs!")
+    #length(sects) == length(nzblks) || error("sects don't match nzblks!")
+    SymTensor{T, N}(charge, legs, sects, nzblks)
 end
 
 mutable struct SymMatrix{T<:Number} <: AbstractSymMatrix{T}
@@ -40,18 +39,25 @@ mutable struct SymMatrix{T<:Number} <: AbstractSymMatrix{T}
     legs   :: Tuple{STLeg, STLeg}
     sects  :: Vector{Tuple{Int, Int}}
     nzblks :: Vector{Matrix{T}}
+end
 
-    function SymMatrix(charge :: Int,
-                       legs   :: Tuple{STLeg, STLeg},
-                       sects  :: Vector{Tuple{Int, Int}},
-                       nzblks :: Vector{Matrix{T}}) where {T<:Number}
-        signs(legs) == (+1, -1) || error("SymMatrix signs should be (+1,-1) ", signs(legs))
-        #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
-        _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-            error("The given sectors and block-sizes do not match legs!")
-        #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
-        new{T}(charge, legs, sects, nzblks)
-    end
+function SymMatrix(charge :: Int,
+                   legs   :: Tuple{STLeg, STLeg},
+                   sects  :: Vector{Tuple{Int, Int}},
+                   nzblks :: Vector{Matrix{T}}) where {T<:Number}
+    signs(legs) == (+1, -1) || error("SymMatrix signs should be (+1,-1) ", signs(legs))
+    #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
+    _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
+        error("The given sectors and block-sizes do not match legs!")
+    #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
+    SymMatrix{T}(charge, legs, sects, nzblks)
+end
+
+##TODO: see if this should be a convert function!
+function SymMatrix(A::SymTensor{T, 2}) where {T<:Number}
+    signs(A.legs) == (+1, -1) ||
+        error("SymTensor{T, 2} doesn't have correct signs to convert to SymMatrix")
+    SymMatrix{T}(A.charge, A.legs, A.sects, A.nzblks)
 end
 
 mutable struct SymDiagonal{T<:Number} <: AbstractSymMatrix{T}
@@ -59,19 +65,19 @@ mutable struct SymDiagonal{T<:Number} <: AbstractSymMatrix{T}
     legs   :: Tuple{STLeg, STLeg}
     sects  :: Vector{Tuple{Int, Int}}
     nzblks :: Vector{Diagonal{T}}
+end
 
-    function SymDiagonal(charge :: Int,
-                         legs,
-                         sects,
-                         nzblks::Vector{Diagonal{T}}) where {T<:Number}
-        signs(legs) == (+1, -1) || error("SyDiagonal signs should be (+1,-1) ", signs(legs))
-        #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
-        _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-            error("The given sectors and block-sizes do not match legs!")
-        #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
-        legs[1].dims == legs[2].dims || error("SymDiagonal is not square!")
-        new{T}(charge, legs, sects, nzblks)
-    end
+function SymDiagonal(charge :: Int,
+                     legs   :: Tuple{STLeg, STLeg},
+                     sects  :: Vector{Tuple{Int, Int}},
+                     nzblks :: Vector{Diagonal{T}}) where {T<:Number}
+    signs(legs) == (+1, -1) || error("SyDiagonal signs should be (+1,-1) ", signs(legs))
+    #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
+    _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
+        error("The given sectors and block-sizes do not match legs!")
+    #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
+    legs[1].dims == legs[2].dims || error("SymDiagonal is not square!")
+    SymDiagonal{T}(charge, legs, sects, nzblks)
 end
 
 struct SymVector{T<:Number} <: AbstractSymTensor{T, 1}
@@ -79,18 +85,18 @@ struct SymVector{T<:Number} <: AbstractSymTensor{T, 1}
     legs   :: Tuple{STLeg}
     sects  :: Vector{Tuple{Int}}
     nzblks :: Vector{Vector{T}}
+end
 
-    function SymVector(charge :: Int,
-                       legs,
-                       sects,
-                       nzblks::Vector{Vector{T}}) where {T<:Number}
-        length(sects) == length(nzblks) == 1 ||
-            error("SymVector accepts only one sector or nzblk!")
-        size(nzblks, 1) == legs[1].dims[1] || error("")
-        legs[1].chrs = [charge]
-        legs[1].dims = [size(nzblks[1], 1)]
-        new{T}(charge, legs, sects, nzblks)
-    end
+function SymVector(charge :: Int,
+                   legs   :: Tuple{STLeg},
+                   sects  :: Vector{Tuple{Int}},
+                   nzblks :: Vector{Vector{T}}) where {T<:Number}
+    length(sects) == length(nzblks) == 1 ||
+        error("SymVector accepts only one sector or nzblk!")
+    size(nzblks, 1) == legs[1].dims[1] || error("")
+    legs[1].chrs = [charge]
+    legs[1].dims = [size(nzblks[1], 1)]
+    SymVector{T}(charge, legs, sects, nzblks)
 end
 
 @inline size(s::SymVector) = size(nzblks[1])
@@ -219,7 +225,7 @@ function array(A::AbstractSymTensor{T}) where {T<:Number}
 end
 
 
-@inline *(A::AbstractSymTensor, a) =
+@inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
     SymTensor(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
 
 function removedummyleg(A::AbstractSymTensor, l::Int)
@@ -234,10 +240,10 @@ end
 ##TODO: this stuff should go up
 @inline eltype(::AbstractSymTensor{T}) where {T<:Number} = T
 
-"construct an additional similar SymTensor, possibly with a
+"construct an additional SymTensor similar to A, possibly with a
 different scalar type T."
-function similar(A::SymTensor{T1, N}, T::Type=T1) where {T1<:Number, N}
-    SymTensor(A.charge, A.legs, A.sects, [similar(blk, T) for blk in v.nzblks])
+function similar(A::AbstractSymTensor{T1, N}, T::Type=T1) where {T1<:Number, N}
+    typeof(A)(A.charge, A.legs, A.sects, [similar(blk, T) for blk in A.nzblks])
 end
 
 "copy the contents of A to a preallocated SymTensor B"

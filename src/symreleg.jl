@@ -30,6 +30,18 @@ unzip(a) = map(x->getfield.(a,x), fieldnames(eltype(a)))
 #### RELEG #####################
 ################################
 
+function permutelegs(A::AbstractSymTensor{T, N},
+                     perm::Vector{Int}) where{T, N}
+
+    sort(perm) == collect(1:N) || error("Not a valid permutation!")
+    sectperm = _sectors_sortperm(A.sects,  by=x->x[perm])
+
+    sects = [sect[perm] for sect in A.sects[sectperm]]
+    nzblks = [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]]
+
+    typeof(A)(A.charge, A.legs[perm], sects, nzblks)
+end
+
 """
     fuse_set(sect, parts)
 
@@ -51,17 +63,6 @@ function fuse_set(op,
     Tuple(result)
 end
 
-function permutelegs(sten::SymTensor{T, N}, perm) where{T, N}
-    @assert sort(perm) == collect(1:N)
-    sectperm = _sectors_sortperm(sten.sects,  by=x->x[perm])
-    nzblks = Array{T, N}[]
-    sects = [sect[perm] for sect in sten.sects[sectperm]]
-    for nzblk in sten.nzblks[sectperm]
-        #println(size(nzblk), " ", perm)
-        push!(nzblks, permutedims(nzblk, perm))
-    end
-    SymTensor(sten.charge, sten.legs[perm], sects, nzblks)
-end
 
 
 # fuse n consequative legs `l` and `l+n-1` to a new leg with sign `sign`
