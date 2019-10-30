@@ -19,7 +19,7 @@ export +, *
 export isequal, ==
 export STLeg, SymTensor, SymMatrix, SymVector
 export eye
-export randSymTensor, fillSymTensor
+#export randSymTensor, fillSymTensor
 export FusedCharge
 
 export symMatrix
@@ -29,7 +29,8 @@ export _sectorlessthan
 export _sectorisallowed
 #export _possible_fuse_patterns
 
-export array_representation
+#export array_representation
+export array
 export alldims, accdims, getdim, fulldims, signs
 export numoflegs
 export _sectors_sortperm

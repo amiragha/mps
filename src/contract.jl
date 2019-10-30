@@ -17,123 +17,139 @@ function contract(A     ::AbstractSymTensor{T1, N},
     remsA, consA, tofinalsA = _contract_index_perm(idxA)
     remsB, consB, tofinalsB = _contract_index_perm(idxB)
 
-    # techniqually here the contraction vector space should be made
-    # once! But now is made twice, so fix this!
+    ## TODO: techniqually here the contraction vector space should be made
+    ## once! But now is made twice, so find a way fix this!
 
     # TODO: check
     # compatibility println(remsA, consA, remsB, consB)
     if length(remsA) == 0
-        matA = SymVector(A, -1, consA)
+        _A = SymVector(A, -1, consA)
         if length(remsB) == 0
-            matB = SymVector(B, +1, consB)
-            return matA * matB
+            _B = SymVector(B, +1, consB)
+            return _A * _B
         else
-            matB = SymMatrix(B, remsB, consB)
-            return permutelegs(defuse_leg(matA*matB, 2, B.legs[remsB]),
+            _B = SymMatrix(B, remsB, consB)
+            return permutelegs(defuse_leg(_A*_B, 2, B.legs[remsB]),
                                invperm(tofinalsB))
         end
     end
 
-    matA = SymMatrix(A, remsA, consA)
+    _A = SymMatrix(A, remsA, consA)
 
     if length(remsB) == 0
-        matB = SymVector(B, +1, consB)
-        return permutelegs(defuse_leg(matA*matB, 1, A.legs[remsA]),
+        _B = SymVector(B, +1, consB)
+        return permutelegs(defuse_leg(_A*_B, 1, A.legs[remsA]),
                            invperm(tofinalsA))
 
     end
 
-    matB = SymMatrix(B, consB, remsB)
+    _B = SymMatrix(B, consB, remsB)
     return permutelegs(
-        defuse_leg(defuse_leg(matA * matB, 1, A.legs[remsA]), 2, B.legs[remsB]),
+        defuse_leg(defuse_leg(_A * _B, 1, A.legs[remsA]), 2, B.legs[remsB]),
         invperm([tofinalsA;tofinalsB]))
 end
 
-
-function SymMatrix(A::AbstractSymTensor{T, N},
+function symMatrix(A::AbstractSymTensor{Tv, N},
                    rowidxs::Vector{Int},
-                   colidxs::Vector{Int}) where {T<:Number, N}
+                   colidxs::Vector{Int}) where{Tv<:Number, N}
 
     idxperm = [rowidxs; colidxs]
-    @assert sort(idxperm) == collect(1:N)
-    pA = permutelegs(A, idxperm)
-
+    sort(idxperm) == collect(1:N) || error("Can't convert to SymMatrix!")
     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
     length(colidxs) == 0 && error("Zero col for matrix not allowed!")
+
+    pA = permutelegs(A, idxperm)
+    return fuselegs(
+        fuselegs(psten, -1, length(rowidxs)+1, length(colidxs)),
+        +1, 1, length(rowidxs))
+
+end
+
+###TODO: This is the above function with a version of fuselegs (that fuses both of them at once!)
+function SymMatrix2(A::AbstractSymTensor{T, N},
+                    rowidxs::Vector{Int},
+                    colidxs::Vector{Int}) where {T<:Number, N}
+
+    idxperm = [rowidxs; colidxs]
+    sort(idxperm) == collect(1:N) || error("Can't convert to SymMatrix!")
+    length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
+    length(colidxs) == 0 && error("Zero col for matrix not allowed!")
+
+    pA = permutelegs(A, idxperm)
 
     fusedsectors = NTuple{Int, Int}[]
     patranges = NTuple{UnitRange{Int}, UnitRange{Int}}[]
 
-#     csects = sten.sects
-#     fchrdict = Dict{Int, FusedCharge{n}}()
-#     signs = Tuple(sten.legs[c].sign for c in l:l+n-1)
-#     for i in eachindex(csects)
-#         sect = [csects[i]...]
+    #     csects = sten.sects
+    #     fchrdict = Dict{Int, FusedCharge{n}}()
+    #     signs = Tuple(sten.legs[c].sign for c in l:l+n-1)
+    #     for i in eachindex(csects)
+    #         sect = [csects[i]...]
 
-#         pat = Tuple(sect[l:l+n-1])
-#         spat = sign .* signs .* pat
-#         fchr = sign * sum(signs .* [sect[c] for c in l:l+n-1])
-#         patrange = UnitRange{Int}(1,1)
-#         if haskey(fchrdict, fchr)
-#             if haskey(fchrdict[fchr].pats, spat)
-#                 patrange = fchrdict[fchr].pats[spat]
-#             else
-#                 fdim = prod([getdim(sten.legs[c+l-1], pat[c]) for c in 1:n])
-#                 dim = fchrdict[fchr].dim
-#                 fchrdict[fchr].dim += fdim
-#                 patrange = dim+1:dim+fdim
-#                 fchrdict[fchr].pats[spat] = patrange
-#             end
-#         else
-#             fdim = prod([getdim(sten.legs[c+l-1], pat[c]) for c in 1:n])
-#             patrange = 1:fdim
-#             fchrdict[fchr] = FusedCharge(fchr, fdim, Dict(spat => patrange))
-#         end
+    #         pat = Tuple(sect[l:l+n-1])
+    #         spat = sign .* signs .* pat
+    #         fchr = sign * sum(signs .* [sect[c] for c in l:l+n-1])
+    #         patrange = UnitRange{Int}(1,1)
+    #         if haskey(fchrdict, fchr)
+    #             if haskey(fchrdict[fchr].pats, spat)
+    #                 patrange = fchrdict[fchr].pats[spat]
+    #             else
+    #                 fdim = prod([getdim(sten.legs[c+l-1], pat[c]) for c in 1:n])
+    #                 dim = fchrdict[fchr].dim
+    #                 fchrdict[fchr].dim += fdim
+    #                 patrange = dim+1:dim+fdim
+    #                 fchrdict[fchr].pats[spat] = patrange
+    #             end
+    #         else
+    #             fdim = prod([getdim(sten.legs[c+l-1], pat[c]) for c in 1:n])
+    #             patrange = 1:fdim
+    #             fchrdict[fchr] = FusedCharge(fchr, fdim, Dict(spat => patrange))
+    #         end
 
-#         fsect = vcat( sect[1:l-1], fchr, sect[l+n:end])
-#         push!(fusedsectors, Tuple(fsect))
-#         push!(patranges, patrange)
-#     end
+    #         fsect = vcat( sect[1:l-1], fchr, sect[l+n:end])
+    #         push!(fusedsectors, Tuple(fsect))
+    #         push!(patranges, patrange)
+    #     end
 
-#     fusedsectperm = _sectors_sortperm(fusedsectors)
-#     new_sectors, refs = uniquesorted(fusedsectors[fusedsectperm])
-#     refs = refs[invperm(fusedsectperm)]
+    #     fusedsectperm = _sectors_sortperm(fusedsectors)
+    #     new_sectors, refs = uniquesorted(fusedsectors[fusedsectperm])
+    #     refs = refs[invperm(fusedsectperm)]
 
-#     # the infos are: new_sectors, refs, patranges
+    #     # the infos are: new_sectors, refs, patranges
 
-#     # make the new leg
-#     fleg = STLeg(sign, unzip([(k, fchrdict[k].dim) for k in sort(collect(keys(fchrdict)))])...)
+    #     # make the new leg
+    #     fleg = STLeg(sign, unzip([(k, fchrdict[k].dim) for k in sort(collect(keys(fchrdict)))])...)
 
-#     new_legs = Tuple(vcat([sten.legs[1:l-1]...], fleg, [sten.legs[l+n:end]...]))
+    #     new_legs = Tuple(vcat([sten.legs[1:l-1]...], fleg, [sten.legs[l+n:end]...]))
 
-#     new_nzblks = Array{T, N-n+1}[]
-#     for sect in new_sectors
-#         push!(new_nzblks,Array{T, N-n+1}(undef, [getdim(new_legs[c], sect[c]) for c in 1:N-n+1]...))
-#     end
-#     #indexing = [1:end for i=1:N-n+1]...
-#     for i in eachindex(sten.nzblks)
-#         s = size(sten.nzblks[i])
-#         new_nzblks[refs[i]][[1:s[i] for i=1:l-1]..., patranges[i],[1:s[i] for i=l+n:N]...] =
-#             reshape(sten.nzblks[i], s[1:l-1]..., prod(s[l:l+n-1]), s[l+n:end]...)
-#     end
+    #     new_nzblks = Array{T, N-n+1}[]
+    #     for sect in new_sectors
+    #         push!(new_nzblks,Array{T, N-n+1}(undef, [getdim(new_legs[c], sect[c]) for c in 1:N-n+1]...))
+    #     end
+    #     #indexing = [1:end for i=1:N-n+1]...
+    #     for i in eachindex(sten.nzblks)
+    #         s = size(sten.nzblks[i])
+    #         new_nzblks[refs[i]][[1:s[i] for i=1:l-1]..., patranges[i],[1:s[i] for i=l+n:N]...] =
+    #             reshape(sten.nzblks[i], s[1:l-1]..., prod(s[l:l+n-1]), s[l+n:end]...)
+    #     end
 
-#     SymTensor(sten.charge, new_legs, new_sectors, new_nzblks)
+    #     SymTensor(sten.charge, new_legs, new_sectors, new_nzblks)
 
 
     fuselegs(
-            fuselegs(psten, -1, length(rowidxs)+1, length(colidxs)),
-            +1, 1, length(rowidxs))
+        fuselegs(psten, -1, length(rowidxs)+1, length(colidxs)),
+        +1, 1, length(rowidxs))
 
 end
 
 # if debug
 #         println(A)
 #         println(remsA, " ", consA)
-#         println(matA)
+#         println(_A)
 #         println(B)
 #         println(remsB, " ", consB)
-#         println(matB)
-#         println(matA*matB)
+#         println(_B)
+#         println(_A*_B)
 #     end
 
 # function contract(A::SymTensor{ComplexF64, N}, idxA::NTuple{N, Int},
@@ -142,26 +158,6 @@ end
 # end
 # contract A and B using idxA and idxB. Note idxA and idxB are the
 # corresponding leg numbers in each tensor that are to be contracted
-
-###TODO: probably give this function a better name!
-###TODO: replace this function by a version of fuselegs (that fuses both of them at once!)
-function symMatrix(A::AbstractSymTensor{Tv, N},
-                   rowidxs::Vector{Int},
-                   colidxs::Vector{Int}) where{Tv<:Number, N}
-
-    idxperm = [rowidxs; colidxs]
-    @assert sort(idxperm) == collect(1:N)
-    psten = permutelegs(sten, idxperm)
-    if length(rowidxs) == 0
-        return fuselegs(psten, -1, 1, N)
-    elseif length(colidxs) == 0
-        return fuselegs(psten, +1, 1, N)
-    else
-        return fuselegs(
-            fuselegs(psten, -1, length(rowidxs)+1, length(colidxs)),
-            +1, 1, length(rowidxs))
-    end
-end
 
 function *(sten1::SymVector{Tv}, sten2::SymVector{Tv}) where {Tv<:Number}
     #bool, idx1, idx2 = _are_contractible(sten1.legs[1], sten2.legs[1])

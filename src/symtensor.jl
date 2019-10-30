@@ -29,7 +29,7 @@ mutable struct SymTensor{T<:Number, N} <: AbstractSymTensor{T, N}
                        nzblks :: Vector{<:AbstractArray{T, N}}) where{T<:Number, N}
         #issorted(sects, lt=_sectorlessthan) ||  error("sectors not sorted!")
         _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-            error("All sects should be present and sorted!")
+            error("The given sectors and block-sizes do not match legs!")
         #length(sects) == length(nzblks) || error("sects don't match nzblks!")
         new{T, N}(charge, legs, sects, nzblks)
     end
@@ -48,7 +48,7 @@ mutable struct SymMatrix{T<:Number} <: AbstractSymMatrix{T}
         signs(legs) == (+1, -1) || error("SymMatrix signs should be (+1,-1) ", signs(legs))
         #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
         _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-            error("All sects should be present and sorted!")
+            error("The given sectors and block-sizes do not match legs!")
         #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
         new{T}(charge, legs, sects, nzblks)
     end
@@ -67,7 +67,7 @@ mutable struct SymDiagonal{T<:Number} <: AbstractSymMatrix{T}
         signs(legs) == (+1, -1) || error("SyDiagonal signs should be (+1,-1) ", signs(legs))
         #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
         _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-            error("All sects should be present and sorted!")
+            error("The given sectors and block-sizes do not match legs!")
         #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
         legs[1].dims == legs[2].dims || error("SymDiagonal is not square!")
         new{T}(charge, legs, sects, nzblks)
@@ -146,7 +146,6 @@ rand(charge::Int, legs::NTuple{N, STLeg}) where {N} = rand(Float64, charge, legs
 
 function fill(x::T, charge::Int, legs::NTuple{N, STLeg}) where {T<:Number, N}
     sects, sizes = _allsectorsandsizes(charge, legs)
-    rng = MersenneTwister(seed)
     nzblks = [fill(x, dims) for dims in sizes]
     SymTensor(charge, legs, sects, nzblks)
 end

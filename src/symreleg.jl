@@ -13,7 +13,7 @@ function uniquesorted(A::Vector{T}) where{T}
     idx = 1
     push!(refs, idx)
     for i=2:length(A)
-        if A[i] != unqvec[end]
+        if A[i] != unqA[end]
             push!(unqA, A[i])
             idx += 1
             push!(refs, idx)
@@ -192,43 +192,45 @@ function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T
 end
 
 # defuses a leg into some given legs
-function defuse_leg(sten::SymTensor{T, N},
+function defuse_leg(A::AbstractSymTensor{T, N},
                     l::Int,
                     legs::NTuple{M, STLeg}) where {T<:Number, N, M}
-    @assert 0 < l <= N
+    0 < l <= N || error("integer l not in range $l, $N")
     #println(sten.legs)
     #println(legs)
     if length(legs) == 1
-        if legs[1].sign == sten.legs[l].sign
-            sten.legs[l] == legs[1] || error("Not the same legs", sten.legs[l], legs[1])
-            return sten
+        if legs[1].sign == A.legs[l].sign
+            A.legs[l] == legs[1] || error("Not the same legs", A.legs[l], legs[1])
+            return A
         else
-            stenleg = change_sign(sten.legs[l])
-            stenleg == legs[1] || (error("Not the same legs", stenleg, legs[1]))
-            return change_legsign(sten, l)
+            error("change of leg sign is not longer supported in defuse_leg!")
+            # Aleg = change_sign(A.legs[l])
+            # Aleg == legs[1] || (error("Not the same legs", Aleg, legs[1]))
+            # return change_legsign(A, l)
         end
     end
 
     sects = NTuple{N+M-1, Int}[]
     nzblks = Array{T, N+M-1}[]
 
-    sign = sten.legs[l].sign
-    csects = sten.sects
+    sign = A.legs[l].sign
+    csects = A.sects
     fchrdict = Dict{Int, Tuple{Vector{NTuple{M,Int}}, Vector{NTuple{M,Int}}}}()
     for i in eachindex(csects)
         charge = sign * csects[i][l]
         if haskey(fchrdict, charge)
             pats, patdims = fchrdict[charge]
         else
-            pats, patdims = _possible_fuse_patterns(charge, legs)
+            pats, patdims = _allsectorsandsizes(charge, legs)
             #println(charge, pats, patdims)
-            ##TODO: is sorting required or can be avoided with a better design?!
-            patperms = _sectors_sortperm(pats)
-            pats, patdims = pats[patperms], patdims[patperms]
+            ## NOTE: sorting is not longer required because
+            ## allsectorsandsizes return sorted pats
+            # patperms = _sectors_sortperm(pats)
+            # pats, patdims = pats[patperms], patdims[patperms]
             #println(pats, patdims)
             fchrdict[charge] = (pats, patdims)
         end
-        old_nzblock =  sten.nzblks[i]
+        old_nzblock =  A.nzblks[i]
         s = size(old_nzblock)
         pivot = 0
         for patidx in eachindex(pats)
@@ -245,19 +247,21 @@ function defuse_leg(sten::SymTensor{T, N},
     ###TODO: there should be an options to remove this step for
     ###efficientcy when it is not needed!
     for charge in keys(fchrdict)
-        cidx = findall(sten.legs[l].chrs .== sign * charge)[1]
-        sten.legs[l].dims[cidx] == sum([prod(patdims) for patdims in fchrdict[charge][2]]) ||
+        cidx = findall(A.legs[l].chrs .== sign * charge)[1]
+        A.legs[l].dims[cidx] == sum([prod(patdims) for patdims in fchrdict[charge][2]]) ||
             error("For defuse, dimensions don't match for charge " , sign*charge)
-        #, " ", sten.legs[l].dims[cidx], " == ", fchrdict[charge]
+        #, " ", A.legs[l].dims[cidx], " == ", fchrdict[charge]
 
     end
 
     #println(fchrdict)
-    new_legs = (sten.legs[1:l-1]...,legs...,sten.legs[l+1:end]...)
-    #println(sten.sects)
+    new_legs = (A.legs[1:l-1]...,legs...,A.legs[l+1:end]...)
+    #println(A.sects)
     #println(sects)
 
-    ##NOTE: at the end of defuse the sectors may no longer be sorted!
+    ## NOTE: It is necessary to sort the sectors here, because while
+    ## the patterns were sorted whitin each fused charge, they are not
+    ## sorted when are the charges are concerned
     sectperm = _sectors_sortperm(sects)
-    SymTensor(sten.charge, new_legs, sects[sectperm], nzblks[sectperm])
+    SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
 end

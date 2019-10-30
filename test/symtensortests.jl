@@ -3,8 +3,9 @@
     @testset "generic" begin
         legs = STLeg(+1, [0,1], [2,3]), STLeg(+1, [0,1], [1,1]), STLeg(-1, [0,1], [3,4])
 
-        sects = [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0)]
-        nzblks = [rand(1:9, 2,1,3), rand(1:9, 2,1,4), rand(1:9, 3,1,4), rand(1:9, 3,1,3)]
+        # Note that all the possible sectors are given!
+        sects = [(0, 0, 0), (0, 1, 1), (1, 0, 1)]
+        nzblks = [rand(1:9, 2,1,3), rand(1:9, 2,1,4), rand(1:9, 3,1,4)]
 
         perm = _sectors_sortperm(sects)
 
@@ -15,15 +16,15 @@
     end
 
     @testset "2siteop s=1/2" begin
-        smat = eye(Float64, 0, [0,1,2], [1,2,1])
-        set_sector!(smat, (1,1), [2. 3;4 5])
+        A = eye(Float64, [0,1,2], [1,2,1])
+        set_sector!(A, (1,1), [2. 3;4 5])
         rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
         clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
-        smat2 = defuse_leg(defuse_leg(smat, 2, clegs), 1, rlegs)
-        @test smat2.sects == [(0,0,0,0), (1,0,1,0), (0,1,1,0),
+        B = defuse_leg(defuse_leg(A, 2, clegs), 1, rlegs)
+        @test B.sects == [(0,0,0,0), (1,0,1,0), (0,1,1,0),
                               (1,0,0,1), (0,1,0,1), (1,1,1,1)]
         i = ones(1,1,1,1)
-        @test smat2.nzblks == [i,2*i, 4*i, 3*i, 5*i, 1*i]
+        @test B.nzblks == [i,2*i, 4*i, 3*i, 5*i, 1*i]
     end
 end
 
@@ -36,15 +37,15 @@ end
             STLeg(+1, [0,1,2,3], [4,2,2,3]),
             STLeg(-1, [0, 1, 2], [3,5,2]),
         )
-        sten1 = randSymTensor(Float64, 0, leglist[1:2])
-        sten2 = fillSymTensor(1.0, 0, leglist[3:4])
+        A = rand(Float64, 0, leglist[1:2])
+        B = fill(1.0, 0, leglist[3:4])
 
-        arr1 = array_representation(sten1)
-        arr2 = array_representation(sten2)
+        A_ = array(A)
+        B_ = array(B)
 
-        contest = contract(sten1, (1, -1), sten2, (-1, 2))
+        C = contract(A, (1, -1), B, (-1, 2))
 
-        @test arr1*arr2 == array_representation(contest)
+        @test A_*B_ == array_representation(C)
     end
     @testset "multi leg tensors" begin
         leglist = (
