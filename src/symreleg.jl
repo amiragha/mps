@@ -63,8 +63,6 @@ function fuse_set(op,
     Tuple(result)
 end
 
-
-
 # fuse n consequative legs `l` and `l+n-1` to a new leg with sign `sign`
 # function fuse_conseqlegs(sten::SymTensor{T, N},
 #                          sign::Int, l::Int, n::Int=2; debug=false) where{T<:Number, N}
@@ -193,9 +191,9 @@ function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T
 end
 
 # defuses a leg into some given legs
-function defuse_leg(A::AbstractSymTensor{T, N},
-                    l::Int,
-                    legs::NTuple{M, STLeg}) where {T<:Number, N, M}
+function defuse_leg(A    :: AbstractSymTensor{T, N},
+                    l    :: Int,
+                    legs :: NTuple{M, STLeg}) where {T<:Number, N, M}
     0 < l <= N || error("integer l not in range $l, $N")
     #println(sten.legs)
     #println(legs)
@@ -242,7 +240,6 @@ function defuse_leg(A::AbstractSymTensor{T, N},
             pivot += sl
         end
     end
-
 
     # now check to see if the new legs can fuse into the original leg
     ###TODO: there should be an options to remove this step for

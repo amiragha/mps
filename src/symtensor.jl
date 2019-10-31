@@ -12,7 +12,10 @@ abstract type AbstractSymMatrix{T<:Number} <: AbstractSymTensor{T, 2} end
     A.charge == B.charge && A.legs == B.legs
 
 @inline isequal(A::T, B::T) where {T<:AbstractSymTensor} =
-    issimilar(A, B) &&  A.nzblks == B.nzblks
+    issimilar(A, B) &&  isequal(A.nzblks, B.nzblks)
+
+@inline isapprox(A::T, B::T) where {T<:AbstractSymTensor} =
+    issimilar(A, B) &&  isapprox(A.nzblks, B.nzblks)
 
 @inline ==(A::T, B::T) where {T<:AbstractSymTensor} = isequal(A, B)
 
@@ -21,6 +24,9 @@ mutable struct SymTensor{T<:Number, N} <: AbstractSymTensor{T, N}
     legs   :: NTuple{N, STLeg}
     sects  :: Vector{NTuple{N, Int}}
     nzblks :: Vector{Array{T, N}}
+    function SymTensor{T, N}(c,l,s,n) where {T<:Number, N}
+        new{T, N}(c,l,s,n)
+    end
 end
 
 function SymTensor(charge :: Int,
@@ -39,6 +45,9 @@ mutable struct SymMatrix{T<:Number} <: AbstractSymMatrix{T}
     legs   :: Tuple{STLeg, STLeg}
     sects  :: Vector{Tuple{Int, Int}}
     nzblks :: Vector{Matrix{T}}
+    function SymMatrix{T}(c,l,s,n) where {T<:Number}
+        new{T}(c,l,s,n)
+    end
 end
 
 function SymMatrix(charge :: Int,
@@ -65,6 +74,9 @@ mutable struct SymDiagonal{T<:Number} <: AbstractSymMatrix{T}
     legs   :: Tuple{STLeg, STLeg}
     sects  :: Vector{Tuple{Int, Int}}
     nzblks :: Vector{Diagonal{T}}
+    function SymDiagonal{T}(c,l,s,n) where {T<:Number}
+        new{T}(c,l,s,n)
+    end
 end
 
 function SymDiagonal(charge :: Int,
@@ -85,6 +97,9 @@ struct SymVector{T<:Number} <: AbstractSymTensor{T, 1}
     legs   :: Tuple{STLeg}
     sects  :: Vector{Tuple{Int}}
     nzblks :: Vector{Vector{T}}
+    function SymVector{T}(c,l,s,n) where {T<:Number}
+        new{T}(c,l,s,n)
+    end
 end
 
 function SymVector(charge :: Int,

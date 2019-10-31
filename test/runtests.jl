@@ -10,6 +10,6 @@ using ExactDiagonalizationTools
 using SymTensors
 
 #include("modeltests.jl")
-# include("mpstests.jl")
-# include("mpotests.jl")
+include("mpstests.jl")
+include("mpotests.jl")
 include("symtensortests.jl")

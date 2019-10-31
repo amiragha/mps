@@ -30,7 +30,7 @@ end
 
 @testset "contract" begin
 
-    @testset "simple" begin
+    @testset "matrices" begin
         leglist = (
             STLeg(+1, [0, 1, 2], [2,3,4]),
             STLeg(-1, [0,1,2,3], [4,2,2,3]),
@@ -47,6 +47,7 @@ end
 
         @test A_*B_ == array(C)
     end
+
     @testset "multi leg tensors" begin
         leglist = (
             STLeg(+1, [0, 1, 2], [2,3,4]),
@@ -61,12 +62,14 @@ end
         A = rand(Float64, 0, leglist[1:4])
         B = rand(Float64, 0, leglist[5:8])
 
+        @test defuse_leg(fuselegs(A, +1, 1, 3), 1, leglist[1:3]) ≈ A
+
         A_ = array(A)
         B_ = array(B)
 
         C = contract(A, (1,2,3,-1), B, (-1,4,5,6))
         @tensor C_[a,b,c,e,f,g] := A_[a,b,c,d] * B_[d,e,f,g]
 
-        @test C_ == array(C);
+        @test C_ ≈ array(C);
     end
 end

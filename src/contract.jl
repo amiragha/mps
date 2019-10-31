@@ -8,11 +8,11 @@ example if there are l negative numbers in both A and B (should
 be numbered from -1 to -l) then the rest of the indexes in A and B
 combined should be 1:N+M-2n.
 """
-function contract(A     ::AbstractSymTensor{T1, N},
-                  idxA  ::NTuple{N, Int},
-                  B     ::AbstractSymTensor{T2, M},
-                  idxB  ::NTuple{M, Int};
-                  debug ::Bool=false) where{T1<:Number, T2<:Number, N, M}
+function contract(A     :: AbstractSymTensor{T1, N},
+                  idxA  :: NTuple{N, Int},
+                  B     :: AbstractSymTensor{T2, M},
+                  idxB  :: NTuple{M, Int};
+                  debug :: Bool=false) where{T1<:Number, T2<:Number, N, M}
 
     remsA, consA, tofinalsA = _contract_index_perm(idxA)
     remsB, consB, tofinalsB = _contract_index_perm(idxB)
@@ -45,7 +45,7 @@ function contract(A     ::AbstractSymTensor{T1, N},
 
     _B = SymMatrix(B, consB, remsB)
     return permutelegs(
-        defuse_leg(defuse_leg(_A * _B, 1, A.legs[remsA]), 2, B.legs[remsB]),
+        defuse_leg(defuse_leg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
         invperm([tofinalsA;tofinalsB]))
 end
 
@@ -85,7 +85,7 @@ function SymMatrix(A::AbstractSymTensor{Tv, N},
 
 end
 
-function _are_contractible(l1::STLeg, l2::STLeg)
+function _arecontractible(l1::STLeg, l2::STLeg)
     if l1.sign == -l2.sign
         return l1.chrs == l2.chrs && l1.dims == l2.dims
     end
@@ -95,7 +95,7 @@ end
 function *(A::SymVector{T},
            B::SymVector{T}) where {T<:Number}
 
-    _are_contractible(A.legs[1], B.legs[1]) ||
+    _arecontractible(A.legs[1], B.legs[1]) ||
         error("not contractible!", A.legs[1], " and ", B.legs[1])
     signs(A.legs) == (-1,) && signs(B.legs) == (+1,) ||
         error("* for SymVector only defined for contraction!")
@@ -106,24 +106,43 @@ end
 function *(A::SymMatrix{T},
            B::SymMatrix{T}) where{T<:Number}
 
-    _are_contractible(A.legs[2], B.legs[1]) ||
+    _arecontractible(A.legs[2], B.legs[1]) ||
         error("not contractible! ", A.legs[2], " and ", B.legs[1])
-
-    n_sectors = length(A.sects)
-    sects = Vector{Tuple{Int, Int}}(undef, n_sectors)
-    nzblks = Vector{Matrix{T}}(undef, n_sectors)
 
     ## NOTE: assume the set of charges for the vector space to be
     ## contracted is {c1,..,ci,...,cn} then each sector in A is given
     ## by (CA+ci, ci) and each sector in B by (ci, ci-CB) and since
     ## both are sorted based on the last charge in sector, then they
     ## are sorted the same. So we simply need to multiply them here
+
+    ## NOTE: After contraction it is possible that some new sectors
+    ## (that weren't allowed with the contraction indexes) are now
+    ## allowed. So they have to be manually added and initialized to
+    ## zero. I am actually not very happy with this; originally I
+    ## decided to not include these new sectors at all but then
+    ## realized at some instances the existance of them is necessary,
+    ## well they are allowed sectors anyways, right! Still don't know
+    ## what is the best approach.
+
+    charge = A.charge + B.charge
+    legs = (A.legs[1], B.legs[2])
+
+    sects, sizes = _allsectorsandsizes(charge, legs)
+    n_sectors = length(sects)
+    nzblks = Vector{Matrix{T}}(undef, n_sectors)
+
+    pmax = length(B.sects)
+    p = 1
     for i=1:n_sectors
-        sects[i]  = (A.sects[i][1], B.sects[i][2])
-        nzblks[i] = A.nzblks[i] * B.nzblks[i]
+        if p <= pmax && sects[i][2] == B.sects[p][2]
+            nzblks[i] = A.nzblks[p] * B.nzblks[p]
+            p += 1
+        else
+            nzblks[i] = zeros(T, sizes[i])
+        end
     end
 
-    SymMatrix(A.charge+B.charge, (A.legs[1], B.legs[2]), sects, nzblks)
+    SymMatrix(charge, legs, sects, nzblks)
 end
 
 ###TODO: This is the above function with a version of fuselegs (that fuses both of them at once!)
@@ -231,7 +250,7 @@ end
 #     *(convert(SymTensor{ComplexF64, 2}, sten1), sten2)
 # end
 
-# function _are_contractible(l1::STLeg, l2::STLeg)
+# function _arecontractible(l1::STLeg, l2::STLeg)
 #     if l1.sign == -l2.sign
 #         # find conciding charges
 #         chrs, idx1, idx2 = intersect(l1, l2)
