@@ -439,11 +439,12 @@ push to either left `:L` or right `:R` (default) matrices using the
 argument `pushto`.
 
 """
-function apply_2siteoperator!(mps     ::SymMatrixProductState{Tv},
-                              l       ::Int,
-                              op      ::SymTensor{Tv, 4};
-                              maxdim  ::Int=mps.dims[l+1],
-                              pushto  ::Symbol=:R) where {Tv<:RLorCX}
+function apply_2siteoperator!(mps        :: SymMatrixProductState{Tv},
+                              l          :: Int,
+                              op         :: SymTensor{Tv, 4};
+                              maxdim     :: Int=mps.dims[l+1],
+                              pushto     :: Symbol=:R
+                              normalizeS :: Bool=false) where {Tv<:RLorCX}
 
     #@assert mps_dims_are_consistent(mps)
     @assert 0 < l < mps.lx
@@ -475,7 +476,7 @@ function apply_2siteoperator!(mps     ::SymMatrixProductState{Tv},
     U, S, Vt = svdtrunc(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2),
                         maxdim=maxdim, tol=1.e-14)
 
-    makenormalize!(S)
+    normalizeS && makenormalize!(S)
     mps.dims[l+1] = size(U, 2)
 
     if (pushto == :R)
@@ -492,14 +493,15 @@ function apply_2siteoperator!(mps     ::SymMatrixProductState{Tv},
     nothing
 end
 
-function apply_2siteoperator!(mps      ::SymMatrixProductState{ComplexF64},
-                              l        ::Int64,
-                              op       ::SymTensor{Float64, 4};
-                              maxdim   ::Int64=mps.dims[l+1],
-                              pushto  ::Symbol=:R)
+function apply_2siteoperator!(mps        :: SymMatrixProductState{ComplexF64},
+                              l          :: Int64,
+                              op         :: SymTensor{Float64, 4};
+                              maxdim     :: Int64=mps.dims[l+1],
+                              pushto     :: Symbol=:R,
+                              normalizeS :: Bool=false)
 
     apply_2siteoperator!(mps, l, convert(SymTensor{ComplexF64, 4}, op),
-                         maxdim=maxdim, pushto=pushto)
+                         maxdim=maxdim, pushto=pushto, normalizeS=normalizeS)
 end
 
 """

@@ -69,7 +69,7 @@ function _applyfishmangates!(mps::MatrixProductState{T},
 
         ## TODO: choose a better order of site or site+1 and push_to!
         move_center!(mps, site)
-        apply_2siteoperator!(mps, site, operator, maxdim=maxdim, pushto=:R)
+        apply_2siteoperator!(mps, site, operator, maxdim=maxdim, pushto=:R, normalizeS=true)
     end
     nothing
 end
@@ -95,7 +95,7 @@ function _applyfishmangates!(mps::SymMatrixProductState{Tv},
 
         ## TODO: choose a better order of site or site+1 and push_to!
         move_center!(mps, site)
-        apply_2siteoperator!(mps, site, uten, maxdim=maxdim, pushto=:R)
+        apply_2siteoperator!(mps, site, uten, maxdim=maxdim, pushto=:R, normalizeS=true)
     end
     nothing
 end

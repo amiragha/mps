@@ -547,11 +547,12 @@ push to either left `:L` or right `:R` (default) matrices using the
 argument `pushto`.
 
 """
-function apply_2siteoperator!(mps      ::MatrixProductState{T},
-                              l        ::Int64,
-                              operator ::Array{T, 4};
-                              maxdim  ::Int64=mps.dims[l+1],
-                              pushto  ::Symbol=:R) where {T<:RLorCX}
+function apply_2siteoperator!(mps        :: MatrixProductState{T},
+                              l          :: Int64,
+                              operator   :: Array{T, 4};
+                              maxdim     :: Int64=mps.dims[l+1],
+                              pushto     :: Symbol=:R,
+                              normalizeS :: Bool=false) where {T<:RLorCX}
 
     @assert mps_dims_are_consistent(mps)
     @assert 0 < l < mps.lx
@@ -575,15 +576,12 @@ function apply_2siteoperator!(mps      ::MatrixProductState{T},
 
     fact = svd(reshape(R, dim_l*d, d*dim_r), full=false)
 
-    #println(fact[:S])
     S, n, ratio = truncate(fact.S, maxdim=maxdim)
-    #println(S)
 
     U = fact.U[:,1:n]
     Vt = fact.Vt[1:n,:]
-    ## QQQ? do we need to normalize S here?
 
-    normalize!(S)
+    normalizeS && normalize!(S)
     mps.dims[l+1] = n
 
     if (pushto == :R)
@@ -600,14 +598,15 @@ function apply_2siteoperator!(mps      ::MatrixProductState{T},
     nothing
 end
 
-function apply_2siteoperator!(mps      ::MatrixProductState{ComplexF64},
-                              l        ::Int64,
-                              op ::Array{Float64, 4};
-                              max_dim  ::Int64=mps.dims[l+1],
-                              push_to  ::Symbol=:R)
+function apply_2siteoperator!(mps        :: MatrixProductState{ComplexF64},
+                              l          :: Int64,
+                              op         :: Array{Float64, 4};
+                              maxdim     :: Int64=mps.dims[l+1],
+                              pushto     :: Symbol=:R
+                              normalizeS :: Bool=false)
 
     apply_2siteoperator!(mps, l, convert(Array{ComplexF64, 4}, op),
-                         max_dim, push_to)
+                         maxdim=maxdim, pushto=pushto, normalizeS=normalizeS)
 end
 
 function twosite_tensor(op1::Matrix{T}, op2::Matrix{T}) where {T<:RLorCX}
