@@ -602,7 +602,7 @@ function apply_2siteoperator!(mps        :: MatrixProductState{ComplexF64},
                               l          :: Int64,
                               op         :: Array{Float64, 4};
                               maxdim     :: Int64=mps.dims[l+1],
-                              pushto     :: Symbol=:R
+                              pushto     :: Symbol=:R,
                               normalizeS :: Bool=false)
 
     apply_2siteoperator!(mps, l, convert(Array{ComplexF64, 4}, op),

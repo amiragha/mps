@@ -3,7 +3,7 @@ module SymTensors
 using LinearAlgebra
 using Random
 
-import Base: convert, size, show, isequal, ==, *, conj
+import Base: convert, size, show, isequal, ==, isapprox, *, conj
 import Base: eltype, similar, copyto!
 import Base: fill, fill!, rand
 import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm
@@ -17,6 +17,7 @@ include("symtools.jl")
 
 export +, *
 export isequal, ==
+export isapprox
 export STLeg, SymTensor, SymMatrix, SymVector
 export eye
 #export randSymTensor, fillSymTensor

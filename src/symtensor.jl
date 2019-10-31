@@ -221,10 +221,9 @@ end
 conj(A::AbstractSymTensor) =
     SymTensor(A.charge, A.legs, A.sects, [conj(blk) for blk in A.nzblks])
 
-function array(A::AbstractSymTensor{T}) where {T<:Number}
-    arrep = zeros(T, sum.(alldims(A.legs)))
+function array(A::AbstractSymTensor)
+    arrep = zeros(eltype(A), sum.(alldims(A.legs)))
     adims = Tuple([0;s] for s in accdims(A.legs))
-    #println(adims)
     chrs = [0, 1]
     for idx in eachindex(A.sects)
         sect = A.sects[idx]
@@ -244,8 +243,9 @@ end
     SymTensor(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
 
 function removedummyleg(A::AbstractSymTensor, l::Int)
-    !isdummy(A.legs[l]) && error("leg is not dummy!")
+    isdummy(A.legs[l]) || error("leg is not dummy!")
 
+    N = numoflegs(A)
     SymTensor(A.charge,
               (A.legs[1:l-1]..., A.legs[l+1:N]...),
               [(s[1:l-1]...,s[l+1:N]...) for s in A.sects],
@@ -257,7 +257,7 @@ end
 
 "construct an additional SymTensor similar to A, possibly with a
 different scalar type T."
-function similar(A::AbstractSymTensor{T1, N}, T::Type=T1) where {T1<:Number, N}
+function similar(A::AbstractSymTensor, T::Type=eltype(A))
     typeof(A)(A.charge, A.legs, A.sects, [similar(blk, T) for blk in A.nzblks])
 end
 

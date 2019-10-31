@@ -443,7 +443,7 @@ function apply_2siteoperator!(mps        :: SymMatrixProductState{Tv},
                               l          :: Int,
                               op         :: SymTensor{Tv, 4};
                               maxdim     :: Int=mps.dims[l+1],
-                              pushto     :: Symbol=:R
+                              pushto     :: Symbol=:R,
                               normalizeS :: Bool=false) where {Tv<:RLorCX}
 
     #@assert mps_dims_are_consistent(mps)

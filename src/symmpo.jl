@@ -16,9 +16,9 @@ function xxz_symmpo(Tv::DataType, lx::Int, d::Int, delta::Float64=1.0)
     legbeg = STLeg(+1, [0], [1])
     legend = STLeg(-1, [0], [1])
 
-    Abeg = fillSymTensor(zero(Tv), 0, (legbeg, legs[2:4]...))
-    A = fillSymTensor(zero(Tv), 0, legs)
-    Aend = fillSymTensor(zero(Tv), 0, (legs[1:2]...,legend, legs[4]))
+    Abeg = fill(zero(Tv), 0, (legbeg, legs[2:4]...))
+    A = fill(zero(Tv), 0, legs)
+    Aend = fill(zero(Tv), 0, (legs[1:2]...,legend, legs[4]))
 
     ###NOTE: here we need nice functions for symtensor which we don't have!!!
     ###TODO: Make the nice functions (slicing and indexing, etc) for SymTensors!
@@ -34,27 +34,27 @@ function xxz_symmpo(Tv::DataType, lx::Int, d::Int, delta::Float64=1.0)
         delta*.5   0.   0.;
         0.   0.5  1
     ]
-    change_nzblk!(A, (0,0,0,0), reshape(mat0, 3,1,3,1))
-    change_nzblk!(A, (0,1,0,1), reshape(mat1, 3,1,3,1))
+    set_sector!(A, (0,0,0,0), reshape(mat0, 3,1,3,1))
+    set_sector!(A, (0,1,0,1), reshape(mat1, 3,1,3,1))
 
-    change_nzblk!(A, (0,1,1,0), reshape([0. 0. 1.], 3,1,1,1))
-    change_nzblk!(A, (0,0,-1,1), reshape([0. 0. 1.], 3,1,1,1))
-    change_nzblk!(A, (1,0,0,1), 0.5*reshape([1. 0. 0.], 1,1,3,1))
-    change_nzblk!(A, (-1,1,0,0), 0.5*reshape([1. 0. 0.], 1,1,3,1))
+    set_sector!(A, (0,1,1,0), reshape([0. 0. 1.], 3,1,1,1))
+    set_sector!(A, (0,0,-1,1), reshape([0. 0. 1.], 3,1,1,1))
+    set_sector!(A, (1,0,0,1), 0.5*reshape([1. 0. 0.], 1,1,3,1))
+    set_sector!(A, (-1,1,0,0), 0.5*reshape([1. 0. 0.], 1,1,3,1))
 
     # making the begging tensor
-    change_nzblk!(Abeg, (0,0,0,0), reshape(mat0[3,:], 1,1,3,1))
-    change_nzblk!(Abeg, (0,1,0,1), reshape(mat1[3,:], 1,1,3,1))
+    set_sector!(Abeg, (0,0,0,0), reshape(mat0[3,:], 1,1,3,1))
+    set_sector!(Abeg, (0,1,0,1), reshape(mat1[3,:], 1,1,3,1))
 
-    change_nzblk!(Abeg, (0,1,1,0), ones(Tv,1,1,1,1))
-    change_nzblk!(Abeg, (0,0,-1,1), ones(Tv,1,1,1,1))
+    set_sector!(Abeg, (0,1,1,0), ones(Tv,1,1,1,1))
+    set_sector!(Abeg, (0,0,-1,1), ones(Tv,1,1,1,1))
 
     # making the end tensor
-    change_nzblk!(Aend, (0,0,0,0), reshape(mat0[:,1], 3,1,1,1))
-    change_nzblk!(Aend, (0,1,0,1), reshape(mat1[:,1], 3,1,1,1))
+    set_sector!(Aend, (0,0,0,0), reshape(mat0[:,1], 3,1,1,1))
+    set_sector!(Aend, (0,1,0,1), reshape(mat1[:,1], 3,1,1,1))
 
-    change_nzblk!(Aend, (-1,1,0,0), 0.5*ones(Tv,1,1,1,1))
-    change_nzblk!(Aend, (1,0,0,1), 0.5*ones(Tv,1,1,1,1))
+    set_sector!(Aend, (-1,1,0,0), 0.5*ones(Tv,1,1,1,1))
+    set_sector!(Aend, (1,0,0,1), 0.5*ones(Tv,1,1,1,1))
 
     tensors = SymTensor{Tv, 4}[]
     dims = zeros(Int, lx+1)
