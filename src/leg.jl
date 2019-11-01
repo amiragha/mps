@@ -58,7 +58,7 @@ end
 @inline fulldims(legs::NTuple{N, STLeg}) where {N} =
     prod([fulldims(legs[n]) for n in eachindex(legs)])
 
-function change_sign(leg::STLeg)
+function negate(leg::STLeg)
     perm = sortperm(leg.chrs, by=x -> -x)
     STLeg(-leg.sign, -1 .*(leg.chrs[perm]), leg.dims[perm])
 end
@@ -134,7 +134,7 @@ function _allsectorsandsizes(charge::Int, legs::NTuple{N, STLeg}) where{N}
     else
         i = searchsortedfirst(legs[1].chrs, legs[1].sign*charge)
         if i <= length(legs[1].chrs) && legs[1].sign*legs[1].chrs[i] == charge
-            return (legs[1].chrs[i]) , (legs[1].dims[i])
+            return [(legs[1].chrs[i],)] , [(legs[1].dims[i],)]
         end
     end
     sects, sizes

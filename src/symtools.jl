@@ -1,28 +1,30 @@
-function svdsym(smat::SymMatrix{Tv}; debug::Bool=false) where {Tv<:Number}
-    signs(smat.legs) != (+1, -1) &&
-        error("svdsym only accespts a SymMatrix (+1,-1) but ", signs(smat.legs))
+function svdsym(A::AbstractSymTensor{T,2}; debug::Bool=false) where {T<:Number}
+    signs(A.legs) != (+1, -1) &&
+        error("svdsym only accepts a SymMatrix (+1,-1) but ", signs(A.legs))
 
-    debug && println(smat)
+    debug && println(A)
 
-    sects_U = Tuple{Int, Int}[]
-    nzblks_U = Matrix{Tv}[]
-    sects_S = Tuple{Int, Int}[]
-    nzblks_S = Vector{Float64}[]
-    nzblks_Vt = Matrix{Tv}[]
-    sects_Vt = Tuple{Int, Int}[]
+    n_sectors = length(A.sects)
+
+    sects_U   = Vector{Tuple{Int, Int}}(undef, n_sectors)
+    nzblks_U  = Vector{Matrix{T}}(undef, n_sectors)
+    sects_S   = Vector{Tuple{Int, Int}}(undef, n_sectors)
+    nzblks_S  = Vector{Vector{Float64}}(undef, n_sectors)
+    nzblks_Vt = Vector{Matrix{T}}(undef, n_sectors)
+    sects_Vt  = Vector{Tuple{Int, Int}}(undef, n_sectors)
     middle_dims = Int[]
 
-    for idx in eachindex(smat.sects)
-        sect = smat.sects[idx]
-        push!(sects_U, (sect[1], sect[1]))
-        push!(sects_S, (sect[1], sect[2]))
-        push!(sects_Vt, (sect[2], sect[2]))
+    for idx in eachindex(A.sects)
+        c1, c2 = A.sects[idx]
+        sects_U[idx] = (c1, c1)
+        sects_S[idx] = (c1, c2)
+        sects_Vt[idx] = (c2, c2)
 
-        nzblk = smat.nzblks[idx]
+        nzblk = A.nzblks[idx]
         fact = svd(nzblk, full=false)
-        push!(nzblks_U, fact.U)
-        push!(nzblks_S, fact.S)
-        push!(nzblks_Vt, fact.Vt)
+        nzblks_U[idx] = fact.U
+        nzblks_S[idx] = fact.S
+        nzblks_Vt[idx] = fact.Vt
 
         push!(middle_dims, length(fact.S))
     end
@@ -42,9 +44,9 @@ function svdsym(smat::SymMatrix{Tv}; debug::Bool=false) where {Tv<:Number}
     Sleg2 = STLeg(-1, rchrs, middle_dims)
     Vtleg1 = STLeg(+1, rchrs, middle_dims)
 
-    U = SymTensor(0, (smat.legs[1], Uleg2), sects_U, nzblks_U)
-    S = SymTensor(smat.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])
-    Vt = SymTensor(0, (Vtleg1, smat.legs[2]), sects_Vt, nzblks_Vt)
+    U  = SymMatrix{T}(0, (A.legs[1], Uleg2), sects_U, nzblks_U)
+    S  = SymDiagonal{T}(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])
+    Vt = SymMatrix{T}(0, (Vtleg1, A.legs[2]), sects_Vt, nzblks_Vt)
     return U, S, Vt
 end
 

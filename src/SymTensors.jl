@@ -44,7 +44,7 @@ export permutelegs
 export removedummyleg
 export contract
 
-export change_sign, change_legsign
+#export change_sign, change_legsign
 export mapcharges
 export invlegs
 

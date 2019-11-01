@@ -35,7 +35,7 @@ function SymTensor(charge :: Int,
                    nzblks :: Vector{<:AbstractArray{T, N}}) where{T<:Number, N}
     #issorted(sects, lt=_sectorlessthan) ||  error("sectors not sorted!")
     _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-        error("The given sectors and block-sizes do not match legs!")
+        error("The given sectors and block-sizes do not match legs!")#, charge, legs, sects, size.(nzblks))
     #length(sects) == length(nzblks) || error("sects don't match nzblks!")
     SymTensor{T, N}(charge, legs, sects, nzblks)
 end
@@ -112,6 +112,16 @@ function SymVector(charge :: Int,
     legs[1].chrs = [charge]
     legs[1].dims = [size(nzblks[1], 1)]
     SymVector{T}(charge, legs, sects, nzblks)
+end
+
+function SymVector(sign::Int, charge::Int, v::Vector{T}) where{T<:Number}
+    leg = STLeg(sign, [charge], [length(v)])
+    SymVector{T}(charge, (leg,), [(charge,)], [v])
+end
+
+##TODO: see if this should be a convert function!
+function SymVector(A::SymTensor{T, 1}) where {T<:Number}
+    SymVector{T}(A.charge, A.legs, A.sects, A.nzblks)
 end
 
 @inline size(s::SymVector) = size(nzblks[1])
@@ -399,12 +409,17 @@ end
 #     Tuple(trimmedlegs)
 # end
 
-# function change_legsign(sten::SymTensor{T, N}, l::Int) where{T<:Number, N}
-#     legs = (sten.legs[1:l-1]..., change_sign(sten.legs[l]), sten.legs[l+1:N]...)
-#     sects = NTuple{N, Int}[]
-#     for sect in sten.sects
-#         push!(sects, (sect[1:l-1]..., -sect[l], sect[l+1:N]...))
-#     end
-#     perm = _sectors_sortperm(sects)
-#     SymTensor(sten.charge, legs, sects[perm], sten.nzblks[perm])
-# end
+function negateleg(A::AbstractSymTensor, l::Int)
+    N = numoflegs(A)
+    0 < l <= N || error("leg $l doesn't exist!")
+    legs = (A.legs[1:l-1]..., negate(A.legs[l]), A.legs[l+1:N]...)
+
+    n_sectors = length(A.sects)
+    sects = Vector{NTuple{N, Int}}(undef, n_sectors)
+    for i = 1:n_sectors
+        sect = A.sects[i]
+        sects[i] = (sect[1:l-1]..., -sect[l], sect[l+1:N]...)
+    end
+    perm = _sectors_sortperm(sects)
+    SymTensor{eltype(A),N}(A.charge, legs, sects[perm], A.nzblks[perm])
+end

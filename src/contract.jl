@@ -69,17 +69,29 @@ function _contract_index_perm(indexset; mode::Symbol=:MINUS)
     rems[perm], cons[sortperm(cons_order, by=x->abs(x))], tofinals[perm]
 end
 
-function SymMatrix(A::AbstractSymTensor{Tv, N},
-                   rowidxs::Vector{Int},
-                   colidxs::Vector{Int}) where{Tv<:Number, N}
+function SymVector(A::AbstractSymTensor,
+                   sign::Int,
+                   perm::Vector{Int})
+    N = numoflegs(A)
+    abs(sign) == 1 || error("Incorrect sign $sign")
+    sort(perm) == collect(1:N) || error("Incorrect index set for conversion to SymVector!")
 
+    pA = permutelegs(A, perm)
+    SymVector(fuselegs(pA, sign, 1, N))
+end
+
+function SymMatrix(A::AbstractSymTensor,
+                   rowidxs::Vector{Int},
+                   colidxs::Vector{Int})
+
+    N = numoflegs(A)
     idxperm = [rowidxs; colidxs]
-    sort(idxperm) == collect(1:N) || error("Incorrect index set for convertion to SymMatrix!")
+    sort(idxperm) == collect(1:N) || error("Incorrect index set for conversion to SymMatrix!")
     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
     length(colidxs) == 0 && error("Zero col for matrix not allowed!")
 
     pA = permutelegs(A, idxperm)
-    return SymMatrix(fuselegs(
+    SymMatrix(fuselegs(
         fuselegs(pA, -1, length(rowidxs)+1, length(colidxs)),
         +1, 1, length(rowidxs)))
 
@@ -92,8 +104,7 @@ function _arecontractible(l1::STLeg, l2::STLeg)
     false
 end
 
-function *(A::SymVector{T},
-           B::SymVector{T}) where {T<:Number}
+function *(A::SymVector, B::SymVector) where {T<:Number}
 
     _arecontractible(A.legs[1], B.legs[1]) ||
         error("not contractible!", A.legs[1], " and ", B.legs[1])
@@ -103,12 +114,14 @@ function *(A::SymVector{T},
     return sum(A.nzblks[1] .* B.nzblks[1])
 end
 
-function *(A::SymMatrix{T},
-           B::SymMatrix{T}) where{T<:Number}
+function *(A::AbstractSymMatrix,
+           B::AbstractSymMatrix)
 
     _arecontractible(A.legs[2], B.legs[1]) ||
         error("not contractible! ", A.legs[2], " and ", B.legs[1])
 
+    eltype(A) == eltype(B) || error("eltypes don't match!")
+    T = eltype(A)
     ## NOTE: assume the set of charges for the vector space to be
     ## contracted is {c1,..,ci,...,cn} then each sector in A is given
     ## by (CA+ci, ci) and each sector in B by (ci, ci-CB) and since
@@ -135,6 +148,11 @@ function *(A::SymMatrix{T},
     p = 1
     for i=1:n_sectors
         if p <= pmax && sects[i][2] == B.sects[p][2]
+            if sects[i][1] != A.sects[p][1]
+                println(sects)
+                println(A)
+                println(B)
+            end
             nzblks[i] = A.nzblks[p] * B.nzblks[p]
             p += 1
         else
