@@ -39,7 +39,7 @@ function SymMatrixProductState{Tv}(
                 end
             end
         end
-        sects = sort(sects, lt=SymTensors._sector_less_than)
+        sects = sort(sects, lt=SymTensors._sectorlessthan)
         l = length(sects)
         A = SymTensor(0,
                       (legl,legd,legr),

@@ -10,12 +10,12 @@ function initialenv(mps::SymMatrixProductState{Tv},
     # mpo.matrices[1].legs[1].chrs[1]
     # mpo.matrices[lx].legs[3].chrs[1]
 
-    env[1] = fillSymTensor(one(Tv), 0, (STLeg(-1,[lchr],[1]),
-                                        STLeg(-1,[0],[1]),
-                                        STLeg(+1,[lchr],[1])))
-    env[lx+2] = fillSymTensor(one(Tv), 0, (STLeg(+1,[rchr],[1]),
-                                           STLeg(+1,[0],[1]),
-                                           STLeg(-1,[rchr],[1])))
+    env[1] = fill(one(Tv), 0, (STLeg(-1,[lchr],[1]),
+                               STLeg(-1,[0],[1]),
+                               STLeg(+1,[lchr],[1])))
+    env[lx+2] = fill(one(Tv), 0, (STLeg(+1,[rchr],[1]),
+                                  STLeg(+1,[0],[1]),
+                                  STLeg(-1,[rchr],[1])))
     for l = lx:-1:1
         env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
     end

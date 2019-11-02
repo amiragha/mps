@@ -302,7 +302,7 @@ function axpy!(α,
                B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
     for i in eachindex(A.nzblks)
-        B.nablks[i] = alpha .* A.nzblks[i] + B.nzblks[i]
+        B.nzblks[i] = α .* A.nzblks[i] + B.nzblks[i]
     end
     B
 end
@@ -314,7 +314,7 @@ function axpby!(α,
                 B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
     for i in eachindex(A.nzblks)
-        B.nablks[i] = alpha .* A.nzblks[i] + B.nzblks[i]
+        B.nzblks[i] = alpha .* A.nzblks[i] + B.nzblks[i]
     end
     B
 end
