@@ -69,11 +69,11 @@ function SymMatrixProductState{Tv}(
         legd = STLeg(+1, [0, 1], [1,1])
         if initconf[site] == 0
             legr = STLeg(-1, [lchr], [1])
-            A = fillSymTensor(one(Tv), 0, (legl,legd,legr))
+            A = fill(one(Tv), 0, (legl,legd,legr))
             push!(matrices, A)
         else
             legr = STLeg(-1, [lchr+1], [1])
-            A = fillSymTensor(one(Tv), 0, (legl,legd,legr))
+            A = fill(one(Tv), 0, (legl,legd,legr))
             push!(matrices, A)
             lchr += 1
         end
@@ -106,11 +106,11 @@ function SymMatrixProductState(
     smleg_ℓ = STLeg(-1, -1*charge_range, [binomial(lx-ℓ, c) for c in charge_range])
     legs = (STLeg(1, [0, 1], [1, 1]), smleg_ℓ)
 
-    statematrix = defuse_leg(statematrix, 1, legs)
+    statematrix = unfuseleg(statematrix, 1, legs)
     U, S, Vt = svdsym(statematrix)
     dims[ℓ+1] = fulldims(U.legs[2])
 
-    push!(matrices, defuse_leg(U, 1, (ex_leg_ℓ, physleg)))
+    push!(matrices, unfuseleg(U, 1, (ex_leg_ℓ, physleg)))
 
     for ℓ = 2:lx-1
         #@show ℓ
@@ -120,16 +120,16 @@ function SymMatrixProductState(
         charge_range = min(charge, lx-ℓ):-1:max(0, charge-ℓ)
         smleg_ℓ = STLeg(-1, -1*charge_range, [binomial(lx-ℓ, c) for c in charge_range])
         legs = (STLeg(1, [0, 1], [1, 1]), smleg_ℓ)
-        statematrix = fuselegs(defuse_leg(S*Vt, 2, legs), 1, 1, 2)
+        statematrix = fuselegs(unfuseleg(S*Vt, 2, legs), 1, 1, 2)
         U, S, Vt = svdsym(statematrix)
         dims[ℓ+1] = fulldims(U.legs[2])
 
-        push!(matrices, defuse_leg(U, 1, (ex_leg_ℓ, physleg)))
+        push!(matrices, unfuseleg(U, 1, (ex_leg_ℓ, physleg)))
     end
 
     dims[lx+1] = 1
     legs = (STLeg(1,[0, 1],[1, 1]), STLeg(-1, [0], [1]))
-    push!(matrices, defuse_leg(S*Vt,2,legs))
+    push!(matrices, unfuseleg(S*Vt,2,legs))
 
     return SymMatrixProductState{Tv}(lx, d, dims, matrices, lx)
 end
@@ -148,18 +148,18 @@ function normalize!(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX}
         n = norm(ss)
 
         S_nzblks = S.nzblks ./ n
-        S = SymTensor(S.charge, S.legs, S.sects, S_nzblks)
+        S = SymDiagonal(S.charge, S.legs, S.sects, S_nzblks)
 
-        mps.matrices[mps.center] = defuse_leg(U * S * Vt, 1, A.legs[1:2])
+        mps.matrices[mps.center] = unfuseleg(U * S * Vt, 1, A.legs[1:2])
     else
         U,S,Vt = svdsym(fuselegs(A, -1, 2, 2))
         ss = vcat(diag.(S.nzblks)...)
         n = norm(ss)
 
         S_nzblks = S.nzblks ./ n
-        S = SymTensor(S.charge, S.legs, S.sects, S_nzblks)
+        S = SymDiagonal(S.charge, S.legs, S.sects, S_nzblks)
 
-        mps.matrices[mps.center] = defuse_leg(U * S * Vt, 2, A.legs[2:3])
+        mps.matrices[mps.center] = unfuseleg(U * S * Vt, 2, A.legs[2:3])
     end
     sort(ss./n, rev=true)
 end
@@ -197,7 +197,7 @@ function isometrize_push_right!(matrices::Vector{SymTensor{Tv, 3}},
         end
 
         legs = A.legs[1:2]
-        matrices[site] = defuse_leg(U, 1, legs)
+        matrices[site] = unfuseleg(U, 1, legs)
 
         matrices[site+1] = contract(S*Vt, (1, -1), matrices[site+1], (-1, 2, 3))
     end
@@ -222,7 +222,7 @@ function isometrize_push_left!(matrices::Vector{SymTensor{Tv, 3}},
         end
 
         legs = A.legs[2:3]
-        matrices[site] = defuse_leg(Vt, 2, legs)
+        matrices[site] = unfuseleg(Vt, 2, legs)
 
         matrices[site-1] = contract(matrices[site-1], (1, 2, -1), U*S, (-1, 3))
     end
@@ -274,7 +274,7 @@ function entanglementspectrum(mps::SymMatrixProductState)
 
     for l = 1:lx-1
         U, S, Vt = svdsym(fuselegs(A, +1, 1, 2))
-        mps.matrices[l] = defuse_leg(U, 1, A.legs[1:2])
+        mps.matrices[l] = unfuseleg(U, 1, A.legs[1:2])
         spectrum = sort(vcat([diag(blk) for blk in S.nzblks]...), rev=true)
         result[l] = spectrum
         A = contract(S*Vt, (1, -1), mps.matrices[l+1], (-1,2,3))
@@ -476,16 +476,16 @@ function apply_2siteoperator!(mps        :: SymMatrixProductState{Tv},
     U, S, Vt = svdtrunc(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2),
                         maxdim=maxdim, tol=1.e-14)
 
-    normalizeS && makenormalize!(S)
+    normalizeS && normalize!(S)
     mps.dims[l+1] = size(U, 2)
 
     if (pushto == :R)
-        mps.matrices[l] = defuse_leg(U, 1, (R.legs[1], R.legs[2]))
-        mps.matrices[l+1] = defuse_leg(S * Vt, 2, (R.legs[3], R.legs[4]))
+        mps.matrices[l] = unfuseleg(U, 1, (R.legs[1], R.legs[2]))
+        mps.matrices[l+1] = unfuseleg(S * Vt, 2, (R.legs[3], R.legs[4]))
         mps.center = l+1
     elseif (pushto == :L)
-        mps.matrices[l] = defuse_leg(U * S, 1, (R.legs[1], R.legs[2]))
-        mps.matrices[l+1] = defuse_leg(Vt, 2, (R.legs[3], R.legs[4]))
+        mps.matrices[l] = unfuseleg(U * S, 1, (R.legs[1], R.legs[2]))
+        mps.matrices[l+1] = unfuseleg(Vt, 2, (R.legs[3], R.legs[4]))
         mps.center = l
     else
         error("invalid push_to :", pushto)

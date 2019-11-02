@@ -123,14 +123,14 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
     ## NOTE: in order to make the gutzwiller projector respect the U1
     ## symmetry we need to do the follwoing. Assume that ↑↑
     ## corresponds to ↑ or 2 and ↓↓ corresponds or ↓ or 0.
-    G = fillSymTensor(one(Tv), 0,
-                      (STLeg(+1, [0,2], [1,1]),
-                       STLeg(-1, [0,1], [1,1]),
-                       STLeg(-1, [0,1], [1,1])))
+    G = fill(one(Tv), 0,
+             (STLeg(+1, [0,2], [1,1]),
+              STLeg(-1, [0,1], [1,1]),
+              STLeg(-1, [0,1], [1,1])))
 
-    E = fillSymTensor(one(Tv), 0, (STLeg(+1, [0], [1]),
-                                   STLeg(-1, [0], [1]),
-                                   STLeg(-1, [0], [1])))
+    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
+                          STLeg(-1, [0], [1]),
+                          STLeg(-1, [0], [1])))
     for l=1:lx-1
         A = mps1.matrices[l]
         B = mps2.matrices[l]
@@ -151,8 +151,8 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
         dims[l+1] = size(S, 1)
         push!(matrices,
               mapcharges(x->div(x,2),
-                         defuse_leg(U, 1, (E.legs[1], G.legs[1]))))
-        E = defuse_leg(S * Vt, 2, (A.legs[3], B.legs[3]))
+                         unfuseleg(U, 1, (E.legs[1], G.legs[1]))))
+        E = unfuseleg(S * Vt, 2, (A.legs[3], B.legs[3]))
     end
     A = mps1.matrices[lx]
     B = mps2.matrices[lx]
@@ -186,14 +186,14 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     ## NOTE: in order to make the gutzwiller projector respect the U1
     ## symmetry we need to do the follwoing. Assume the first mps
     ## corresponds to ↑ or 1 and second mps to ↓ or -1.
-    G = fillSymTensor(one(Tv), 0,
-                      (STLeg(+1, [-1,1], [1,1]),
-                       STLeg(-1, [0,1], [1,1]),
-                       STLeg(+1, [0,1], [1,1])))
+    G = fill(one(Tv), 0,
+             (STLeg(+1, [-1,1], [1,1]),
+              STLeg(-1, [0,1], [1,1]),
+              STLeg(+1, [0,1], [1,1])))
 
-    E = fillSymTensor(one(Tv), 0, (STLeg(+1, [0], [1]),
-                                   STLeg(-1, [0], [1]),
-                                   STLeg(+1, [0], [1])))
+    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
+                          STLeg(-1, [0], [1]),
+                          STLeg(+1, [0], [1])))
     for l=1:lx-1
         A = mps1.matrices[l]
         B = invlegs(mps2.matrices[l])
@@ -221,8 +221,8 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
         fnr = x->div(x+l, 2)
         push!(matrices,
               mapcharges((fnl,fnd,fnr),
-                         defuse_leg(U, 1, (E.legs[1], G.legs[1]))))
-        E = defuse_leg(S * Vt, 2, (A.legs[3], B.legs[3]))
+                         unfuseleg(U, 1, (E.legs[1], G.legs[1]))))
+        E = unfuseleg(S * Vt, 2, (A.legs[3], B.legs[3]))
     end
     A = mps1.matrices[lx]
     B = invlegs(mps2.matrices[lx])

@@ -79,7 +79,7 @@ function _applyfishmangates!(mps::SymMatrixProductState{Tv},
                              maxdim::Int) where{Tv}
 
     # u is the two-body U gate matrix
-    u = eye(Float64, 0, [0,1,2], [1,2,1])
+    u = eye(Float64, [0,1,2], [1,2,1])
 
     #   twobodyugate = Matrix{ComplexF64}(I, 4, 4)
     ## NOTE: the gates are applies in reverse order
@@ -89,9 +89,9 @@ function _applyfishmangates!(mps::SymMatrixProductState{Tv},
     for n=length(fsmset.positions):-1:1
         site = fsmset.positions[n]
         θ = fsmset.θs[n]
-        change_nzblk!(u, (1,1), rotationmat(θ))
+        set_sector!(u, (1,1), rotationmat(θ))
 
-        uten = defuse_leg(defuse_leg(u, 2, clegs), 1, rlegs)
+        uten = unfuseleg(unfuseleg(u, 2, clegs), 1, rlegs)
 
         ## TODO: choose a better order of site or site+1 and push_to!
         move_center!(mps, site)

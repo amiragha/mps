@@ -1,6 +1,9 @@
-function svdsym(A::AbstractSymTensor{T,2}; debug::Bool=false) where {T<:Number}
-    signs(A.legs) != (+1, -1) &&
+function svdsym(A::AbstractSymTensor; debug::Bool=false)
+    numoflegs(A) == 2 ||
+        error("svd only defined for matrix like objects N = ", numoflegs(A))
+    signs(A.legs) == (+1, -1) ||
         error("svdsym only accepts a SymMatrix (+1,-1) but ", signs(A.legs))
+    T = eltype(A)
 
     debug && println(A)
 
@@ -16,8 +19,8 @@ function svdsym(A::AbstractSymTensor{T,2}; debug::Bool=false) where {T<:Number}
 
     for idx in eachindex(A.sects)
         c1, c2 = A.sects[idx]
-        sects_U[idx] = (c1, c1)
-        sects_S[idx] = (c1, c2)
+        sects_U[idx]  = (c1, c1)
+        sects_S[idx]  = (c1, c2)
         sects_Vt[idx] = (c2, c2)
 
         nzblk = A.nzblks[idx]
@@ -45,9 +48,10 @@ function svdsym(A::AbstractSymTensor{T,2}; debug::Bool=false) where {T<:Number}
     Vtleg1 = STLeg(+1, rchrs, middle_dims)
 
     U  = SymMatrix{T}(0, (A.legs[1], Uleg2), sects_U, nzblks_U)
-    S  = SymDiagonal{T}(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])
+    S  = SymDiagonal{Float64}(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])
     Vt = SymMatrix{T}(0, (Vtleg1, A.legs[2]), sects_Vt, nzblks_Vt)
-    return U, S, Vt
+
+    U, S, Vt
 end
 
 

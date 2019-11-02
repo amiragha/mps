@@ -11,7 +11,7 @@
 
         test = SymTensor(0, legs, sects[perm], nzblks[perm])
         ftest = fuselegs(test, +1, 1, 2)
-        dftest = defuse_leg(ftest, 1, legs[1:2])
+        dftest = unfuseleg(ftest, 1, legs[1:2])
         @test dftest == test
     end
 
@@ -20,7 +20,7 @@
         set_sector!(A, (1,1), [2. 3;4 5])
         rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
         clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
-        B = defuse_leg(defuse_leg(A, 2, clegs), 1, rlegs)
+        B = unfuseleg(unfuseleg(A, 2, clegs), 1, rlegs)
         @test B.sects == [(0,0,0,0), (1,0,1,0), (0,1,1,0),
                               (1,0,0,1), (0,1,0,1), (1,1,1,1)]
         i = ones(1,1,1,1)
@@ -62,7 +62,7 @@ end
         A = rand(Float64, 0, leglist[1:4])
         B = rand(Float64, 0, leglist[5:8])
 
-        @test defuse_leg(fuselegs(A, +1, 1, 3), 1, leglist[1:3]) ≈ A
+        @test unfuseleg(fuselegs(A, +1, 1, 3), 1, leglist[1:3]) ≈ A
 
         A_ = array(A)
         B_ = array(B)

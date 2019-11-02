@@ -6,7 +6,7 @@ using Random
 import Base: convert, size, show, isequal, ==, isapprox, *, conj
 import Base: eltype, similar, copyto!
 import Base: fill, fill!, rand
-import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm
+import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!
 import Base.intersect
 
 include("leg.jl")
@@ -18,7 +18,8 @@ include("symtools.jl")
 export +, *
 export isequal, ==
 export isapprox
-export STLeg, SymTensor, SymMatrix, SymVector
+export AbstractSymTensor, AbstractSymMatrix
+export STLeg, SymTensor, SymMatrix, SymDiagonal, SymVector
 export eye
 #export randSymTensor, fillSymTensor
 export FusedCharge
@@ -37,9 +38,9 @@ export numoflegs
 export _sectors_sortperm
 
 export fuse_set
-export fuse_conseqlegs
+#export fuse_conseqlegs
 export fuselegs
-export defuse_leg
+export unfuseleg
 export permutelegs
 export removedummyleg
 export contract
@@ -48,12 +49,14 @@ export contract
 export mapcharges
 export invlegs
 
+export get_sector!
 export set_sector!
 
 export svdsym
 
 export eltype, similar, copyto!
 export mul!, rmul!, axpy!, axpby!, dot, norm
+export normalize!
 export fill, fill!
 
 export fermionswapgate

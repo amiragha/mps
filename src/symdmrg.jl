@@ -55,12 +55,12 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
         U, S, Vt = svdtrunc(vreleg, maxdim=maxdim, tol=tol)
 
-        mps.matrices[l] = defuse_leg(U, 1, A.legs[1:2])
+        mps.matrices[l] = unfuseleg(U, 1, A.legs[1:2])
         mps.dims[l+1] = size(S, 1)
 
         env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
 
-        A = defuse_leg(S*Vt, 2, AA.legs[3:4])
+        A = unfuseleg(S*Vt, 2, AA.legs[3:4])
     end
 
     l = lx-1
@@ -77,12 +77,12 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
         U, S, Vt = svdtrunc(vreleg, maxdim=maxdim, tol=tol)
 
-        mps.matrices[l+1] = defuse_leg(Vt, 2, AA.legs[3:4])
+        mps.matrices[l+1] = unfuseleg(Vt, 2, AA.legs[3:4])
         mps.dims[l+1] = size(S, 2)
 
         env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
-        A = defuse_leg(U*S, 1, AA.legs[1:2])
+        A = unfuseleg(U*S, 1, AA.legs[1:2])
         AA = contract(mps.matrices[l-1], (1,2,-1), A, (-1,3,4))
 
         es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
@@ -97,11 +97,11 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
     U, S, Vt = svdtrunc(vreleg, maxdim=maxdim, tol=tol)
 
-    mps.matrices[l+1] = defuse_leg(Vt, 2, AA.legs[3:4])
+    mps.matrices[l+1] = unfuseleg(Vt, 2, AA.legs[3:4])
     mps.dims[l+1] = size(S, 2)
 
     env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
-    mps.matrices[l] = defuse_leg(U*S, 1, AA.legs[1:2])
+    mps.matrices[l] = unfuseleg(U*S, 1, AA.legs[1:2])
     return e
 end

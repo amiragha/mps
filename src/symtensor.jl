@@ -73,7 +73,7 @@ mutable struct SymDiagonal{T<:Number} <: AbstractSymMatrix{T}
     charge :: Int
     legs   :: Tuple{STLeg, STLeg}
     sects  :: Vector{Tuple{Int, Int}}
-    nzblks :: Vector{Diagonal{T}}
+    nzblks :: Vector{Diagonal{T,Vector{T}}}
     function SymDiagonal{T}(c,l,s,n) where {T<:Number}
         new{T}(c,l,s,n)
     end
@@ -82,7 +82,7 @@ end
 function SymDiagonal(charge :: Int,
                      legs   :: Tuple{STLeg, STLeg},
                      sects  :: Vector{Tuple{Int, Int}},
-                     nzblks :: Vector{Diagonal{T}}) where {T<:Number}
+                     nzblks :: Vector{Diagonal{T,Vector{T}}}) where {T<:Number}
     signs(legs) == (+1, -1) || error("SyDiagonal signs should be (+1,-1) ", signs(legs))
     #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
     _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
@@ -206,9 +206,11 @@ eye(cs::Vector{Int}, ds::Vector{Int}) = eye(Float64, cs, ds)
 invert the direction (sign) of all legs of the tensor therefore
 negative the total charge of the tensor as well!
 """
-function invlegs(sten::SymTensor{T, N}) where{T<:Number, N}
-    legs = Tuple([STLeg(-l.sign, l.chrs, l.dims) for l in sten.legs])
-    SymTensor(-sten.charge, legs, sten.sects, sten.nzblks)
+# This function seems to be not respecting the (+1, -1) convention for
+# SymMatrix objects, should I change the convention then?
+function invlegs(A::AbstractSymTensor)
+    legs = Tuple([STLeg(-l.sign, l.chrs, l.dims) for l in A.legs])
+    typeof(A)(-A.charge, legs, A.sects, A.nzblks)
 end
 
 function mapcharges(f::Function, A::AbstractSymTensor)
@@ -229,7 +231,7 @@ function mapcharges(f::NTuple{N, Function},
 end
 
 conj(A::AbstractSymTensor) =
-    SymTensor(A.charge, A.legs, A.sects, [conj(blk) for blk in A.nzblks])
+    typeof(A)(A.charge, A.legs, A.sects, [conj(blk) for blk in A.nzblks])
 
 function array(A::AbstractSymTensor)
     arrep = zeros(eltype(A), sum.(alldims(A.legs)))
@@ -291,7 +293,7 @@ end
 false, A is initialized with all zeros"
 function rmul!(A::T, α) where {T<:AbstractSymTensor}
     rmul!(A.nzblks,  α)
-    v
+    A
 end
 
 "Stores in B the result of α*A + B"
@@ -317,15 +319,18 @@ function axpby!(α,
     B
 end
 
-"compute the inner product of two SymTensors which conjugates the second one"
+"""
+compute the inner product of two similar SymTensors which conjugates
+the second one
+"""
 function dot(A::AbstractSymTensor{T1, N},
              B::AbstractSymTensor{T2, N}) where{T1<:Number, T2<:Number, N}
-    contract(v, .-Tuple(1:N), invlegs(conj(w)), .-Tuple(1:N))
+    contract(A, .-Tuple(1:N), invlegs(conj(B)), .-Tuple(1:N))
 end
 
-" compute the 2-norm of a vector"
-function norm(v::AbstractSymTensor)
-    sqrt(dot(v, v))
+" compute the 2-norm of a  AbstractSymTensor"
+function norm(A::AbstractSymTensor)
+    sqrt(dot(A, A))
 end
 
 function normalize!(S::SymDiagonal)

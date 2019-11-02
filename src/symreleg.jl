@@ -30,15 +30,20 @@ unzip(a) = map(x->getfield.(a,x), fieldnames(eltype(a)))
 #### RELEG #####################
 ################################
 
-function permutelegs(A::AbstractSymTensor{T, N},
-                     perm::Vector{Int}) where{T, N}
-
+function permutelegs(A::AbstractSymTensor,
+                     perm::Vector{Int})
+    N = numoflegs(A)
     sort(perm) == collect(1:N) || error("Not a valid permutation!")
     sectperm = _sectors_sortperm(A.sects,  by=x->x[perm])
 
     sects = [sect[perm] for sect in A.sects[sectperm]]
-    nzblks = [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]]
 
+    ## NOTE: The line below because for some reason the permutedims of
+    ## Diagonal returns a sparse matrix in Julia 1.2.x
+    typeof(A) <: SymDiagonal &&
+        return typeof(A)(A.charge, A.legs[perm], sects, A.nzblks)
+
+    nzblks = [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]]
     typeof(A)(A.charge, A.legs[perm], sects, nzblks)
 end
 
@@ -101,6 +106,7 @@ function fuselegs(A::AbstractSymTensor,
     end
 
     fsectperm = _sectors_sortperm(fsects)
+
     newsects, refs = uniquesorted(fsects[fsectperm])
     refs = refs[invperm(fsectperm)]
 
@@ -126,7 +132,7 @@ function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T
 end
 
 # defuses a leg into some given legs
-function defuse_leg(A    :: AbstractSymTensor{T, N},
+function unfuseleg(A    :: AbstractSymTensor{T, N},
                     l    :: Int,
                     legs :: NTuple{M, STLeg}) where {T<:Number, N, M}
     0 < l <= N || error("integer l not in range $l, $N")

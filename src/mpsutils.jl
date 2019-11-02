@@ -79,7 +79,7 @@ end
 """
     truncatedsizes(S [; maxdim, tol])
 
-for a vector of diagonal matrices `S` of singular values (or basically
+for a vector of float vectors `S` of singular values (or basically
 it is just assumed that each sector is sorted descendingly), returns
 the vector of new sizes when the singular values are to be truncated
 to the `maxdim` largest numbers or when `tol` is reached whichever is
@@ -88,7 +88,7 @@ lower.
 """
 function truncatedsizes(S::Vector{Vector{Float64}};
                         maxdim::Int=200,
-                        to::Float64=1.e-14)
+                        tol::Float64=1.e-14)
 
     pointers = ones(Int, length(S))
 
@@ -100,7 +100,8 @@ function truncatedsizes(S::Vector{Vector{Float64}};
             n==1 && error("The largest singular value is smaller than tol! $m < $tol")
             break
         end
-        if pointers[index] == size(S[index], 1)
+        if pointers[index] >= size(S[index], 1)
+            pointers[index] += 1
             c[index] = 0.0
         else
             pointers[index] += 1
@@ -112,9 +113,14 @@ end
 
 ######NOTE
 ###TODO: this needs to be tested!
-function svdtrunc(A::SymMatrix{T};
+function svdtrunc(A::AbstractSymTensor;
                   maxdim::Int=200,
-                  tol::Float64=1.e-14) where {T<:Number}
+                  tol::Float64=1.e-14)
+    numoflegs(A) == 2 ||
+        error("svd only defined for matrix like objects N = ", numoflegs(A))
+    signs(A.legs) == (+1, -1) ||
+        error("svdsym only accepts a SymMatrix (+1,-1) but ", signs(A.legs))
+    T = eltype(A)
 
     n_sects = length(A.sects)
     sects_U  = Vector{Tuple{Int, Int}}(undef, n_sects)
@@ -133,23 +139,23 @@ function svdtrunc(A::SymMatrix{T};
 
         fact = svd(A.nzblks[idx], full=false)
         blks_U[idx] = fact.U
-        blks_S[idx] = Diagonal(fact.S)
+        blks_S[idx] = fact.S
         blks_Vt[idx] = fact.Vt
     end
 
     ns = truncatedsizes(blks_S, maxdim=maxdim, tol=tol)
-    indices = find(ns)
+    indices = findall(x->x>0, ns)
     #n_sects_new = sum(ns .> 0)
 
-    sect_U  = sect_U[indices]
-    sect_S  = sect_S[indices]
-    sect_Vt = sect_Vt[indices]
+    sects_U  = sects_U[indices]
+    sects_S  = sects_S[indices]
+    sects_Vt = sects_Vt[indices]
 
-    blks_U = [blks_U[index][:, 1:ns[index]] for index in indeces]
-    blks_S = [blks_S[index][1:ns[index]] for index in indeces]
-    blks_Vt = [blks_Vt[index][1:ns[index]] for index in indeces]
+    blks_U = [blks_U[index][:, 1:ns[index]] for index in indices]
+    blks_S = [blks_S[index][1:ns[index]] for index in indices]
+    blks_Vt = [blks_Vt[index][1:ns[index], :] for index in indices]
 
-    middledims = ns[indeces]
+    middledims = ns[indices]
 
     ls, rs = zip(sects_S...)
     lchrs = [ls...]
@@ -160,77 +166,11 @@ function svdtrunc(A::SymMatrix{T};
     Sleg2  = STLeg(-1, rchrs, middledims)
     Vtleg1 = STLeg(+1, rchrs, middledims)
 
-    U = SymMatrix(0, (A.legs[1], Uleg2), sects_U, blks_U)
-    S = SymDiagonal(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in blks_S])
-    Vt = SymMatrix(0, (Vtleg1, A.legs[2]), sects_Vt, blks_Vt)
+    U  = SymMatrix{T}(0, (A.legs[1], Uleg2), sects_U, blks_U)
+    S  = SymDiagonal{Float64}(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in blks_S])
+    Vt = SymMatrix{T}(0, (Vtleg1, A.legs[2]), sects_Vt, blks_Vt)
 
     U, S, Vt
-end
-
-function svdtrunc(A::SymTensor{Tv, 2};
-                  maxdim::Int=200,
-                  tol::Float64=1.e-14) where {Tv<:Number}
-    @assert signs(A.legs) == (+1, -1)
-
-    sects_U = Tuple{Int, Int}[]
-    nzblks_U = Matrix{Tv}[]
-    sects_S = Tuple{Int, Int}[]
-    nzblks_S = Vector{Float64}[]
-    nzblks_Vt = Matrix{Tv}[]
-    sects_Vt = Tuple{Int, Int}[]
-    middle_dims = Int[]
-
-    for idx in eachindex(A.sects)
-        sect = A.sects[idx]
-        push!(sects_U, (sect[1], sect[1]))
-        push!(sects_S, (sect[1], sect[2]))
-        push!(sects_Vt, (sect[2], sect[2]))
-
-        nzblk = A.nzblks[idx]
-        fact = svd(nzblk, full=false)
-        push!(nzblks_U, fact.U)
-        push!(nzblks_S, fact.S)
-        push!(nzblks_Vt, fact.Vt)
-
-        push!(middle_dims, length(fact.S))
-    end
-
-    nzblks_S = picklargests(nzblks_S, maxdim, tol)
-    vblkindexes = Int[]
-    for i in eachindex(nzblks_S)
-        n = size(nzblks_S[i], 1)
-        if n != 0
-            push!(vblkindexes, i)
-        else
-            continue
-        end
-        middle_dims[i] = n
-        #println(n)
-        #println(nzblks_U[i])
-        nzblks_U[i] = nzblks_U[i][:, 1:n]
-        nzblks_Vt[i] = nzblks_Vt[i][1:n, :]
-    end
-    middle_dims = middle_dims[vblkindexes]
-    nzblks_U = nzblks_U[vblkindexes]
-    nzblks_Vt = nzblks_Vt[vblkindexes]
-    nzblks_S = nzblks_S[vblkindexes]
-    sects_U = sects_U[vblkindexes]
-    sects_S = sects_S[vblkindexes]
-    sects_Vt = sects_Vt[vblkindexes]
-
-    ls, rs = zip(sects_S...)
-    lchrs = [ls...]
-    rchrs = [rs...]
-
-    Uleg2 = STLeg(-1, lchrs, middle_dims)
-    Sleg1 = STLeg(+1, rchrs, middle_dims)
-    Sleg2 = STLeg(-1, rchrs, middle_dims)
-    Vtleg1 = STLeg(+1, lchrs, middle_dims)
-
-    U = SymTensor(0, (A.legs[1], Uleg2), sects_U, nzblks_U)
-    S = SymTensor(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])
-    Vt = SymTensor(0, (Vtleg1, A.legs[2]), sects_Vt, nzblks_Vt)
-    return U, S, Vt
 end
 
 """

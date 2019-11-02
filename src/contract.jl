@@ -29,7 +29,7 @@ function contract(A     :: AbstractSymTensor{T1, N},
             return _A * _B
         else
             _B = SymMatrix(B, remsB, consB)
-            return permutelegs(defuse_leg(_A*_B, 2, B.legs[remsB]),
+            return permutelegs(unfuseleg(_A*_B, 2, B.legs[remsB]),
                                invperm(tofinalsB))
         end
     end
@@ -38,14 +38,14 @@ function contract(A     :: AbstractSymTensor{T1, N},
 
     if length(remsB) == 0
         _B = SymVector(B, +1, consB)
-        return permutelegs(defuse_leg(_A*_B, 1, A.legs[remsA]),
+        return permutelegs(unfuseleg(_A*_B, 1, A.legs[remsA]),
                            invperm(tofinalsA))
 
     end
 
     _B = SymMatrix(B, consB, remsB)
     return permutelegs(
-        defuse_leg(defuse_leg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
+        unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
         invperm([tofinalsA;tofinalsB]))
 end
 
@@ -127,6 +127,9 @@ function *(A::AbstractSymMatrix,
     ## by (CA+ci, ci) and each sector in B by (ci, ci-CB) and since
     ## both are sorted based on the last charge in sector, then they
     ## are sorted the same. So we simply need to multiply them here
+    ## but take into account that it is possible for the matrices to
+    ## have different number of sectors allowed due to the other
+    ## vector space they map from/to.
 
     ## NOTE: After contraction it is possible that some new sectors
     ## (that weren't allowed with the contraction indexes) are now
@@ -144,22 +147,22 @@ function *(A::AbstractSymMatrix,
     n_sectors = length(sects)
     nzblks = Vector{Matrix{T}}(undef, n_sectors)
 
-    pmax = length(B.sects)
-    p = 1
+    bmax = length(B.sects)
+    amax = length(A.sects)
+    a, b = 1, 1
+    #println(A)
+    #println(B)
     for i=1:n_sectors
-        if p <= pmax && sects[i][2] == B.sects[p][2]
-            if sects[i][1] != A.sects[p][1]
-                println(sects)
-                println(A)
-                println(B)
-            end
-            nzblks[i] = A.nzblks[p] * B.nzblks[p]
-            p += 1
+        c1, c2 = sects[i]
+        a += searchsortedfirst(A.sects[a:end], (c1, c1-A.charge)) - 1
+        b += searchsortedfirst(B.sects[b:end], (B.charge+c2, c2)) - 1
+
+        if a <=amax && b <=bmax && c1 == A.sects[a][1] && c2 == B.sects[b][2]
+            nzblks[i] = A.nzblks[a] * B.nzblks[b]
         else
             nzblks[i] = zeros(T, sizes[i])
         end
     end
-
     SymMatrix(charge, legs, sects, nzblks)
 end
 
