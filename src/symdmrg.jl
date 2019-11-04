@@ -44,6 +44,9 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     A = mps.matrices[1]
     for l = 1:lx-2
         AA = contract(A, (1,2,-1), mps.matrices[l+1], (-1,3,4))
+        println(AA)
+        println(_applymps2site(AA, env[1], env[4], mpo.tensors[1], mpo.tensor[2]))
+        return
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                   mpo.tensors[l], mpo.tensors[l+1]),
                                 AA, 1, :SR, ishermitian=true)

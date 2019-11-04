@@ -137,6 +137,11 @@ end
 ### conversions
 ###############
 
+function MatrixProductState(mps::SymMatrixProductState{T}) where {T<:Number}
+    MatrixProductState{T}(mps.lx, mps.d, mps.dims,
+                          [array(mat) for mat in mps.matrices], mps.center)
+end
+
 ### TOOLS
 #########
 

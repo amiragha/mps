@@ -117,6 +117,10 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
     mat = mps.matrices[1]
     for l = 1:lx-2
         @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
+        println(vmat)
+        println(_applymps2site(vmat, env[1], env[4], mpo.tensors[1], mpo.tensor[2]))
+        return
+
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                     mpo.tensors[l], mpo.tensors[l+1]),
                                 vmat, 1, :SR, ishermitian=true)

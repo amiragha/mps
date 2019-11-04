@@ -71,3 +71,11 @@ function xxz_symmpo(Tv::DataType, lx::Int, d::Int, delta::Float64=1.0)
 
     SymMatrixProductOperator{Tv}(lx, d, dims, tensors)
 end
+
+### conversions
+###############
+
+function MatrixProductOperator(mpo::SymMatrixProductOperator{T}) where {T<:Number}
+    MatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
+                          [array(mat) for mat in mpo.tensors])
+end
