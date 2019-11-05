@@ -60,4 +60,7 @@ export normalize!
 export fill, fill!
 
 export fermionswapgate
+
+export isleftisometry, isrightisometry, isunitary
+
 end

@@ -45,7 +45,7 @@ function SymMatrixProductState{Tv}(
                       (legl,legd,legr),
                       sects,
                       #[1/sqrt(length(rchrs)) .*
-                      [(ones(Tv,1,1,1) + noise * ones(Tv,1,1,1)) for n in 1:l])
+                      [(ones(Tv,1,1,1) + noise * randn(Tv,1,1,1)) for n in 1:l])
         push!(matrices, A)
         lchrs = rchrs
     end

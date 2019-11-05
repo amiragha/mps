@@ -1,5 +1,6 @@
 function initialenv(mps::SymMatrixProductState{Tv},
-                    mpo::SymMatrixProductOperator{Tv}) where {Tv<:Number}
+                    mpo::SymMatrixProductOperator{Tv};
+                    isometry::Symbol=:R) where {Tv<:Number}
     lx = mps.lx
     env = Vector{SymTensor{Tv, 3}}(undef, lx+2)
 
@@ -16,15 +17,29 @@ function initialenv(mps::SymMatrixProductState{Tv},
     env[lx+2] = fill(one(Tv), 0, (STLeg(+1,[rchr],[1]),
                                   STLeg(+1,[0],[1]),
                                   STLeg(-1,[rchr],[1])))
-    for l = lx:-1:1
-        env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
+
+    if isometry == :R
+        for l = lx:-1:1
+            mps.center == 1 || error("MPS center has to be 1")
+            env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
+        end
+    elseif isometry == :L
+        for l = 1:lx
+            mps.center == lx || error("MPS center has to be $lx")
+            env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
+        end
+    else
+        error("Invalid isometry value $isometry")
     end
     return env
 end
 
 function initialenv(mps::SymMatrixProductState{ComplexF64},
-                    mpo::SymMatrixProductOperator{Float64})
-    initialenv(mps, convert(MatrixProductOperator{ComplexF64}, mpo))
+                    mpo::SymMatrixProductOperator{Float64};
+                    isometry::Symbol=:R)
+    initialenv(mps,
+               convert(MatrixProductOperator{ComplexF64}, mpo),
+               isometry=isometry)
 end
 
 
@@ -37,16 +52,14 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     lx = mps.lx
     d = mps.d
 
-    if mps.center != 1
-        move_center!(mps, 1)
-    end
+    mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
 
     A = mps.matrices[1]
     for l = 1:lx-2
         AA = contract(A, (1,2,-1), mps.matrices[l+1], (-1,3,4))
-        println(AA)
-        println(_applymps2site(AA, env[1], env[4], mpo.tensors[1], mpo.tensor[2]))
-        return
+        # display(AA)
+        # display(_applymps2site(AA, env[1], env[4], mpo.tensors[1], mpo.tensors[2]))
+        # return
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                   mpo.tensors[l], mpo.tensors[l+1]),
                                 AA, 1, :SR, ishermitian=true)

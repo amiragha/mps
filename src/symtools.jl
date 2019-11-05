@@ -85,3 +85,15 @@ function fermionswapgate(l1::STLeg, l2::STLeg)
     end
     SymTensor(0, legs, sects, nzblks)
 end
+
+function isrightisometry(A::SymMatrix)
+    leg = A.legs[1]
+    eye(eltype(A), leg.chrs, leg.dims) ≈ contract(A, (1, -1), invlegs(conj(A)), (2, -1))
+end
+
+function isleftisometry(A::SymMatrix)
+    leg = A.legs[2]
+    eye(eltype(A), leg.chrs, leg.dims) ≈ contract(invlegs(conj(A)), (-1, 1), A, (-1, 2))
+end
+
+isunitary(A::SymMatrix) = isrightisometry(A) && isleftisometry(A)

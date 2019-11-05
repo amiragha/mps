@@ -2,25 +2,41 @@
     initialenv(mps, mpo)
 
 initialize and environment for a dmrg algorithm that is about to start
-from left!
+from left by default! The variable `isometry=:L2R` will initialize
+for a dmrg about to start from right.
 
 """
 function initialenv(mps::MatrixProductState{T},
-                    mpo::MatrixProductOperator{T}) where {T<:Number}
+                    mpo::MatrixProductOperator{T};
+                    isometry::Symbol=:R) where {T<:Number}
     lx = mps.lx
     env = Vector{Array{T, 3}}(undef, lx+2)
     env[1] = ones(T, 1,1,1)
     env[lx+2] = ones(T, 1,1,1)
-    for l = lx:-1:1
-        env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
+    if isometry == :R
+        mps.center == 1 || error("MPS center has to be 1")
+        for l = lx:-1:1
+            env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
+        end
+    elseif isometry == :L
+        for l = 1:lx
+            mps.center == lx || error("MPS center has to be $lx")
+            env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
+        end
+    else
+        error("Invalid isometry value $isometry")
     end
     return env
 end
 
 function initialenv(mps::MatrixProductState{ComplexF64},
-                    mpo::MatrixProductOperator{Float64})
-    initialenv(mps, convert(MatrixProductOperator{ComplexF64}, mpo))
+                    mpo::MatrixProductOperator{Float64};
+                    isometry::Symbol=:R)
+    initialenv(mps,
+               convert(MatrixProductOperator{ComplexF64}, mpo),
+               isometry=isometry)
 end
+
 """
     dmrg1sitesweep!(mps, mpo, env, maxdim [; verbose])
 
@@ -38,9 +54,7 @@ function dmrg1sitesweep!(mps::MatrixProductState{T},
     lx = mps.lx
     d = mps.d
 
-    if mps.center != 1
-        move_center!(mps, 1)
-    end
+    mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
 
     mat = mps.matrices[1]
     for l = 1:lx-1
@@ -110,19 +124,17 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
     lx = mps.lx
     d = mps.d
 
-    if mps.center != 1
-        move_center!(mps, 1)
-    end
+    mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
 
     mat = mps.matrices[1]
     for l = 1:lx-2
         @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
-        println(vmat)
-        println(_applymps2site(vmat, env[1], env[4], mpo.tensors[1], mpo.tensor[2]))
-        return
+        # display(vmat)
+        # display(_applymps2site(vmat, env[1], env[4], mpo.tensors[1], mpo.tensors[2]))
+        # return
 
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
-                                                    mpo.tensors[l], mpo.tensors[l+1]),
+                                                  mpo.tensors[l], mpo.tensors[l+1]),
                                 vmat, 1, :SR, ishermitian=true)
         v = vs[1]
         e = es[1]
@@ -142,7 +154,7 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
     l = lx-1
     @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
     es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
-                                                mpo.tensors[l], mpo.tensors[l+1]),
+                                              mpo.tensors[l], mpo.tensors[l+1]),
                             vmat, 1, :SR, ishermitian=true)
     v = vs[1]
     e = es[1]
@@ -161,7 +173,7 @@ function dmrg2sitesweep!(mps::MatrixProductState{T},
         @tensor vmat[-1,-2,-3,-4] := mps.matrices[l-1][-1,-2,1] * mat[1,-3,-4]
 
         es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
-                                                    mpo.tensors[l-1], mpo.tensors[l]),
+                                                  mpo.tensors[l-1], mpo.tensors[l]),
                                 vmat, 1, :SR, ishermitian=true)
         v = vs[1]
         e = es[1]
