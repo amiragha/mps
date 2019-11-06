@@ -82,46 +82,58 @@ function fuselegs(A::AbstractSymTensor,
                   l::Int,
                   n::Int=2;
                   debug=false)
+
     abs(sign) == 1 || "sign has to be ± 1!"
     N = numoflegs(A)
     0 < l < N+2-n  || "fuselegs $(l+n-1) vs $N"
-    T = eltype(A)
 
-    fsects = NTuple{N-n+1, Int}[]
+    if n == 1
+        if sign == A.legs[l].sign
+            return A
+        else
+            return negateleg(A, l)
+        end
+    end
+
+    T = eltype(A)
+    fsects = Vector{NTuple{N-n+1, Int}}(undef, length(A.sects))
     patranges = UnitRange{Int}[]
     signs = Tuple(A.legs[i].sign for i in l:l+n-1)
-    fleg, fcdict = fuse(sign, A.legs[l:l+n-1])
+    fleg = fuse(sign, A.legs[l:l+n-1])
     #println(fleg, fcdict)
 
     csects = A.sects
+
     for i in eachindex(csects)
         csect = csects[i]
         pat = Tuple(csect[l:l+n-1])
         spat = sign .* signs .* pat
         fc = sum(spat)
-        patrange = fcdict[fc].pats[spat]
         fsect = (csect[1:l-1]..., fc, csect[l+n:end]...)
-        push!(fsects, fsect)
-        push!(patranges, patrange)
+        fsects[i] = fsect
     end
 
     fsectperm = _sectors_sortperm(fsects)
-
     newsects, refs = uniquesorted(fsects[fsectperm])
     refs = refs[invperm(fsectperm)]
 
     newlegs = Tuple(vcat([A.legs[1:l-1]...], fleg, [A.legs[l+n:end]...]))
 
-    newnzblks = Array{T, N-n+1}[]
-    for sect in newsects
-        push!(newnzblks,zeros(T, [getdim(newlegs[c], sect[c])
-                                   for c in 1:N-n+1]...))
+    newnzblks = Vector{Array{T, N-n+1}}(undef, length(newsects))
+    for i in eachindex(newsects)
+        sect = newsects[i]
+        newnzblks[i] = zeros(T, [getdim(newlegs[c], sect[c])
+                                  for c in 1:N-n+1]...)
     end
 
+    pointers = ones(Int, length(newnzblks))
     for i in eachindex(A.nzblks)
         s = size(A.nzblks[i])
-        newnzblks[refs[i]][[1:s[i] for i=1:l-1]..., patranges[i],[1:s[i] for i=l+n:N]...] =
-            reshape(A.nzblks[i], s[1:l-1]..., prod(s[l:l+n-1]), s[l+n:end]...)
+        p = pointers[refs[i]]
+        fd = prod(s[l:l+n-1])
+        newnzblks[refs[i]][[1:s[i] for i=1:l-1]..., p:p+fd-1, [1:s[i] for i=l+n:N]...] =
+            reshape(A.nzblks[i], s[1:l-1]..., fd, s[l+n:end]...)
+        pointers[refs[i]] += fd
     end
 
     SymTensor(A.charge, newlegs, newsects, newnzblks)
@@ -133,8 +145,8 @@ end
 
 # defuses a leg into some given legs
 function unfuseleg(A    :: AbstractSymTensor{T, N},
-                    l    :: Int,
-                    legs :: NTuple{M, STLeg}) where {T<:Number, N, M}
+                   l    :: Int,
+                   legs :: NTuple{M, STLeg}) where {T<:Number, N, M}
     0 < l <= N || error("integer l not in range $l, $N")
     #println(A.legs)
     #println(legs)

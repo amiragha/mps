@@ -1,21 +1,3 @@
-mutable struct FusedCharge{N}
-    charge :: Int # total charge
-    dim :: Int # total dimension
-    #signs :: NTuple{N, Int}
-    pats :: Dict{NTuple{N, Int}, UnitRange{Int}} # patterns and positions
-
-    function FusedCharge(charge, dim, pats::Dict{NTuple{N, Int}, UnitRange{Int}}) where {N}
-        all(sum.(keys(pats)) .== charge) || error("oops", pats, charge)
-        #all(abs.(signs) .== 1) || error("oops")
-        new{N}(charge, dim, pats)
-    end
-end
-
-# struct DefusedCharge{N}
-#     charge :: Int
-#     dim :: Int
-
-# end
 struct STLeg
     sign :: Int    # +1 for ket (ingoing) or -1 for bra (outgoing)
     chrs :: Vector{Int}    # set of possible charges
@@ -79,27 +61,38 @@ function intersect(l1::STLeg, l2::STLeg)
 end
 
 function fuse(sign::Int, legs::NTuple{N, STLeg}) where {N}
-    signs = Tuple(leg.sign for leg in legs)
-    fcdict = Dict{Int, FusedCharge{N}}()
-    for is in Iterators.product([1:length(l.chrs) for l in legs]...)
-        pat = Tuple(legs[n].chrs[is[n]] for n in 1:N)
-        fdim = prod([legs[n].dims[is[n]] for n in 1:N])
-        spat = sign .* signs .* pat
-        fc = sum(spat)
-        if haskey(fcdict, fc)
-            dim = fcdict[fc].dim
-            fcdict[fc].dim += fdim
-            patrange = dim+1:dim+fdim
-            fcdict[fc].pats[spat] = patrange
-        else
-            patrange=1:fdim
-            fcdict[fc] = FusedCharge(fc, fdim, Dict(spat => patrange))
-        end
 
+    #signs = sign .* [leg.sign for leg in legs]
+    lchrs = sign .* [leg.sign .* leg.chrs for leg in legs]
+    ldims = [leg.dims for leg in legs]
+    lengs = [length(leg.chrs) for leg in legs]
+
+    fdims = Vector{Int}(undef, prod(lengs))
+    fchrs = Vector{Int}(undef, prod(lengs))
+    i=0
+    for is in Iterators.product([1:l for l in lengs]...)
+        i+=1
+        fdims[i] = prod([ldims[n][is[n]] for n in 1:N])
+        fchrs[i] = sum([lchrs[n][is[n]] for n in 1:N])
     end
-    fleg = STLeg(sign, unzip([(k, fcdict[k].dim)
-                              for k in sort(collect(keys(fcdict)))])...)
-    fleg, fcdict
+
+    perm = sortperm(fchrs)
+    sortedfchrs = fchrs[perm]
+    sortedfdims = fdims[perm]
+
+    chrs = Int[]
+    dims = Int[]
+    c = undef
+    for i in eachindex(fchrs)
+        if c != sortedfchrs[i]
+            c = sortedfchrs[i]
+            push!(chrs, c)
+            push!(dims, sortedfdims[i])
+        else
+            dims[end] += sortedfdims[i]
+        end
+    end
+    STLeg(sign, chrs, dims)
 end
 
 function mapcharges(f::Function, l::STLeg)

@@ -63,6 +63,7 @@ function SymMatrix(charge :: Int,
 end
 
 ##TODO: see if this should be a convert function!
+SymMatrix(A::AbstractSymMatrix) = A
 function SymMatrix(A::SymTensor{T, 2}) where {T<:Number}
     signs(A.legs) == (+1, -1) ||
         error("SymTensor{T, 2} doesn't have correct signs to convert to SymMatrix")
@@ -114,6 +115,7 @@ function SymVector(charge :: Int,
     SymVector{T}(charge, legs, sects, nzblks)
 end
 
+SymVector(A::SymVector{T}) where{T<:Number} = A
 function SymVector(sign::Int, charge::Int, v::Vector{T}) where{T<:Number}
     leg = STLeg(sign, [charge], [length(v)])
     SymVector{T}(charge, (leg,), [(charge,)], [v])
