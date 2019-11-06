@@ -327,7 +327,9 @@ the second one
 """
 function dot(A::AbstractSymTensor{T1, N},
              B::AbstractSymTensor{T2, N}) where{T1<:Number, T2<:Number, N}
-    contract(A, .-Tuple(1:N), invlegs(conj(B)), .-Tuple(1:N))
+    #contract(A, .-Tuple(1:N), invlegs(conj(B)), .-Tuple(1:N))
+    issimilar(A, B) || error("The two SymTensors have to be similar to dot!")
+    sum([dot(A.nzblks[i], B.nzblks[i]) for i in eachindex(A.nzblks)])
 end
 
 " compute the 2-norm of a  AbstractSymTensor"

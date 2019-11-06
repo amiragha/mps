@@ -22,7 +22,7 @@
         clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
         B = unfuseleg(unfuseleg(A, 2, clegs), 1, rlegs)
         @test B.sects == [(0,0,0,0), (1,0,1,0), (0,1,1,0),
-                              (1,0,0,1), (0,1,0,1), (1,1,1,1)]
+                          (1,0,0,1), (0,1,0,1), (1,1,1,1)]
         i = ones(1,1,1,1)
         @test B.nzblks == [i,2*i, 4*i, 3*i, 5*i, 1*i]
     end
@@ -71,5 +71,23 @@ end
         @tensor C_[a,b,c,e,f,g] := A_[a,b,c,d] * B_[d,e,f,g]
 
         @test C_ ≈ array(C);
+    end
+end
+
+@testset "LA fns" begin
+    leglist = (
+        STLeg(+1, [0, 1, 2], [2,3,4]),
+        STLeg(-1, [0,1,2,3], [4,2,2,3]),
+        STLeg(+1, [0, 1, 2], [3,5,2]),
+        STLeg(-1, [0, 1], [6,7]),
+        STLeg(+1, [0, 1], [6,7]),
+        STLeg(+1, [0,1,2,3,4], [2,3,4,5,6]),
+        STLeg(+1, [0,1], [2,3]),
+        STLeg(-1, [0,1,2], [3,4,5])
+    )
+    @testset "dot" begin
+        A = rand(ComplexF64, 0, leglist[1:4])
+        A_ = array(A)
+        @test dot(A_,A_) ≈ dot(A, A)
     end
 end
