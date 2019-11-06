@@ -34,8 +34,9 @@ function permutelegs(A::AbstractSymTensor,
                      perm::Vector{Int})
     N = numoflegs(A)
     sort(perm) == collect(1:N) || error("Not a valid permutation!")
-    sectperm = _sectors_sortperm(A.sects,  by=x->x[perm])
+    perm == collect(1:N) && return A
 
+    sectperm = _sectors_sortperm(A.sects,  by=x->x[perm])
     sects = [sect[perm] for sect in A.sects[sectperm]]
 
     ## NOTE: The line below because for some reason the permutedims of
@@ -43,8 +44,8 @@ function permutelegs(A::AbstractSymTensor,
     typeof(A) <: SymDiagonal &&
         return typeof(A)(A.charge, A.legs[perm], sects, A.nzblks)
 
-    nzblks = [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]]
-    typeof(A)(A.charge, A.legs[perm], sects, nzblks)
+    typeof(A)(A.charge, A.legs[perm], sects,
+              [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]])
 end
 
 """
@@ -103,7 +104,8 @@ function fuselegs(A::AbstractSymTensor,
     fsects = Vector{NTuple{N-n+1, Int}}(undef, length(A.sects))
     for i in eachindex(csects)
         csect = csects[i]
-        fc = sum(sign .* signs .* csect[l:l+n-1])
+        #fc = sign * sum(signs .* csect[l:l+n-1]) # this is slower than below!
+        fc = sign * sum([signs[i] * csect[l+i-1] for i=1:n])
         fsects[i] = (csect[1:l-1]..., fc, csect[l+n:end]...)
     end
 
@@ -118,7 +120,7 @@ function fuselegs(A::AbstractSymTensor,
     for i in eachindex(newsects)
         sect = newsects[i]
         newnzblks[i] = zeros(T, [getdim(newlegs[c], sect[c])
-                                  for c in 1:N-n+1]...)
+                                 for c in 1:N-n+1]...)
     end
 
     pointers = ones(Int, length(newnzblks))
@@ -126,6 +128,10 @@ function fuselegs(A::AbstractSymTensor,
         s = size(A.nzblks[i])
         p = pointers[refs[i]]
         fd = prod(s[l:l+n-1])
+        # This is slower than below!
+        #axesA = axes(A.nzblks[i])
+        # newnzblks[refs[i]][axesA[1:l-1]..., p:p+fd-1, axesA[l+n:N]...] =
+        #     reshape(A.nzblks[i], s[1:l-1]..., fd, s[l+n:end]...)
         newnzblks[refs[i]][[1:s[i] for i=1:l-1]..., p:p+fd-1, [1:s[i] for i=l+n:N]...] =
             reshape(A.nzblks[i], s[1:l-1]..., fd, s[l+n:end]...)
         pointers[refs[i]] += fd
