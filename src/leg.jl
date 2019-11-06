@@ -67,14 +67,8 @@ function fuse(sign::Int, legs::NTuple{N, STLeg}) where {N}
     ldims = [leg.dims for leg in legs]
     lengs = [length(leg.chrs) for leg in legs]
 
-    fdims = Vector{Int}(undef, prod(lengs))
-    fchrs = Vector{Int}(undef, prod(lengs))
-    i=0
-    for is in Iterators.product([1:l for l in lengs]...)
-        i+=1
-        fdims[i] = prod([ldims[n][is[n]] for n in 1:N])
-        fchrs[i] = sum([lchrs[n][is[n]] for n in 1:N])
-    end
+    fdims = reshape(prod.(Iterators.product(ldims...)), prod(lengs))
+    fchrs = reshape(sum.(Iterators.product(lchrs...)), prod(lengs))
 
     perm = sortperm(fchrs)
     sortedfchrs = fchrs[perm]
