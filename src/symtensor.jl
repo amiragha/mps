@@ -294,7 +294,9 @@ end
 "in-place scalar multiplication of A with α; in particular with α =
 false, A is initialized with all zeros"
 function rmul!(A::T, α) where {T<:AbstractSymTensor}
-    rmul!(A.nzblks,  α)
+    for i in eachindex(A.nzblks)
+        rmul!(A.nzblks[i],  α)
+    end
     A
 end
 
@@ -316,7 +318,7 @@ function axpby!(α,
                 B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
     for i in eachindex(A.nzblks)
-        B.nzblks[i] = alpha .* A.nzblks[i] + B.nzblks[i]
+        B.nzblks[i] = α .* A.nzblks[i] + B.nzblks[i]
     end
     B
 end
