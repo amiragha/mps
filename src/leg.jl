@@ -20,9 +20,8 @@ end
 ==(l1::STLeg, l2::STLeg) = isequal(l1, l2)
 
 # This function assumes that charge definitely exists!
-function getdim(leg::STLeg, charge::Int)
+@inline getdim(leg::STLeg, charge::Int) =
     leg.dims[searchsortedfirst(leg.chrs, charge)]
-end
 
 @inline charges(legs::NTuple{N, STLeg}) where {N} =
     Tuple(legs[n].chrs for n in eachindex(legs))

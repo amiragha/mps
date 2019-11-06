@@ -96,28 +96,23 @@ function fuselegs(A::AbstractSymTensor,
     end
 
     T = eltype(A)
-    fsects = Vector{NTuple{N-n+1, Int}}(undef, length(A.sects))
-    patranges = UnitRange{Int}[]
-    signs = Tuple(A.legs[i].sign for i in l:l+n-1)
-    fleg = fuse(sign, A.legs[l:l+n-1])
-    #println(fleg, fcdict)
+
+    signs = [A.legs[i].sign for i in l:l+n-1]
 
     csects = A.sects
-
+    fsects = Vector{NTuple{N-n+1, Int}}(undef, length(A.sects))
     for i in eachindex(csects)
         csect = csects[i]
-        pat = Tuple(csect[l:l+n-1])
-        spat = sign .* signs .* pat
-        fc = sum(spat)
-        fsect = (csect[1:l-1]..., fc, csect[l+n:end]...)
-        fsects[i] = fsect
+        fc = sum(sign .* signs .* csect[l:l+n-1])
+        fsects[i] = (csect[1:l-1]..., fc, csect[l+n:end]...)
     end
 
     fsectperm = _sectors_sortperm(fsects)
     newsects, refs = uniquesorted(fsects[fsectperm])
     refs = refs[invperm(fsectperm)]
 
-    newlegs = Tuple(vcat([A.legs[1:l-1]...], fleg, [A.legs[l+n:end]...]))
+    fleg = fuse(sign, A.legs[l:l+n-1])
+    newlegs = Tuple([A.legs[1:l-1]..., fleg, A.legs[l+n:end]...])
 
     newnzblks = Vector{Array{T, N-n+1}}(undef, length(newsects))
     for i in eachindex(newsects)
