@@ -13,6 +13,7 @@ import LinearAlgebra: normalize!
 include("mpsutils.jl")
 include("mpo.jl")
 include("symmpo.jl")
+include("mpogen.jl")
 include("mps.jl")
 include("imps.jl")
 include("symmps.jl")
