@@ -30,9 +30,7 @@ function sitelinearindex(lattice::QLattice{D},
                          ucidx::Int,
                          x_uc::NTuple{D, Int}) where{D}
     if lattice.bc == :OBC
-        if all([1 <= x_uc[i] <= lattice.sizes[1] for i=1:D])
-            #println("here", x_uc)
-            #println(ucidx)
+        if all([1 <= x_uc[i] <= lattice.sizes[i] for i=1:D])
             return ucidx + lattice.unitc.n *
                 sum((x_uc .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
         end
@@ -50,7 +48,7 @@ end
 abstract type AbstractQInteraction end
 struct QModelInteraction{D, N, T} <: AbstractQInteraction
     amp     :: T
-    ucidxs   :: NTuple{N, Int}
+    ucidxs  :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
     #repeat  :: Union{NTuple{D, Int}, Nothing}
     terms   :: Vector{NTuple{N, Matrix{T}}}

@@ -8,11 +8,13 @@ function generatempo(model::UnitCellQModel)
 
     allterms = Vector{QInteraction}()
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
+        #println(is)
         for interaction in model.inters
             ns = interaction.ucidxs
             offs = interaction.offsets
             indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
                        for i in 1:support(interaction)]
+            #println(indexes)
             if all(indexes .> 0)
                 perm = sortperm(indexes)
                 terms = [term[perm] for term in interaction.terms]
@@ -23,6 +25,7 @@ function generatempo(model::UnitCellQModel)
     end
     sort!(allterms, by=x->x.sites[1])
 
+    #println(allterms)
     # for term in allterms
     #     println(term)
     # end

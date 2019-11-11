@@ -30,7 +30,8 @@ export spinoperators
 export ringexchangeoperator
 export nbodyopexpansion
 
+# spin model examples
 export j1j2model
-export triangularmodel
+export triangularspinmodel
 
 end
