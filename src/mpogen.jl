@@ -3,79 +3,125 @@ function generatempo(model::UnitCellQModel)
     model.lattice.bc == :OBC || error("Can only generate MPO for :OBC boundary condition!")
     D = dimension(model)
     d = model.qtype.d
+    n_sites = prod(model.lattice.sizes)
+    T = eltype(model.inters[1])
 
-    # We need a map between sites and their linear ordering
-    #cartesian coordinates of (uc.n, ly, lx)
-
-    # traverse through the lattice generate all terms and sort them
     allterms = Vector{QInteraction}()
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
-            for interaction in model.inters
-                ns = interaction.sites
-                offs = interaction.offsets
-                indexes = [sitelinearindex(model.lattice, ns,offs .+ is)
-                           for i in 1:N]
+        for interaction in model.inters
+            ns = interaction.ucidxs
+            offs = interaction.offsets
+            indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                       for i in 1:support(interaction)]
+            if all(indexes .> 0)
                 perm = sortperm(indexes)
-                terms = [permute(term, perm) for term in interaction.terms]
-                allterms.push!(QInteraction(interaction.amp, indexes[perm], terms))
+                terms = [term[perm] for term in interaction.terms]
+                push!(allterms,
+                      QInteraction(interaction.amp, Tuple(indexes[perm]), terms))
             end
+        end
     end
-    sort!(allterm, by=x->x.sites[1])
+    sort!(allterms, by=x->x.sites[1])
 
+    # for term in allterms
+    #     println(term)
+    # end
+
+    dims = ones(Int, n_sites+1)
     pointer=1
     tensors = Vector{Array{Float64, 4}}(undef, n_sites)
     ldim = 1
-    fterms = Vector{QInteraction}()
-    cterms = Vector{QInteraction}()
+    n_pcols = 0
     pterms = Vector{QInteraction}()
+    nextterms = Vector{QInteraction}()
     for n in 1:n_sites
-        # traves allterms to see how many sterms we have
         lterms = Vector{QInteraction}()
         sterms = Vector{QInteraction}()
+        n_ncols = 0
         while pointer <= length(allterms) && allterms[pointer].sites[1] == n
-            if support(allterms[i]) > 1
+            if support(allterms[pointer]) > 1
                 push!(sterms, allterms[pointer])
+                n_ncols += length(allterms[pointer].terms)
             else
                 push!(lterms, allterms[pointer])
             end
             pointer += 1
         end
-        rdim = 2 + n_sterms + n_cterms
 
-        # MPO matrix generation
-        W = zeros(T, ldim, d, rdim, d)
-        W[1,:,1,:] = I(d)
-        W[ldim, :, rdim, :] = I(d)
-
-        #W[ldim, :, 1, :] = sum(lterms).terms[1]
-        for t in 1:n_pterms
-            if pterms[t].sites[1] == n
-                if support(pterms[t], 1)
-                    W[t+1, :, 1, :] = pterm[t].amp * pterms[t].terms
-                else
-                    W[t+1, :, c+1, :] = pterms[t].terms[i][1]
-                    push!(nexterms, removehead(pterms[t]))
-                    c += 1
-                end
-            else
-                W[t+1, :, c+1, :] = I(d)
-                push!(nexterms, pterms[t])
-                c += 1
+        n_pcols = 0
+        for pterm in pterms
+            if pterm.sites[1] > n || support(pterm) > 1
+                n_pcols += length(pterm.terms)
             end
         end
 
-        for t in 1:n_lterms
-            W[ldim, :, 1, :] += lterms[t].terms[i][1]
+        if n < n_sites
+            rdim = 2 + n_pcols + n_ncols
+        else
+            n_ncols == 0 || error()
+            n_pcols == 0 || error()
+            rdim = 1
         end
 
-        for t in 1:n_sterms
-            W[ldim, :, c+1, :] = lterms[t].terms[i][1]
-            push!(nexterms, removehead(pterms[t]))
-            c += 1
+        dims[n] = rdim
+        # MPO matrix generation
+        W = zeros(T, ldim, d, rdim, d)
+
+        # better logic is needed for this!
+        if n > 1
+            W[1,:,1,:] = I(d)
+        end
+        if n < n_sites
+            W[ldim, :, rdim, :] = I(d)
         end
 
-        tensors.push!(W)
+        #W[ldim, :, 1, :] = sum(lterms).terms[1]
+        row = 2
+        col = 2
+        for pterm in pterms
+            if pterm.sites[1] == n
+                if support(pterm) == 1
+                    for i in eachindex(pterm.terms)
+                        W[row, :, 1, :] = pterm.amp * pterm.terms[i][1]
+                        row+=1
+                    end
+                else
+                    for i in eachindex(pterm.terms)
+                        W[row, :, col, :] = pterm.amp * pterm.terms[i][1]
+                        row+=1
+                        col+=1
+                    end
+                    push!(nextterms, removehead(pterm))
+                end
+            else
+                for i in eachindex(pterm.terms)
+                    W[row, :, col, :] = I(d)
+                    row+=1
+                    col+=1
+                end
+                push!(nextterms, pterm)
+            end
+        end
+        n_pcols = col - 2
+
+        for lterm in lterms
+            for i in eachindex(lterm.terms)
+                W[ldim, :, 1, :] += lterm.amp * lterm.terms[i][1]
+            end
+        end
+
+        for sterm in sterms
+            for i in eachindex(sterm.terms)
+                W[ldim, :, col, :] = sterm.terms[i][1]
+                col += 1
+            end
+            push!(nextterms, removehead(sterm))
+        end
+
+        tensors[n] =  W
+        pterms = nextterms
+        nextterms = Vector{QInteraction}()
+        ldim = rdim
     end
-    ldim = rdim
+    MatrixProductOperator(n_sites, d, dims, tensors)
 end
-# return MPO

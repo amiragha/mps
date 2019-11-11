@@ -54,6 +54,7 @@ export xxz_symmpo
 export xxzlong_mpo
 export qitf_mpo
 
+export mpo2hamiltonian
 export generatempo
 
 end

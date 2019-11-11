@@ -123,7 +123,7 @@ function qitf_mpo(T::DataType, lx::Int64, d::Int64,
     MatrixProductOperator{T}(lx, d, dims, tensors)
 end
 
-function j1j2_mpo(Lx::Int64, j1::T, j2::T, d::Int64=2) where {T<:RLorCX}
+function j1j2_mpo(lx::Int64, j1::T, j2::T, d::Int64=2) where {T<:RLorCX}
     Id = Matrix{T}(I, d, d)
     mat = zeros(T, 8, d, 8, d)
 
@@ -167,4 +167,17 @@ function convert(::Type{MatrixProductOperator{ComplexF64}},
                  mpo::MatrixProductOperator{Float64})
     MatrixProductOperator{ComplexF64}(mpo.lx, mpo.d, mpo.dims,
                                       convert(Vector{Array{ComplexF64,4}}, mpo.tensors))
+end
+
+function mpo2hamiltonian(mpo::MatrixProductOperator)
+    lx = mpo.lx
+    d = mpo.d
+    mpo.d^lx > 10000 && error("model is too large for explicit Hamiltonian!")
+    L = mpo.tensors[1]
+    for two in mpo.tensors[2:end]
+        @tensor L[l,o1,o2,r,o1',o2'] := L[l,o1,m,o1'] * two[m, o2, r, o2']
+        dd = size(L,2)*d
+        L = reshape(L, 1, dd, size(two,3), dd)
+    end
+    reshape(L, d^lx, d^lx)
 end
