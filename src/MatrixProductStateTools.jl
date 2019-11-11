@@ -1,6 +1,8 @@
 module MatrixProductStateTools
 
 using SymTensors
+using QuantumModel
+
 using Random
 using LinearAlgebra
 using KrylovKit
@@ -51,5 +53,7 @@ export xxz_mpo
 export xxz_symmpo
 export xxzlong_mpo
 export qitf_mpo
+
+export generatempo
 
 end

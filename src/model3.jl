@@ -21,6 +21,9 @@ struct QLattice{D}
     bc    :: Symbol
 end
 
+QLattice(uc::UnitCell{D}, lx::Int, bc::Symbol) where{D}=
+    QLattice{1}(uc, (lx,), bc)
+
 abstract type AbstractQType end
 struct SpinType <: AbstractQType
     d :: Int
@@ -31,7 +34,7 @@ struct QModelInteraction{D, N, T} <: AbstractQInteraction
     amp     :: T
     sites   :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
-    repeat  :: Union{NTuple{N, Int}, Nothing}
+    repeat  :: Union{NTuple{D, Int}, Nothing}
     terms   :: Vector{NTuple{N, Matrix{T}}}
 end
 
@@ -43,11 +46,11 @@ struct QInteraction{T, N} <: AbstractQInteraction
 end
 support(::QInteraction{T,N}) where{T, N} = N
 
-abstract type AbstractQModel end
+abstract type AbstractQModel{Q, D} end
 struct UnitCellQModel{Q<:AbstractQType, D} <: AbstractQModel{Q, D}
     qtype   :: Q
     lattice :: QLattice{D}
     inters  :: Vector{QModelInteraction}
 end
 
-dimension(::AbstractQModel{Q, D}) where {Q, D} == D
+dimension(::AbstractQModel{Q, D}) where {Q, D} = D

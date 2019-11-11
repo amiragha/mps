@@ -1,5 +1,7 @@
 module ExactDiagonalizationTools
 
+using QuantumModel
+
 using LinearAlgebra
 using SparseArrays
 using SymTensors
@@ -13,19 +15,13 @@ import LinearAlgebra: normalize!
 import Base: +, *
 include("model.jl")
 
-include("spin_definitions.jl")
+#include("spin_definitions.jl")
 include("ket.jl")
 include("xxz.jl")
 include("longxxz.jl")
 include("qitf.jl")
 include("hopping.jl")
 include("correlationmatrix.jl")
-
-export sz_half, sp_half, sm_half
-export sz_half_U1sym
-export sp_half_U1sym
-export sm_half_U1sym
-export spinoperators
 
 export KetState
 export opextend

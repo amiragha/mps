@@ -1,25 +1,24 @@
 function generatempo(model::UnitCellQModel)
-    model.qtype <: SpinType || error("Can generate MPO only for SpinType models.")
+    typeof(model.qtype) == SpinType || error("Can generate MPO only for SpinType models.")
+    model.lattice.bc == :OBC || error("Can only generate MPO for :OBC boundary condition!")
     D = dimension(model)
-    d = mode.qtype.d
+    d = model.qtype.d
 
     # We need a map between sites and their linear ordering
     #cartesian coordinates of (uc.n, ly, lx)
 
     # traverse through the lattice generate all terms and sort them
     allterms = Vector{QInteraction}()
-    for i=1:lx
-        for j=1:ly
+    for is in Iterators.product([1:l for l in model.lattice.sizes]...)
             for interaction in model.inters
                 ns = interaction.sites
                 offs = interaction.offsets
-                indexes = [sitelinearindex(model.lattice, ns[i],offs[i] .+ (i, j))
+                indexes = [sitelinearindex(model.lattice, ns,offs .+ is)
                            for i in 1:N]
                 perm = sortperm(indexes)
                 terms = [permute(term, perm) for term in interaction.terms]
                 allterms.push!(QInteraction(interaction.amp, indexes[perm], terms))
             end
-        end
     end
     sort!(allterm, by=x->x.sites[1])
 
@@ -80,4 +79,3 @@ function generatempo(model::UnitCellQModel)
     ldim = rdim
 end
 # return MPO
-end
