@@ -42,3 +42,55 @@ const sm_half_U1sym = SymTensor(-1,
                                  STLeg(-1, [0, 1], [1, 1])),
                                 [(0, 1)],
                                 [ones(1,1)])
+
+
+"""
+    ringexchangeoperator(n)
+
+defined based on its action on Ising basis, which is a cricular shift
+to right plus the hermitian conjugate.
+
+With this definition heiseberg is 1/4 *(R(2)-I(4))
+"""
+function ringexchangeoperator(n::Int)
+    @assert 1 < n < 7
+    Pn = spzeros(2^n, 2^n)
+    for j=1:2^n
+        i = ((j-1) >> 1) | (((j-1) & 1) << (n-1))
+        Pn[i+1, j] = 1
+    end
+    Pn + Pn'
+end
+
+# only for spin-half right now
+function nbodyopexpansion(n::Int,
+                          H::AbstractMatrix;
+                          verbose::Bool=false)
+    @assert 1 < n < 7
+    @assert size(H) == (2^n, 2^n)
+    ⊗ = kron
+    Z = sz_half
+    P = sp_half
+    M = sm_half
+    E = I(2)
+    ops = [Z, P, M, E]
+    ols = ['Z', 'P', 'M', 'E']
+
+    T = eltype(H)
+    amps = Vector{T}()
+    terms = Vector{NTuple{n, Matrix{T}}}()
+    for is in Iterators.product([1:4 for i=1:n]...)
+        op = reduce(⊗, [ops[i] for i in is], init=I(1))
+        opnorm = norm(op)
+        amp = dot(H, op)/norm(op)^2
+        if amp != 0
+            term = [Matrix(ops[i]) for i in is]
+            term[n] = term[n] * amp
+            push!(terms, Tuple(term))
+            verbose && println([ols[i] for i in is]..., "  $amp")
+            is == Tuple([4 for i=1:n]) &&
+                @warn "Operator has identity with amplitude $amp"
+        end
+    end
+    terms
+end

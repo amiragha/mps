@@ -27,7 +27,10 @@ export sz_half_U1sym
 export sp_half_U1sym
 export sm_half_U1sym
 export spinoperators
+export ringexchangeoperator
+export nbodyopexpansion
 
 export j1j2model
+export triangularmodel
 
 end

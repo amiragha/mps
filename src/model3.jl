@@ -52,7 +52,7 @@ struct QModelInteraction{D, N, T} <: AbstractQInteraction
     amp     :: T
     ucidxs   :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
-    repeat  :: Union{NTuple{D, Int}, Nothing}
+    #repeat  :: Union{NTuple{D, Int}, Nothing}
     terms   :: Vector{NTuple{N, Matrix{T}}}
 end
 support(::QModelInteraction{D, N, T}) where{D, N, T} = N
