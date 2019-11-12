@@ -79,3 +79,17 @@ function MatrixProductOperator(mpo::SymMatrixProductOperator{T}) where {T<:Numbe
     MatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
                           [array(mat) for mat in mpo.tensors])
 end
+
+function mpo2hamiltonian(mpo::SymMatrixProductOperator)
+    lx = mpo.lx
+    d = mpo.d
+    mpo.d^lx > 10000 && error("model is too large for explicit Hamiltonian!")
+    L = mpo.tensors[1]
+    for two in mpo.tensors[2:end]
+        L = fuselegs(fuselegs(contract(L, (1, 2, -1, 5),
+                                       two[-1, 3, 4, 6]),
+                              -1, 5, 2),
+                     +1, 2, 2)
+    end
+    removedummyleg(removedummyleg(L, 3), 1)
+end

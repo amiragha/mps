@@ -65,6 +65,7 @@ end
 # only for spin-half right now
 function nbodyopexpansion(n::Int,
                           H::AbstractMatrix;
+                          symmetry::Symbol=:NONE,
                           verbose::Bool=false)
     @assert 1 < n < 7
     @assert size(H) == (2^n, 2^n)
@@ -77,19 +78,33 @@ function nbodyopexpansion(n::Int,
     ols = ['Z', 'P', 'M', 'E']
 
     T = eltype(H)
+    symops = [sz_half_U1sym, sp_half_U1sym, sm_half_U1sym, SymTensors.eye(T, [0,1], [1,1])]
+
     amps = Vector{T}()
-    terms = Vector{NTuple{n, Matrix{T}}}()
+    if symmetry == :NONE
+        terms = Vector{NTuple{n, Matrix{T}}}()
+    elseif symmetry == :U1
+        terms = Vector{NTuple{n, SymTensor{T, 2}}}()
+    end
     for is in Iterators.product([1:4 for i=1:n]...)
         op = reduce(⊗, [ops[i] for i in is], init=I(1))
         opnorm = norm(op)
         amp = dot(H, op)/norm(op)^2
         if amp != 0
-            term = [Matrix(ops[i]) for i in is]
-            term[n] = term[n] * amp
-            push!(terms, Tuple(term))
             verbose && println([ols[i] for i in is]..., "  $amp")
             is == Tuple([4 for i=1:n]) &&
                 @warn "Operator has identity with amplitude $amp"
+            if symmetry == :NONE
+                term = [Matrix(ops[i]) for i in is]
+                term[n] = term[n] * amp
+                push!(terms, Tuple(term))
+            elseif symmetry == :U1
+                term = [symops[i] for i in is]
+                term[n] = term[n] * amp
+                push!(terms, Tuple(term))
+            else
+                error("symmetry not yet implemented: $symmetry")
+            end
         end
     end
     terms

@@ -45,24 +45,39 @@ struct SpinType <: AbstractQType
     d :: Int
 end
 
-abstract type AbstractQInteraction end
-struct QModelInteraction{D, N, T} <: AbstractQInteraction
+abstract type AbstractQInteraction{T, N} end
+
+abstract type AbstractQModelInteraction{D, N, T} end
+struct QModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     amp     :: T
     ucidxs  :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
-    #repeat  :: Union{NTuple{D, Int}, Nothing}
     terms   :: Vector{NTuple{N, Matrix{T}}}
 end
-support(::QModelInteraction{D, N, T}) where{D, N, T} = N
-eltype(::QModelInteraction{D, N, T}) where{D, N, T} = T
+
+struct SymQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
+    amp     :: T
+    ucidxs  :: NTuple{N, Int}
+    offsets :: NTuple{N, NTuple{D, Int}}
+    terms   :: Vector{NTuple{N, SymTensor{T, 2}}}
+end
+
+support(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = N
+eltype(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = T
 
 # This is the generic linear QTerm
-struct QInteraction{T, N} <: AbstractQInteraction
+struct QInteraction{T, N} <: AbstractQInteraction{T, N}
     amp   :: T
     sites :: NTuple{N, Int}
     terms :: Vector{NTuple{N, Matrix{T}}}
 end
-support(::QInteraction{T,N}) where{T, N} = N
+struct SymQInteraction{T, N} <: AbstractQInteraction{T, N}
+    amp   :: T
+    sites :: NTuple{N, Int}
+    terms :: Vector{NTuple{N, SymTensor{T, 2}}}
+end
+
+support(::AbstractQInteraction{T,N}) where{T, N} = N
 
 removehead(A::QInteraction{T, N}) where {T, N} =
     QInteraction{T, N-1}(A.amp, A.sites[2:N], [term[2:N] for term in A.terms])
@@ -71,7 +86,7 @@ abstract type AbstractQModel{Q, D} end
 struct UnitCellQModel{Q<:AbstractQType, D} <: AbstractQModel{Q, D}
     qtype   :: Q
     lattice :: QLattice{D}
-    inters  :: Vector{QModelInteraction}
+    inters  :: Vector{AbstractQModelInteraction}
 end
 
 dimension(::AbstractQModel{Q, D}) where {Q, D} = D
