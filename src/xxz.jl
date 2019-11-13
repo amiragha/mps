@@ -19,7 +19,7 @@ function xxz_explicit(lx::Int64, delta::Float64, boundary::Symbol)
     if lx > 2
         # recursive generation of open chain
         for i=3:lx
-            Hmat = kron(Hmat, I2) + kron(eye(2^(i-2)), heis_term)
+            Hmat = kron(Hmat, I(2)) + kron(I(2^(i-2)), heis_term)
         end
     end
 
@@ -27,9 +27,9 @@ function xxz_explicit(lx::Int64, delta::Float64, boundary::Symbol)
         return Hmat
     elseif boundary == :PBC
         Hmat = Hmat +
-            0.5 * kron(kron(sp_half, eye(2^(lx-2))), sm_half) +
-            0.5 * kron(kron(sm_half, eye(2^(lx-2))), sp_half) +
-            delta * kron(kron(sz_half, eye(2^(lx-2))), sz_half)
+            0.5 * kron(kron(sp_half, I(2^(lx-2))), sm_half) +
+            0.5 * kron(kron(sm_half, I(2^(lx-2))), sp_half) +
+            delta * kron(kron(sz_half, I(2^(lx-2))), sz_half)
         return Hmat
     else
         error("unrecognized boundary condition :", boundary)
@@ -133,23 +133,23 @@ function j1j2_explicit(Lx::Int64,
 
     Hmat = heis_term1
     for i=3:Lx
-        Hmat = kron(Hmat, I2) + kron(eye(2^(i-2)), heis_term1) +
-            kron(eye(2^(i-3)), heis_term2)
+        Hmat = kron(Hmat, I2) + kron(I(2^(i-2)), heis_term1) +
+            kron(I(2^(i-3)), heis_term2)
     end
 
     if boundary == :open
         return Hmat
     elseif boundary == :periodic
         Hmat = Hmat +
-            j1 * 0.5 * kron(kron(Sp,eye(2^(Lx-2))), Sm) +
-            j1 * 0.5 * kron(kron(Sm,eye(2^(Lx-2))), Sp) +
-            j1 * kron(kron(Sz,eye(2^(Lx-2))), Sz) +
-            j2 * 0.5 * kron(I2, kron(kron(Sp,eye(2^(Lx-3))), Sm)) +
-            j2 * 0.5 * kron(I2, kron(kron(Sm,eye(2^(Lx-3))), Sp)) +
-            j2 * kron(I2, kron(kron(Sz,eye(2^(Lx-3))), Sz)) +
-            j2 * 0.5 * kron(kron(kron(Sp,eye(2^(Lx-3))), Sm), I2) +
-            j2 * 0.5 * kron(kron(kron(Sm,eye(2^(Lx-3))), Sp), I2) +
-            j2 * kron(kron(kron(Sz,eye(2^(Lx-3))), Sz), I2)
+            j1 * 0.5 * kron(kron(Sp,I(2^(Lx-2))), Sm) +
+            j1 * 0.5 * kron(kron(Sm,I(2^(Lx-2))), Sp) +
+            j1 * kron(kron(Sz,I(2^(Lx-2))), Sz) +
+            j2 * 0.5 * kron(I2, kron(kron(Sp,I(2^(Lx-3))), Sm)) +
+            j2 * 0.5 * kron(I2, kron(kron(Sm,I(2^(Lx-3))), Sp)) +
+            j2 * kron(I2, kron(kron(Sz,I(2^(Lx-3))), Sz)) +
+            j2 * 0.5 * kron(kron(kron(Sp,I(2^(Lx-3))), Sm), I2) +
+            j2 * 0.5 * kron(kron(kron(Sm,I(2^(Lx-3))), Sp), I2) +
+            j2 * kron(kron(kron(Sz,I(2^(Lx-3))), Sz), I2)
         return Hmat
     else
         error("unrecognized boundary conditions :", boundary)

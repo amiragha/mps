@@ -78,9 +78,24 @@ struct SymQInteraction{T, N} <: AbstractQInteraction{T, N}
 end
 
 support(::AbstractQInteraction{T,N}) where{T, N} = N
-
 removehead(A::QInteraction{T, N}) where {T, N} =
     QInteraction{T, N-1}(A.amp, A.sites[2:N], [term[2:N] for term in A.terms])
+
+struct QTerm{OP, N}
+    sites :: NTuple{N, Int}
+    ops   :: NTuple{N, OP}
+end
+
+eltype(term::QTerm{OP}) where {OP} = eltype(OP)
+support(::QTerm{OP, N}) where {OP, N} = N
+removehead(A::QTerm{OP, N}) where {OP, N} =
+    QTerm{OP, N-1}(A.sites[2:N], A.ops[2:N])
+
+# function *(a::T, term::QTerm) where {T<:Number}
+#     T == eltype(eltype(term)) || error("oops, $T vs $(eltype(eltype(term)))")
+#     N = support(term)
+#     QTerm{OP, N}(term.sites, [op for op in term.ops[1:N-1]]..., a*term.ops[N])
+# end
 
 abstract type AbstractQModel{Q, D} end
 struct UnitCellQModel{Q<:AbstractQType, D} <: AbstractQModel{Q, D}

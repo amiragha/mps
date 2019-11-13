@@ -3,8 +3,8 @@ using LinearAlgebra
 using TensorOperations
 using KrylovKit
 
+using QuantumModels
 using MatrixProductStateTools
-
 using ExactDiagonalizationTools
 
 using SymTensors

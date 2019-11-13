@@ -148,22 +148,22 @@ end
                           by::Function=identity) where {N} =
                               sortperm(sects, by=by, lt=_sectorlessthan)
 
-function get_sector(A::AbstractSymTensor{T, N},
-                    s::NTuple{N, Int}) where {T<:Number, N}
+function index_sector(A::AbstractSymTensor{T, N},
+                      s::NTuple{N, Int}) where{T<:Number, N}
     index = searchsortedfirst(A.sects, s, lt=_sectorlessthan)
     index > length(A.sects) && s != A.sects[index] && error("sector not found!")
+    index
+end
 
-    A.nzblks[index]
+function get_sector(A::AbstractSymTensor{T, N},
+                    s::NTuple{N, Int}) where {T<:Number, N}
+    A.nzblks[index_sector(A, s)]
 end
 
 function set_sector!(A::AbstractSymTensor{T, N},
                      s::NTuple{N, Int},
                      nzblk::Array{T, N}) where {T<:Number, N}
-
-    index = searchsortedfirst(A.sects, s, lt=_sectorlessthan)
-    index > length(A.sects) && s != A.sects[index] && error("sector not found!")
-
-    A.nzblks[index] = nzblk
+    A.nzblks[index_sector(A, s)] = nzblk
     A
 end
 
@@ -255,6 +255,7 @@ end
 
 @inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
     SymTensor(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
+@inline *(a::T, A::AbstractSymTensor) where {T<:Number} = *(A, a)
 
 function removedummyleg(A::AbstractSymTensor, l::Int)
     isdummy(A.legs[l]) || error("leg is not dummy!")
@@ -268,6 +269,7 @@ end
 
 ##TODO: this stuff should go up
 @inline eltype(::AbstractSymTensor{T}) where {T<:Number} = T
+@inline eltype(::Type{<:AbstractSymTensor{T}}) where {T<:Number} = T
 
 "construct an additional SymTensor similar to A, possibly with a
 different scalar type T."

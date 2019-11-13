@@ -1,11 +1,11 @@
-module QuantumModel
+module QuantumModels
 
 using LinearAlgebra
 using SparseArrays
 
 using SymTensors
 
-import Base: eltype
+import Base: eltype, *
 
 include("spin_definitions.jl")
 include("model3.jl")
@@ -15,7 +15,9 @@ export UnitCell
 export QLattice
 export AbstractQType, SpinType
 export QModelInteraction, QInteraction
+export SymQModelInteraction, QInteraction
 export UnitCellQModel
+export QTerm
 
 export dimension
 export sitelinearindex

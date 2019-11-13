@@ -49,6 +49,7 @@ export contract
 export mapcharges
 export invlegs
 
+export index_sector
 export get_sector!
 export set_sector!
 

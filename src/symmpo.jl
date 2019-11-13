@@ -87,7 +87,7 @@ function mpo2hamiltonian(mpo::SymMatrixProductOperator)
     L = mpo.tensors[1]
     for two in mpo.tensors[2:end]
         L = fuselegs(fuselegs(contract(L, (1, 2, -1, 5),
-                                       two[-1, 3, 4, 6]),
+                                       two, (-1, 3, 4, 6)),
                               -1, 5, 2),
                      +1, 2, 2)
     end

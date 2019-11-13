@@ -1,7 +1,7 @@
 module MatrixProductStateTools
 
 using SymTensors
-using QuantumModel
+using QuantumModels
 
 using Random
 using LinearAlgebra
@@ -56,5 +56,6 @@ export qitf_mpo
 
 export mpo2hamiltonian
 export generatempo
+export generatesymmpo
 
 end

@@ -84,3 +84,41 @@
         @test h4 ≈ Matrix(H4)
     end
 end
+
+@testset "MPOgen" begin
+
+    @testset "j1j2" begin
+        n = 4
+        lx = 2*n
+        j1, j2 = 1.0, 0.3
+        model = j1j2model(lx, j1, j2)
+        mpo = generatempo(model)
+        legacympo = MatrixProductStateTools.j1j2_mpo(lx, j1, j2, 2)
+        @test mpo2hamiltonian(legacympo) ≈ mpo2hamiltonian(mpo)
+
+        tmodel = triangularspinmodel((2, n), 0.3, 1.0, 1.0, 0.0, 0.0, 0.0)
+        tmpo = generatempo(tmodel)
+        @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(mpo)
+    end
+
+    @testset "j1j2sym" begin
+        j1, j2 = 1.0, 0.3
+        for lx in [3, 4]
+            smodel = j1j2model(lx, j1, j2, symmetry=:U1)
+            smpo = generatesymmpo(smodel)
+
+            model = j1j2model(lx, j1, j2)
+            mpo = generatempo(model)
+
+            sH = mpo2hamiltonian(smpo)
+            H = mpo2hamiltonian(mpo)
+
+            nums = collect(0:2^lx-1)
+            indexes = [count_ones.(nums) .== m for m in 0:lx]
+
+            for n = 1:lx
+                @test H[indexes[n], indexes[n]] ≈ sH.nzblks[n]
+            end
+        end
+    end
+end

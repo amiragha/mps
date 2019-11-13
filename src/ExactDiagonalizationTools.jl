@@ -1,6 +1,6 @@
 module ExactDiagonalizationTools
 
-using QuantumModel
+using QuantumModels
 
 using LinearAlgebra
 using SparseArrays
