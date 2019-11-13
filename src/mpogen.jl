@@ -14,7 +14,6 @@ function generatempo(model::UnitCellQModel)
             offs = interaction.offsets
             indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
                        for i in 1:support(interaction)]
-            #println(indexes)
             if all(indexes .> 0)
                 perm = sortperm(indexes)
                 terms = [term[perm] for term in interaction.terms]
@@ -61,7 +60,7 @@ function generatempo(model::UnitCellQModel)
             rdim = 1
         end
 
-        dims[n] = rdim
+        dims[n+1] = rdim
         # MPO matrix generation
         W = zeros(T, ldim, d, rdim, d)
 
@@ -85,7 +84,7 @@ function generatempo(model::UnitCellQModel)
                     end
                 else
                     for i in eachindex(pterm.terms)
-                        W[row, :, col, :] = pterm.amp * pterm.terms[i][1]
+                        W[row, :, col, :] = pterm.terms[i][1]
                         row+=1
                         col+=1
                     end

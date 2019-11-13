@@ -125,7 +125,7 @@ function j1j2_explicit(Lx::Int64,
     Sz = sparse(sz_half)
     Sp = sparse(sp_half)
     Sm = sparse(sm_half)
-    I2 = speye(Float64,2)
+    I2 = I(2)
 
     heis_term1 = j1 * 0.5 * (kron(Sp, Sm) + kron(Sm, Sp)) + j1 * kron(Sz,Sz)
     heis_term2 = j2 * 0.5 * (kron(kron(Sp, I2), Sm) + kron(kron(Sm, I2), Sp)) +

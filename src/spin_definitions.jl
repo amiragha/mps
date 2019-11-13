@@ -64,16 +64,22 @@ Given an operator `op` on spins 1...n return the same operator on the
 given permutation `perm` of those spins.
 
 """
-function permutespins(op::Matrix, perm::Vector{Int})
+function permutespins(op::AbstractMatrix, perm::Vector{Int})
     size(op, 1) == size(op, 2) || error("square matrix please!")
     n = Int(log2(size(op,1)))
     sort(perm) == collect(1:n) || error("not a valid permutation!")
 
     mask = 2^n - 1
+    indexes = Vector{Int}(undef, 2^n)
     for num=0:mask
-        0 # to do using some bindary represenation of integers
+        new = 0
+        for i=1:n
+            ni = perm[i]
+            new += (num & (1 << (ni-1))) >> (ni - i)
+        end
+        indexes[num+1] = new+1
     end
-    op
+    op[indexes, indexes]
 end
 
 """
@@ -124,7 +130,7 @@ function nbodyopexpansion(n::Int,
             is == Tuple([4 for i=1:n]) &&
                 @warn "Operator has identity with amplitude $amp"
             if symmetry == :NONE
-                term = [Matrix(ops[i]) for i in is]
+                term = [Matrix{T}(ops[i]) for i in is]
                 term[n] = term[n] * amp
                 push!(terms, Tuple(term))
             elseif symmetry == :U1

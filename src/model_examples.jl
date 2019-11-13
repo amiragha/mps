@@ -87,13 +87,13 @@ function triangularspinmodel(ls::Tuple{Int, Int},
         R4)
 
     ring2 = qitype{2, 4, Float64}(
-        k1,
+        k2,
         (1, 1, 1, 1),
         ((0, 0), (0, 1), (1, 0), (1, -1)),
         R4)
 
     ring3 = qitype{2, 4, Float64}(
-        k1,
+        k3,
         (1, 1, 1, 1),
         ((0, 0), (1, 0), (0, 1), (-1, 1)),
         R4)

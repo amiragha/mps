@@ -132,4 +132,48 @@ end
             @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(smpo)
         end
     end
+
+    @testset "2legtriangle" begin
+        ⊗ = kron
+        n = 4
+        j1, j2, k1, k2 = 1.0, 0.3, 0.4, 0.7
+        k = 0.3
+        H = j1j2_explicit(2*n, j1, j2)
+        for i=1:2*n-3
+            if i % 2 == 1
+                H += k1 * I(2^(i-1)) ⊗ permutespins(ringop, [1,3,4,2]) ⊗ I(2^(2*n-i-3))
+            else
+                H += k2 * I(2^(i-1)) ⊗ permutespins(ringop, [1,3,4,2]) ⊗ I(2^(2*n-i-3))
+            end
+        end
+
+        model = triangularspinmodel((2, n), j2, j1, j1, k1, k2, 0.)
+        mpo = generatempo(model)
+        Hmpo = mpo2hamiltonian(mpo)
+
+        nk1s = div(2*n-3, 2) + (2*n-3) % 2
+        nk2s = div(2*n-3, 2)
+        @test Hmpo + 0.25*I(2^(2*n))*k1*nk1s + 0.25*I(2^(2*n))*k2*nk2s ≈ H
+    end
+
+    @testset "2legtrianglesym" begin
+        j1, j2, j3, k1, k2, k3 = rand(6)
+        for n in [2, 3]
+            smodel = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3, symmetry=:U1)
+            smpo = generatesymmpo(smodel)
+
+            model = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3)
+            mpo = generatempo(model)
+
+            sH = mpo2hamiltonian(smpo)
+            H = mpo2hamiltonian(mpo)
+
+            lx = 2*n
+            nums = collect(0:2^lx-1)
+            indexes = [count_ones.(nums) .== m for m in 0:lx]
+            for n = 1:lx
+                @test H[indexes[n], indexes[n]] ≈ sH.nzblks[n]
+            end
+        end
+    end
 end

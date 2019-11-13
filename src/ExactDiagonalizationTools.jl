@@ -31,6 +31,7 @@ export measure1point
 
 export xxz_hamiltonian
 export xxz_longrange
+export j1j2_explicit
 export qitf_hamiltonian, qitf_bondtensor
 export qitf_energy_exact
 

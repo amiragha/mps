@@ -24,6 +24,7 @@ export sitelinearindex
 export support
 export removehead
 
+export spinhalf
 export sz_half, sp_half, sm_half
 export sz_half_U1sym
 export sp_half_U1sym
@@ -31,8 +32,11 @@ export sm_half_U1sym
 export spinoperators
 export ringexchangeoperator
 export nbodyopexpansion
+export permutespins
 
 # spin model examples
+export chainunitcell
+export triangularunitcell
 export j1j2model
 export triangularspinmodel
 
