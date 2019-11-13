@@ -48,7 +48,9 @@ function triangularspinmodel(ls::Tuple{Int, Int},
                              k3::Float64;
                              symmetry::Symbol=:NONE)
 
-    heis = nbodyopexpansion(2, 0.25 * (ringexchangeoperator(2) - I(4)), symmetry=symmetry)
+    heis = nbodyopexpansion(2,
+                            0.25 * (ringexchangeoperator(2) - I(4)),
+                            symmetry=symmetry)
     ly, lx = ls
 
     if symmetry == :NONE
@@ -74,7 +76,9 @@ function triangularspinmodel(ls::Tuple{Int, Int},
         (1, 1),
         ((0, 0), (1, -1)), heis)
 
-    R4 = nbodyopexpansion(4, ringexchangeoperator(4) - 0.25 * I(16), symmetry=symmetry)
+    R4 = nbodyopexpansion(4,
+                          ringexchangeoperator(4) - 0.25 * I(16),
+                          symmetry=symmetry)
 
     ring1 = qitype{2, 4, Float64}(
         k1,

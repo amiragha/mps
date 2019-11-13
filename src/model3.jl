@@ -59,7 +59,7 @@ struct SymQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     amp     :: T
     ucidxs  :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
-    terms   :: Vector{NTuple{N, SymTensor{T, 2}}}
+    terms   :: Vector{NTuple{N, SymMatrix{T}}}
 end
 
 support(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = N
@@ -70,11 +70,6 @@ struct QInteraction{T, N} <: AbstractQInteraction{T, N}
     amp   :: T
     sites :: NTuple{N, Int}
     terms :: Vector{NTuple{N, Matrix{T}}}
-end
-struct SymQInteraction{T, N} <: AbstractQInteraction{T, N}
-    amp   :: T
-    sites :: NTuple{N, Int}
-    terms :: Vector{NTuple{N, SymTensor{T, 2}}}
 end
 
 support(::AbstractQInteraction{T,N}) where{T, N} = N

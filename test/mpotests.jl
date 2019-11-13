@@ -96,7 +96,8 @@ end
         legacympo = MatrixProductStateTools.j1j2_mpo(lx, j1, j2, 2)
         @test mpo2hamiltonian(legacympo) ≈ mpo2hamiltonian(mpo)
 
-        tmodel = triangularspinmodel((2, n), 0.3, 1.0, 1.0, 0.0, 0.0, 0.0)
+        tmodel = triangularspinmodel((2, n),
+                                     0.3, 1.0, 1.0, 0.0, 0.0, 0.0)
         tmpo = generatempo(tmodel)
         @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(mpo)
     end
@@ -115,10 +116,20 @@ end
 
             nums = collect(0:2^lx-1)
             indexes = [count_ones.(nums) .== m for m in 0:lx]
-
             for n = 1:lx
                 @test H[indexes[n], indexes[n]] ≈ sH.nzblks[n]
             end
+        end
+
+        for n in [2, 3]
+            smodel = j1j2model(2*n, j1, j2, symmetry=:U1)
+            smpo = generatesymmpo(smodel)
+
+            tmodel = triangularspinmodel((2, n),
+                                         0.3, 1.0, 1.0, 0.0, 0.0, 0.0,
+                                         symmetry=:U1)
+            tmpo = generatesymmpo(tmodel)
+            @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(smpo)
         end
     end
 end

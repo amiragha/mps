@@ -18,6 +18,7 @@ include("symtools.jl")
 export +, *
 export isequal, ==
 export isapprox
+export issimilar
 export AbstractSymTensor, AbstractSymMatrix
 export STLeg, SymTensor, SymMatrix, SymDiagonal, SymVector
 export eye

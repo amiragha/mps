@@ -2,17 +2,22 @@
 ** testing
    - [-] lots of test need to be written! (by someone)
 
-** idmrg and dmrg stuff
+** tensornetalgs
    - [-]  Best method for arnoldi and lanczos algorithms to make the
      process as seemlessly as possible (done with KrylovKit for now!
      but explore and test other choices)
 
-   - [-] code algorithm such as TDVP, etc. at least the general case
+   - [-] code algorithm such as TDVP, TEBD
      for undestanding and possible comparisons for later
 
+   - [-] idmrg has some small issue still! Figure it out
+
+   - [-] VUMPS (important!)
+
+   - [-] MERA and play with GMERA
 ** symmetry stuff
-   - [-] the svd function needs revision, possibly the return value
-     could be an svd object to better integration with standard julia
+   - [-] should the svd return be svd object to better integration
+     with standard julia?
 
    - [-] implement the symmetry more general and also add the Z_2
      symmetry as an example (it is also incredibly useful)
@@ -20,24 +25,32 @@
    - [-] General clean-up
 
    - [-] how would the symmetry and charges play out in the case of
-     infinte algorithms like iDMRG
+     infinte algorithms like iDMRG. Write iDMRG with symmetry
 
-** cools stuff
+** QuantumModels
    - [-] code a general Model class so that you can use it to define
      models, what is the best approach and how can you make it better!
-
-   - [-] MPO generator! This is very important.
+   - [-] need to write down spins in a more abstract way!
+   - [-] integrate femionic and bosonic models.
 
 ** performance
+   - [-] dmrg symmetric is still very slow! We need better contraction
    - [-] Read and think about Julia parallelization!
    - [-] performance improvements in getindex, etc ... using modifiers!
    - [-] compare different approached in making Hamiltonians for ED2imps
 
 ** General clean-ups
-   - [-] name change and move all application operators for dmrg and
-     related algorithms to some file for example "mpsapply.jl"
+   - [-] mpogen need clean-up or better algorithm
 
 ** Fix complex real issues in a systematic fashion. HOW?
+   - [-] More understanding of julia types is required
+
 ** revise
-   - discourage making SymTensors explicitely (how!) and don't check for stuff!
-   - fn _possible_fuse_patterns in leg.jl should return sorted!
+   - [-] discourage making SymTensors explicitely (how!) and don't
+     check for stuff! This is somehow done by the definition of new
+     constructors but need better stuff
+
+   - [-] MPS and MPO need revision. i) local dimension needs to depend
+     on sites ii) dims is needed or not? iii) combine sym and normal
+
+   - [-] General combination of sym and none!

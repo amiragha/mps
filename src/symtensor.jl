@@ -254,7 +254,8 @@ end
 
 
 @inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
-    SymTensor(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
+    typeof(A)(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
+
 @inline *(a::T, A::AbstractSymTensor) where {T<:Number} = *(A, a)
 
 function removedummyleg(A::AbstractSymTensor, l::Int)

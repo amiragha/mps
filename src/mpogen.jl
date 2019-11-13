@@ -135,7 +135,7 @@ function generatesymmpo(model::UnitCellQModel)
     n_sites = prod(model.lattice.sizes)
     T = eltype(model.inters[1])
 
-    allterms = Vector{QTerm{SymTensor{T, 2}}}()
+    allterms = Vector{QTerm{SymMatrix{T}}}()
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
         for interaction in model.inters
             ns = interaction.ucidxs

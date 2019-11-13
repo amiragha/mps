@@ -15,7 +15,6 @@ import LinearAlgebra: normalize!
 import Base: +, *
 include("model.jl")
 
-#include("spin_definitions.jl")
 include("ket.jl")
 include("xxz.jl")
 include("longxxz.jl")
