@@ -56,3 +56,33 @@ function nnhoppingchain(lx::Int, t1::T, t2::T, mu::T=0.0;
     end
     hopmatrix
 end
+
+function generatebdg(model::UnitCellQFermionModel)
+    typeof(model.qtype) == FermionType ||
+        error("BdG Hamiltonian only for FermionType models!")
+    model.lattice.bc == :OBC || error("Only OBC for now!")
+
+    n_sites = prod(mode.lattice.sizes)
+    H = zeros(n_sites, n_sites)
+    for is in Iterators.product([1:l for l in model.lattice.sizes]...)
+        for interaction in model.inters
+            ns = interaction.ucidxs
+            offs = interaction.offsets
+            indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                       for i in 1:support(interaction)]
+            if all(indexes .> 0)
+                if interaction.inters == FermionHop
+                    i, j = indexes
+                    H[i, j] += interaction.amp
+                    H[j, i] += interaction.amp
+                elseif interaction.inters == FermionNum
+                    index = indexes[1]
+                    H[index, index] += interaction.amp
+                else
+                    error("unsupported fermion interaction!")
+                end
+            end
+        end
+    end
+    H
+end

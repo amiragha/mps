@@ -8,7 +8,6 @@ function generatempo(model::UnitCellQModel)
 
     allterms = Vector{QInteraction}()
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
-        #println(is)
         for interaction in model.inters
             ns = interaction.ucidxs
             offs = interaction.offsets

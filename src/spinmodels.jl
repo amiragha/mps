@@ -23,13 +23,13 @@ function j1j2model(lx::Int, j1::Float64, j2::Float64; symmetry::Symbol=:NONE)
         error()
     end
     heis1 = qitype{1, 2, Float64}(
-            j1,
-            (1, 1),
-            ((0,), (1,)), heis)
-        heis2 = qitype{1, 2, Float64}(
-            j2,
-            (1, 1),
-            ((0,), (2,)), heis)
+        j1,
+        (1, 1),
+        ((0,), (1,)), heis)
+    heis2 = qitype{1, 2, Float64}(
+        j2,
+        (1, 1),
+        ((0,), (2,)), heis)
     terms = []
     j1 != 0 && push!(terms, heis1)
     j2 != 0 && push!(terms, heis2)

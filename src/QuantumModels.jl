@@ -17,6 +17,7 @@ export QLattice
 export AbstractQType, SpinType
 export QModelInteraction, QInteraction
 export SymQModelInteraction, QInteraction
+export FermionQModelInteraction
 export UnitCellQModel
 export QTerm
 
@@ -26,10 +27,6 @@ export support
 export removehead
 
 export spinhalf
-export sz_half, sp_half, sm_half
-export sz_half_U1sym
-export sp_half_U1sym
-export sm_half_U1sym
 export spinoperators
 export ringexchangeoperator
 export nbodyopexpansion

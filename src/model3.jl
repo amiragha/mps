@@ -62,6 +62,13 @@ struct SymQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     terms   :: Vector{NTuple{N, SymMatrix{T}}}
 end
 
+struct FermionQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
+    amp     :: T
+    ucidxs  :: NTuple{N, Int}
+    offsets :: NTuple{N, NTuple{D, Int}}
+    terms   :: Vector{FermionTerm{N}}
+end
+
 support(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = N
 eltype(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = T
 
