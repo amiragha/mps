@@ -22,7 +22,8 @@ sz_half = [0.5 0.0; 0.0 -.5]
     end
 
     @testset "operator measurements" begin
-        @test measure_1point(mps, sz_half) ≈ zeros(lx) atol=1.e-12
+        sz = spinoperators(1/2)[1]
+        @test measure_1point(mps, sz) ≈ zeros(lx) atol=1.e-12
 
         mpo = xxz_mpo(Float64, lx, 2)
         @test measure_mpo(mps, mpo) ≈ eheis[1]
@@ -52,10 +53,11 @@ end
 
         mpscopy = deepcopy(mps)
         move_center!(mps, l)
-        M = twosite_tensor(sz_half, sz_half)
+        sz = spinoperators(1/2)[1]
+        M = twosite_tensor(sz, sz)
         apply_2siteoperator!(mps, l, M)
 
         @test mps_dims_are_consistent(mps)
-        @test overlap(mpscopy, mps) ≈ measure_2point(mpscopy, sz_half, sz_half, l, l+1)
+        @test overlap(mpscopy, mps) ≈ measure_2point(mpscopy, sz, sz, l, l+1)
     end
 end

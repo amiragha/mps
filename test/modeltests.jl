@@ -22,15 +22,17 @@
     # end
 
     @testset "opexpansion" begin
+        ringop = ringexchangeoperator(4)
         terms = nbodyopexpansion(4, ringop)
         h = zeros(16,16)
         for t in terms
-            h += reduce(⊗, t, init=I(1))
+            h += reduce(kron, t, init=I(1))
         end
         @test h == ringop
     end
 
     @testset "ringop" begin
+        ringop = ringexchangeoperator(4)
         symmetry = :NONE
         k = 0.3
         R4 = nbodyopexpansion(4,
@@ -44,7 +46,7 @@
             R4)
 
         model = UnitCellQModel{SpinType, 1}(spinhalf,
-                                            QLattice(chainunitcell, lx, :OBC),
+                                            QLattice(chainunitcell, 4, :OBC),
                                             [ring1])
         mpo = generatempo(model)
         hmpo = mpo2hamiltonian(mpo)

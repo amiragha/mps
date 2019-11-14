@@ -9,7 +9,8 @@ import Base: eltype, *
 
 include("spin_definitions.jl")
 include("model3.jl")
-include("model_examples.jl")
+include("spinmodels.jl")
+include("fermionmodels.jl")
 
 export UnitCell
 export QLattice

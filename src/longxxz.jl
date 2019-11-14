@@ -1,7 +1,7 @@
 function xxz_longrange(lx::Int, delta::Float64=1.0, r::Float64=0.5)
     (lx < 2) && error("The system size is too small : ", lx)
 
-    sz, sp, sm = sz_half, sp_half, sm_half
+    sz, sp, sm = sparse.(spinoperators(1/2))
 
     heis_term = 0.5 * (sp ⊗ sm + sm ⊗ sp) + delta * sz ⊗ sz
 

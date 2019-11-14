@@ -139,6 +139,7 @@ end
         j1, j2, k1, k2 = 1.0, 0.3, 0.4, 0.7
         k = 0.3
         H = j1j2_explicit(2*n, j1, j2)
+        ringop = ringexchangeoperator(4)
         for i=1:2*n-3
             if i % 2 == 1
                 H += k1 * I(2^(i-1)) ⊗ permutespins(ringop, [1,3,4,2]) ⊗ I(2^(2*n-i-3))

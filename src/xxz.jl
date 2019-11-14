@@ -12,8 +12,9 @@ end
 
 function xxz_explicit(lx::Int64, delta::Float64, boundary::Symbol)
 
-    heis_term = 0.5 * (kron(sp_half, sm_half) + kron(sm_half, sp_half)) +
-        delta * kron(sz_half,sz_half)
+    sz, sp, sm = sparse.(spinoperators(1/2))
+    heis_term = 0.5 * (kron(sp, sm) + kron(sm, sp)) +
+        delta * kron(sz,sz)
 
     Hmat = heis_term
     if lx > 2
@@ -27,9 +28,9 @@ function xxz_explicit(lx::Int64, delta::Float64, boundary::Symbol)
         return Hmat
     elseif boundary == :PBC
         Hmat = Hmat +
-            0.5 * kron(kron(sp_half, I(2^(lx-2))), sm_half) +
-            0.5 * kron(kron(sm_half, I(2^(lx-2))), sp_half) +
-            delta * kron(kron(sz_half, I(2^(lx-2))), sz_half)
+            0.5 * kron(kron(sp, I(2^(lx-2))), sm) +
+            0.5 * kron(kron(sm, I(2^(lx-2))), sp) +
+            delta * kron(kron(sz, I(2^(lx-2))), sz)
         return Hmat
     else
         error("unrecognized boundary condition :", boundary)
@@ -122,9 +123,7 @@ function j1j2_explicit(Lx::Int64,
                        j2::Float64;
                        boundary::Symbol=:open)
     @assert Lx > 2
-    Sz = sparse(sz_half)
-    Sp = sparse(sp_half)
-    Sm = sparse(sm_half)
+    Sz, Sp, Sm = sparse.(spinoperators(1/2))
     I2 = I(2)
 
     heis_term1 = j1 * 0.5 * (kron(Sp, Sm) + kron(Sm, Sp)) + j1 * kron(Sz,Sz)

@@ -6,12 +6,14 @@ triangularunitcell = UnitCell{2}(1, [(0, 0)], [(1, 0), (0.5, sin(pi/3))])
 # example types
 spinhalf = SpinType(2)
 
-sz, sp, sm = Matrix(sz_half), Matrix(sp_half), Matrix(sm_half)
+sz, sp, sm = spinoperators(1/2)
 
 # example models
 function j1j2model(lx::Int, j1::Float64, j2::Float64; symmetry::Symbol=:NONE)
 
-    heis = nbodyopexpansion(2, 0.25 * (ringexchangeoperator(2) - I(4)), symmetry=symmetry)
+    heis = nbodyopexpansion(2,
+                            0.25 * (ringexchangeoperator(2) - I(4)),
+                            symmetry=symmetry)
 
     if symmetry == :NONE
         qitype = QModelInteraction
@@ -34,7 +36,7 @@ function j1j2model(lx::Int, j1::Float64, j2::Float64; symmetry::Symbol=:NONE)
 
     UnitCellQModel{SpinType, 1}(spinhalf,
                                 QLattice(chainunitcell, lx, :OBC),
-                                [heis1, heis2])
+                                terms)
 end
 
 # triangular
