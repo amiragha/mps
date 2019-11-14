@@ -295,7 +295,7 @@ function entanglemententropy(mps::SymMatrixProductState;
     [entropy(spectrum.^2) for spectrum in entanglementspectrum(mps)]
 end
 
-function measure_1point(mps::SymMatrixProductState{Tv}, op::SymTensor{Tv,2},
+function measure_1point(mps::SymMatrixProductState{Tv}, op::SymMatrix{Tv},
                         site::Int) where {Tv<:RLorCX}
     d = mps.d
     lx = mps.lx
@@ -313,7 +313,7 @@ function measure_1point(mps::SymMatrixProductState{Tv}, op::SymTensor{Tv,2},
 end
 
 function measure_1point(mps::SymMatrixProductState{Tv},
-                        op::SymTensor{Tv,2}) where {Tv<:RLorCX}
+                        op::SymMatrix{Tv}) where {Tv<:RLorCX}
     d = mps.d
     lx = mps.lx
     @assert signs(op.legs) == (+1, -1)
@@ -341,7 +341,7 @@ function measure_1point(mps::SymMatrixProductState{Tv},
 end
 
 function measure_2point(mps::SymMatrixProductState{Tv},
-                        op1::SymTensor{Tv,2}, op2::SymTensor{Tv,2},
+                        op1::SymMatrix{Tv}, op2::SymMatrix{Tv},
                         site1::Int64, site2::Int64) where {Tv<:RLorCX}
     d = mps.d
     lx = mps.lx
@@ -370,7 +370,7 @@ function measure_2point(mps::SymMatrixProductState{Tv},
 end
 
 function measure_2point(mps::SymMatrixProductState{Tv},
-                        op1::SymTensor{Tv,2}, op2::SymTensor{Tv,2}) where {Tv<:RLorCX}
+                        op1::SymMatrix{Tv}, op2::SymMatrix{Tv}) where {Tv<:RLorCX}
     d = mps.d
     lx = mps.lx
     @assert signs(op1.legs) == signs(op2.legs) == (+1, -1)
