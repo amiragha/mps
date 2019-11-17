@@ -46,4 +46,5 @@ export triangularspinmodel
 export t1t1model
 export triangularhopping
 
+export tikzlattice
 end

@@ -15,6 +15,8 @@ end
 UnitCell{1}(n::Int, sites::Vector{Float64}, a::Float64) =
     UnitCell{1}(n, [(site,) for site in sites], [(a,)])
 
+@inline coordsum(A::NTuple{N}, B::NTuple{N}) where {N} = A .+ B
+
 struct QLattice{D}
     unitc :: UnitCell{D}
     sizes :: NTuple{D, Int}
@@ -127,3 +129,75 @@ struct UnitCellQModel{Q<:AbstractQType, D} <: AbstractQModel{Q, D}
 end
 
 dimension(::AbstractQModel{Q, D}) where {Q, D} = D
+
+function tikzlattice(model::UnitCellQModel,
+                     filename::String)
+    isfile(filename) && error("file already exists: $filename")
+    D = dimension(model)
+    D == 2 || error("only 2D plotting is support for now!")
+    lattice = model.lattice
+
+    open(filename, "w") do f
+        write(f, """\\documentclass[tikz, border=1mm]{standalone}
+  \\usepackage{tikz,pgf}
+  %\\usetikzlibrary{calc,arrows,arrows.meta}
+  %\\usetikzlibrary{decorations.markings}
+
+  \\begin{document}
+
+  \\begin{tikzpicture}
+  """)
+        write(f, """
+  \\tikzset{
+    crbond/.style={thick, blue!70!black},
+    bond/.style={thin, double, brown!80!yellow},
+    ball/.style={inner color=blue, ball color=green!20!black}
+  }
+
+  \\def\\l{1cm}
+  \\def\\h{\\l * 0.866}
+
+  \\def\\ya{0 * \\h}
+  \\def\\yb{1 * \\h}
+
+  \\def\\radius{\\l/10}\n
+""")
+        for is in Iterators.product([1:l for l in model.lattice.sizes]...)
+            for interaction in model.inters
+                support(interaction) == 2 || continue
+                n1, n2 = interaction.ucidxs
+                off1, off2 = interaction.offsets
+                if lattice.bc == :OBC
+                    x_uc1 = [off1[i] .+ is[i] for i=1:D]
+                    x_uc2 = [off2[i] .+ is[i] for i=1:D]
+                    if all([1 <= x_uc1[i] <= lattice.sizes[i] for i=1:D]) &
+                        all([1 <= x_uc2[i] <= lattice.sizes[i] for i=1:D])
+                        one = reduce(coordsum,
+                                     [(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                     init=(0,0)).+ lattice.unitc.sites[n1]
+                        two = reduce(coordsum,
+                                     [(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                     init=(0,0)).+ lattice.unitc.sites[n2]
+                        write(f, "\\draw [bond] $one -- $two;\n")
+                    end
+                else
+                    error("boundary not supported yet!")
+                end
+            end
+        end
+
+        for ls in Iterators.product([1:l for l in model.lattice.sizes]...)
+
+            x_uc = reduce(coordsum,
+                          [(ls .- 1)[i] .* lattice.unitc.as[i] for i=1:D], init=(0,0))
+            for n in 1:lattice.unitc.n
+                x_site = x_uc .+ lattice.unitc.sites[n]
+                write(f, "\\shade [ball] $x_site circle (\\radius);\n")
+            end
+        end
+
+
+        write(f, "\\end{tikzpicture}\n")
+        write(f, "\\end{document}")
+    end
+end
