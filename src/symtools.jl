@@ -64,23 +64,23 @@ which is `-1` if the two legs has charge odd and `+1` otherwise.
 The output legs are l2_afterX, l1_afterX, l2, l1
 """
 function fermionswapgate(l1::STLeg, l2::STLeg)
-
     (l1.chrs != [0, 1] || l1.dims != [1,1]) && error("fermionswap oops!")
 
     l1X = STLeg(-l1.sign, l1.chrs, l1.dims)
     l2X = STLeg(-l2.sign, l2.chrs, l2.dims)
     legs = (l2, l1, l2X, l1X)
 
-    sects = NTuple{4, Int}[]
-    nzblks = Array{Float64, 4}[]
+    sects, sizes = _allsectorsandsizes(0, legs)
+    nzblks = Vector{Array{Float64, 4}}(undef, length(sizes))
 
-    for i1 in eachindex(l1.chrs)
-        for i2 in eachindex(l2.chrs)
-            c1, c2 = l1.chrs[i1], l2.chrs[i2]
-            d1, d2 = l1.dims[i1], l2.dims[i2]
-            push!(sects, (c2, c1, c2, c1))
+    for index in eachindex(sects)
+        c2, c1, c2X, c1X = sects[index]
+        if c1 == c1X && c2 == c2X
+            d2, d1 = sizes[index][1:2]
             s = isodd(c1) && isodd(c2) ? -1 : +1
-            push!(nzblks,s * reshape(I(d2), d2, d1, d2, d1))
+            nzblks[index] =  s * reshape(I(d1*d2), d2, d1, d2, d1)
+        else
+            nzblks[index] = zeros(sizes[index])
         end
     end
     SymTensor(0, legs, sects, nzblks)
