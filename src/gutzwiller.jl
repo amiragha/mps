@@ -148,6 +148,7 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
 
 
         U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+        normalize!(S)
         dims[l+1] = size(S, 1)
         push!(matrices,
               mapcharges(x->div(x,2),
@@ -214,6 +215,7 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
                      (1,2, -2, -1,3), B, (-1,-2, 4))
 
         U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+        normalize!(S)
         dims[l+1] = size(S, 1)
 
         fnl = x->div(x+l-1, 2)
