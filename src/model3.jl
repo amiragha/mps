@@ -173,10 +173,12 @@ function tikzlattice(model::UnitCellQModel,
                     if all([1 <= x_uc1[i] <= lattice.sizes[i] for i=1:D]) &
                         all([1 <= x_uc2[i] <= lattice.sizes[i] for i=1:D])
                         one = reduce(coordsum,
-                                     [(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                     #[(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                     [reverse(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
                                      init=(0,0)).+ lattice.unitc.sites[n1]
                         two = reduce(coordsum,
-                                     [(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                     #[(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                     [reverse(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
                                      init=(0,0)).+ lattice.unitc.sites[n2]
                         write(f, "\\draw [bond] $one -- $two;\n")
                     end
@@ -187,16 +189,15 @@ function tikzlattice(model::UnitCellQModel,
         end
 
         for ls in Iterators.product([1:l for l in model.lattice.sizes]...)
-
             x_uc = reduce(coordsum,
-                          [(ls .- 1)[i] .* lattice.unitc.as[i] for i=1:D], init=(0,0))
+                          #[(ls .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                          [reverse(ls .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                          init=(0,0))
             for n in 1:lattice.unitc.n
                 x_site = x_uc .+ lattice.unitc.sites[n]
                 write(f, "\\shade [ball] $x_site circle (\\radius);\n")
             end
         end
-
-
         write(f, "\\end{tikzpicture}\n")
         write(f, "\\end{document}")
     end
