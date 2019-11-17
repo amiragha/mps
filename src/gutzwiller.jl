@@ -46,10 +46,10 @@ function zipandgutzwiller!(mps1::MatrixProductState{T},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    if mps1.center == 1
+    if mps1.center != 1
         move_center!(mps1, 1)
     end
-    if mps2.center == 1
+    if mps2.center != 1
         move_center!(mps2, 1)
     end
 
@@ -110,10 +110,10 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    if mps1.center == 1
+    if mps1.center != 1
         move_center!(mps1, 1)
     end
-    if mps2.center == 1
+    if mps2.center != 1
         move_center!(mps2, 1)
     end
 
@@ -173,10 +173,10 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    if mps1.center == 1
+    if mps1.center != 1
         move_center!(mps1, 1)
     end
-    if mps2.center == 1
+    if mps2.center != 1
         move_center!(mps2, 1)
     end
 
