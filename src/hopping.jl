@@ -57,30 +57,42 @@ function nnhoppingchain(lx::Int, t1::T, t2::T, mu::T=0.0;
     hopmatrix
 end
 
-function generatebdg(model::UnitCellQFermionModel)
-    typeof(model.qtype) == FermionType ||
+function generatebdg(model::UnitCellQModel)
+    typeof(model.qtype) <: Fermion ||
         error("BdG Hamiltonian only for FermionType models!")
     model.lattice.bc == :OBC || error("Only OBC for now!")
 
-    n_sites = prod(mode.lattice.sizes)
-    H = zeros(n_sites, n_sites)
+    ft, f = fermionoperators(model.qtype)
+    n_sites = prod(model.lattice.sizes)
+    H = zeros(eltype(model.inters[1]), n_sites, n_sites)
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
         for interaction in model.inters
             ns = interaction.ucidxs
             offs = interaction.offsets
             indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
                        for i in 1:support(interaction)]
-            if all(indexes .> 0)
-                if interaction.inters == FermionHop
-                    i, j = indexes
-                    H[i, j] += interaction.amp
-                    H[j, i] += interaction.amp
-                elseif interaction.inters == FermionNum
-                    index = indexes[1]
-                    H[index, index] += interaction.amp
-                else
-                    error("unsupported fermion interaction!")
+            if all(indexes .> 0) && length(indexes) < 3 #ignore higher fermion stuff
+                for term in interaction.terms
+                    if term == (ft, f)
+                        i, j = indexes
+                        H[i, j] += interaction.amp
+                    elseif term == (f, ft)
+                        j, i  = indexes
+                        H[i, j] += conj(interaction.amp)
+                    else
+                        error("term Not supported")
+                    end
                 end
+                # if interaction.inters == FermionHop
+                #     i, j = indexes
+                #     H[i, j] += interaction.amp
+                #     H[j, i] += interaction.amp
+                # elseif interaction.inters == FermionNum
+                #     index = indexes[1]
+                #     H[index, index] += interaction.amp
+                # else
+                #     error("unsupported fermion interaction!")
+                # end
             end
         end
     end

@@ -49,4 +49,6 @@ export makemodelJW
 
 export makemodelJW_u1sym
 
+export generatebdg
+
 end

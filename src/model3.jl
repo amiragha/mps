@@ -45,6 +45,26 @@ struct SpinType <: AbstractQType
     d :: Int
 end
 
+# because different species of fermions should be different for
+# anticommutation relations
+struct Fermion{Name} <: AbstractQType
+    Fermion{Name}() where {Name} = new{typeassert(Name, Symbol)}()
+end
+
+abstract type QuantumOperator end
+abstract type FermionOp end
+
+struct FCreate{F} <: FermionOp
+    FCreate{F}() where {F} = new{typeassert(F, Fermion)}()
+end
+
+struct FAnnihilate{F} <: FermionOp
+    FAnnihilate{F}() where {F}= new{typeassert(F, Fermion)}()
+end
+
+function fermionoperators(f::Fermion)
+    FCreate{f}(), FAnnihilate{f}()
+end
 abstract type AbstractQInteraction{T, N} end
 
 abstract type AbstractQModelInteraction{D, N, T} end
@@ -66,7 +86,7 @@ struct FermionQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     amp     :: T
     ucidxs  :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
-    terms   :: Vector{FermionTerm{N}}
+    terms   :: Vector{NTuple{N, FermionOp}}
 end
 
 support(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = N

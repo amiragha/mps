@@ -26,16 +26,24 @@ export sitelinearindex
 export support
 export removehead
 
+export Fermion
+export fermionoperators
+
 export spinhalf
 export spinoperators
 export ringexchangeoperator
 export nbodyopexpansion
 export permutespins
 
-# spin model examples
 export chainunitcell
 export triangularunitcell
+
+# spin model examples
 export j1j2model
 export triangularspinmodel
+
+# fermion model examples
+export t1t1model
+export triangularhopping
 
 end
