@@ -44,9 +44,9 @@ function contract(A     :: AbstractSymTensor{T1, N},
     end
 
     _B = SymMatrix(B, consB, remsB)
-    return permutelegs(
-        unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
-        invperm([tofinalsA;tofinalsB]))
+    return permutelegs(SymTensor(_A * _B, A.legs[remsA], B.legs[remsB]),
+                       #unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
+                       invperm([tofinalsA; tofinalsB]))
 end
 
 # auxillary function to find indexes for contract
@@ -160,6 +160,67 @@ end
 #         +1, 1, length(rowidxs)))
 
 # end
+
+function SymTensor(A     :: SymMatrix,
+                   rlegs :: NTuple{N, STLeg},
+                   clegs :: NTuple{M, STLeg}) where {N, M}
+    #0 < l <= N || error("integer l not in range $l, $N")
+    #println(A.legs)
+    #println(legs)
+    # if length(rlegs) == 1
+    #     if legs[1].sign == A.legs[1].sign
+    #         A.legs[l] == legs[1] || error("Not the same legs", A.legs[l], legs[1])
+    #         return A
+    #     else
+    #         Aleg = negate(A.legs[l])
+    #         Aleg == legs[1] || (error("Not the same legs", Aleg, legs[1]))
+    #         return negateleg(A, l)
+    #     end
+    # end
+    T = eltype(A)
+    sects = NTuple{N+M, Int}[]
+    nzblks = Array{T, N+M}[]
+
+    rsign = A.legs[1].sign
+    csign = A.legs[2].sign
+
+    sectperm = sortperm(A.sects, by=x->x[2])
+    csects = A.sects[sectperm]
+    oldcharge = 0
+    rpats, rsizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
+    cpats, csizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
+    for i in eachindex(csects)
+        c1 = rsign * csects[i][1]
+        c2 = csign * csects[i][2]
+        if i == 1 || c2 != oldcharge
+            rpats, rsizes = _allsectorsandsizes(c1, rlegs)
+            cpats, csizes = _allsectorsandsizes(c2, clegs)
+            oldcharge = c2
+        end
+
+        old_nzblock =  A.nzblks[i]
+        s = size(old_nzblock)
+        pc = 0
+        for cpatidx in eachindex(cpats)
+            csl = prod(csizes[cpatidx])
+            pr = 0
+            for rpatidx in eachindex(rpats)
+                rsl = prod(rsizes[rpatidx])
+                push!(sects, (rpats[rpatidx]..., cpats[cpatidx]...))
+                push!(nzblks, reshape(old_nzblock[pr+1:pr+rsl, pc+1:pc+csl],
+                                      rsizes[rpatidx]..., csizes[cpatidx]...))
+                pr += rsl
+            end
+            pc += csl
+        end
+    end
+
+    #TODO: now check to see if the new legs can fuse into the original leg
+    new_legs = (rlegs...,clegs...)
+
+    sectperm = _sectors_sortperm(sects)
+    SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
+end
 
 function _arecontractible(l1::STLeg, l2::STLeg)
     if l1.sign == -l2.sign

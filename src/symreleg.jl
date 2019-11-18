@@ -143,9 +143,11 @@ function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T
 end
 
 # defuses a leg into some given legs
-function unfuseleg(A    :: AbstractSymTensor{T, N},
+function unfuseleg(A    :: AbstractSymTensor,
                    l    :: Int,
-                   legs :: NTuple{M, STLeg}) where {T<:Number, N, M}
+                   legs :: NTuple{M, STLeg}) where {M}
+    T = eltype(A)
+    N = numoflegs(A)
     0 < l <= N || error("integer l not in range $l, $N")
     #println(A.legs)
     #println(legs)
@@ -164,53 +166,107 @@ function unfuseleg(A    :: AbstractSymTensor{T, N},
     nzblks = Array{T, N+M-1}[]
 
     sign = A.legs[l].sign
-    csects = A.sects
-    fchrdict = Dict{Int, Tuple{Vector{NTuple{M,Int}}, Vector{NTuple{M,Int}}}}()
+    sectperm = sortperm(A.sects, by=x->x[l])
+    csects = A.sects[sectperm]
+    oldcharge = 0
+    pats, sizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
     for i in eachindex(csects)
         charge = sign * csects[i][l]
-        if haskey(fchrdict, charge)
-            pats, patdims = fchrdict[charge]
-        else
-            pats, patdims = _allsectorsandsizes(charge, legs)
-            #println(charge, pats, patdims)
-            ## NOTE: sorting is not longer required because
-            ## allsectorsandsizes return sorted pats
-            # patperms = _sectors_sortperm(pats)
-            # pats, patdims = pats[patperms], patdims[patperms]
-            #println(pats, patdims)
-            fchrdict[charge] = (pats, patdims)
+        if i == 1 || charge != oldcharge
+            pats, sizes = _allsectorsandsizes(charge, legs)
+            oldcharge = charge
         end
+
         old_nzblock =  A.nzblks[i]
         s = size(old_nzblock)
         pivot = 0
         for patidx in eachindex(pats)
-            sl = prod(patdims[patidx])
+            sl = prod(sizes[patidx])
             push!(sects, (csects[i][1:l-1]..., pats[patidx]..., csects[i][l+1:N]...))
-            push!(nzblks, reshape(old_nzblock[[1:s[n] for n=1:l-1]...,pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
-                                  s[1:l-1]...,patdims[patidx]...,s[l+1:N]...))
+            push!(nzblks,
+                  reshape(old_nzblock[[1:s[n] for n=1:l-1]...,
+                                      pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
+                                  s[1:l-1]...,sizes[patidx]...,s[l+1:N]...))
             pivot += sl
         end
     end
 
-    # now check to see if the new legs can fuse into the original leg
-    ###TODO: there should be an options to remove this step for
-    ###efficientcy when it is not needed!
-    for charge in keys(fchrdict)
-        cidx = findall(A.legs[l].chrs .== sign * charge)[1]
-        A.legs[l].dims[cidx] == sum([prod(patdims) for patdims in fchrdict[charge][2]]) ||
-            error("For defuse, dimensions don't match for charge " , sign*charge)
-        #, " ", A.legs[l].dims[cidx], " == ", fchrdict[charge]
-
-    end
-
-    #println(fchrdict)
+    #TODO: now check to see if the new legs can fuse into the original leg
     new_legs = (A.legs[1:l-1]...,legs...,A.legs[l+1:end]...)
-    #println(A.sects)
-    #println(sects)
 
-    ## NOTE: It is necessary to sort the sectors here, because while
-    ## the patterns were sorted whitin each fused charge, they are not
-    ## sorted when are the charges are concerned
     sectperm = _sectors_sortperm(sects)
     SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
 end
+
+# # defuses a leg into some given legs
+# function unfuseleg(A    :: AbstractSymTensor{T, N},
+#                    l    :: Int,
+#                    legs :: NTuple{M, STLeg}) where {T<:Number, N, M}
+#     0 < l <= N || error("integer l not in range $l, $N")
+#     #println(A.legs)
+#     #println(legs)
+#     if length(legs) == 1
+#         if legs[1].sign == A.legs[l].sign
+#             A.legs[l] == legs[1] || error("Not the same legs", A.legs[l], legs[1])
+#             return A
+#         else
+#             Aleg = negate(A.legs[l])
+#             Aleg == legs[1] || (error("Not the same legs", Aleg, legs[1]))
+#             return negateleg(A, l)
+#         end
+#     end
+
+#     sects = NTuple{N+M-1, Int}[]
+#     nzblks = Array{T, N+M-1}[]
+
+#     sign = A.legs[l].sign
+#     csects = A.sects
+#     fchrdict = Dict{Int, Tuple{Vector{NTuple{M,Int}}, Vector{NTuple{M,Int}}}}()
+#     for i in eachindex(csects)
+#         charge = sign * csects[i][l]
+#         if haskey(fchrdict, charge)
+#             pats, patdims = fchrdict[charge]
+#         else
+#             pats, patdims = _allsectorsandsizes(charge, legs)
+#             #println(charge, pats, patdims)
+#             ## NOTE: sorting is not longer required because
+#             ## allsectorsandsizes return sorted pats
+#             # patperms = _sectors_sortperm(pats)
+#             # pats, patdims = pats[patperms], patdims[patperms]
+#             #println(pats, patdims)
+#             fchrdict[charge] = (pats, patdims)
+#         end
+#         old_nzblock =  A.nzblks[i]
+#         s = size(old_nzblock)
+#         pivot = 0
+#         for patidx in eachindex(pats)
+#             sl = prod(patdims[patidx])
+#             push!(sects, (csects[i][1:l-1]..., pats[patidx]..., csects[i][l+1:N]...))
+#             push!(nzblks, reshape(old_nzblock[[1:s[n] for n=1:l-1]...,pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
+#                                   s[1:l-1]...,patdims[patidx]...,s[l+1:N]...))
+#             pivot += sl
+#         end
+#     end
+
+#     # now check to see if the new legs can fuse into the original leg
+#     ###TODO: there should be an options to remove this step for
+#     ###efficientcy when it is not needed!
+#     for charge in keys(fchrdict)
+#         cidx = findall(A.legs[l].chrs .== sign * charge)[1]
+#         A.legs[l].dims[cidx] == sum([prod(patdims) for patdims in fchrdict[charge][2]]) ||
+#             error("For defuse, dimensions don't match for charge " , sign*charge)
+#         #, " ", A.legs[l].dims[cidx], " == ", fchrdict[charge]
+
+#     end
+
+#     #println(fchrdict)
+#     new_legs = (A.legs[1:l-1]...,legs...,A.legs[l+1:end]...)
+#     #println(A.sects)
+#     #println(sects)
+
+#     ## NOTE: It is necessary to sort the sectors here, because while
+#     ## the patterns were sorted whitin each fused charge, they are not
+#     ## sorted when are the charges are concerned
+#     sectperm = _sectors_sortperm(sects)
+#     SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
+# end
