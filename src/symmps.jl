@@ -274,6 +274,7 @@ end
 function entanglementspectrum(mps::SymMatrixProductState)
     lx = mps.lx
     result = Vector{Vector{Float64}}(undef, lx-1)
+    center = mps.center
     move_center!(mps, 1)
     A = mps.matrices[1]
 
@@ -286,7 +287,7 @@ function entanglementspectrum(mps::SymMatrixProductState)
     end
 
     mps.matrices[lx] = A
-    mps.center = lx
+    move_center!(mps, center)
     result
 end
 
