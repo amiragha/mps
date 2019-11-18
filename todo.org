@@ -54,3 +54,5 @@
      on sites ii) dims is needed or not? iii) combine sym and normal
 
    - [-] General combination of sym and none!
+** measurement class
+   - [-] Add the measurement class! How? What is the best design?

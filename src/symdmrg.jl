@@ -45,28 +45,27 @@ end
 
 function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
                          mpo::SymMatrixProductOperator{Tv},
-                         env::Vector{SymTensor{Tv, 3}},
+                         env::Vector{SymTensor{Tv, 3}};
                          maxdim::Int=200,
-                         tol::Float64=1.e-8;
+                         tol::Float64=1.e-9,
                          verbose::Bool=false) where {Tv<:Number}
     lx = mps.lx
     d = mps.d
 
     mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
 
+    energies = Vector{Float64}()
+
     A = mps.matrices[1]
     for l = 1:lx-2
         AA = contract(A, (1,2,-1), mps.matrices[l+1], (-1,3,4))
-        # display(AA)
-        # display(_applymps2site(AA, env[1], env[4], mpo.tensors[1], mpo.tensors[2]))
-        # return
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                   mpo.tensors[l], mpo.tensors[l+1]),
                                 AA, 1, :SR, ishermitian=true)
         v = vs[1]
         e = es[1]
-        verbose && println("Sweep L2R: site $l -> energy $e")
-        #push!(energies, e)
+        verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
+        push!(energies, e)
 
         vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
         U, S, Vt = svdtrunc(vreleg, maxdim=maxdim, tol=tol)
@@ -86,8 +85,8 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
                             AA, 1, :SR, ishermitian=true)
     v = vs[1]
     e = es[1]
-    verbose && println("Sweep L2R: site $l -> energy $e")
-    #push!(energies, e)
+    verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
+    push!(energies, e)
 
     for l = lx-1:-1:2
         vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
@@ -106,8 +105,8 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
                                 AA, 1, :SR, ishermitian=true)
         v = vs[1]
         e = es[1]
-        verbose && println("Sweep R2L: site $l -> energy $e")
-        #push!(energies, e)
+        verbose && println("Sweep R2L: bond $(l-1), $l -> energy $e")
+        push!(energies, e)
     end
     l = 1
     vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
@@ -119,5 +118,30 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
 
     mps.matrices[l] = unfuseleg(U*S, 1, AA.legs[1:2])
-    return e
+    return energies
 end
+
+# function dmrg2site!(mps::SymMatrixProductState{Tv},
+#                     mpo::SymMatrixProductOperator{Tv};
+#                     infostring::String="",
+#                     finalmeasurements::Vector{Measurement}=[],
+#                     sweepmeasurements::Vector{Measurement}=[],
+#                     n_sweeps::Int=4,
+#                     maxdim::Int=200,
+#                     tol::Float64=1.e-8,
+#                     verbose::Bool=false)
+
+#     n < 1 && return
+
+#     env = initialenv(mps, mpo)
+#     energies = zeros(Float64, 2*mps.lx-3, n_sweeps)
+#     for n in 1:n_sweeps
+#         verbose && println("Starting sweeps ")
+#         energies[:, n] =
+#             dmrg2sitesweep!(mps, mpo, env, maxdim=maxdim, tol=tol, verbose=verbose)
+#         if length(sweepmeasurements) > 0
+#             # do the measurements
+#         end
+#     end
+
+# end
