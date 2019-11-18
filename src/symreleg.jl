@@ -110,34 +110,40 @@ function fuselegs(A::AbstractSymTensor,
     end
 
     fsectperm = _sectors_sortperm(fsects)
-    newsects, refs = uniquesorted(fsects[fsectperm])
-    refs = refs[invperm(fsectperm)]
+    #newsects, refs = uniquesorted(fsects[fsectperm])
+    #refs = refs[invperm(fsectperm)]
 
     fleg = fuse(sign, A.legs[l:l+n-1])
-    newlegs = Tuple([A.legs[1:l-1]..., fleg, A.legs[l+n:end]...])
+    legs = Tuple([A.legs[1:l-1]..., fleg, A.legs[l+n:end]...])
 
-    newnzblks = Vector{Array{T, N-n+1}}(undef, length(newsects))
-    for i in eachindex(newsects)
-        sect = newsects[i]
-        newnzblks[i] = zeros(T, [getdim(newlegs[c], sect[c])
-                                 for c in 1:N-n+1]...)
+    sects, sizes = _allsectorsandsizes(A.charge, legs)
+
+    nzblks = Vector{Array{T, N-n+1}}()
+    pointer = 1
+    for index in 1:length(sects)
+        blk = Array{T, N-n+1}(undef, sizes[index])
+        range = [1:m for m in sizes[index]]
+
+        sizel = sizes[index][l]
+        p = 1
+        while p <= sizel
+            s = size(A.nzblks[fsectperm][pointer])
+            fd = prod(s[l:l+n-1])
+            if p+fd-1 > sizel
+                println(A, "$sign, $l, $n")
+                println(sects)
+                println(A.sects[fsectperm])
+                println("$pointer, $index")
+            end
+            range[l] = p:p+fd-1
+            blk[range...] =
+                reshape(A.nzblks[fsectperm][pointer], s[1:l-1]..., fd, s[l+n:end]...)
+            p += fd
+            pointer += 1
+        end
+        push!(nzblks, blk)
     end
-
-    pointers = ones(Int, length(newnzblks))
-    for i in eachindex(A.nzblks)
-        s = size(A.nzblks[i])
-        p = pointers[refs[i]]
-        fd = prod(s[l:l+n-1])
-        # This is slower than below!
-        #axesA = axes(A.nzblks[i])
-        # newnzblks[refs[i]][axesA[1:l-1]..., p:p+fd-1, axesA[l+n:N]...] =
-        #     reshape(A.nzblks[i], s[1:l-1]..., fd, s[l+n:end]...)
-        newnzblks[refs[i]][[1:s[i] for i=1:l-1]..., p:p+fd-1, [1:s[i] for i=l+n:N]...] =
-            reshape(A.nzblks[i], s[1:l-1]..., fd, s[l+n:end]...)
-        pointers[refs[i]] += fd
-    end
-
-    SymTensor(A.charge, newlegs, newsects, newnzblks)
+    SymTensor(A.charge, legs, sects, nzblks)
 end
 
 function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T, N, M}
