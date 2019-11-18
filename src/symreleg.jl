@@ -110,8 +110,6 @@ function fuselegs(A::AbstractSymTensor,
     end
 
     fsectperm = _sectors_sortperm(fsects)
-    #newsects, refs = uniquesorted(fsects[fsectperm])
-    #refs = refs[invperm(fsectperm)]
 
     fleg = fuse(sign, A.legs[l:l+n-1])
     legs = Tuple([A.legs[1:l-1]..., fleg, A.legs[l+n:end]...])
@@ -129,12 +127,6 @@ function fuselegs(A::AbstractSymTensor,
         while p <= sizel
             s = size(A.nzblks[fsectperm][pointer])
             fd = prod(s[l:l+n-1])
-            if p+fd-1 > sizel
-                println(A, "$sign, $l, $n")
-                println(sects)
-                println(A.sects[fsectperm])
-                println("$pointer, $index")
-            end
             range[l] = p:p+fd-1
             blk[range...] =
                 reshape(A.nzblks[fsectperm][pointer], s[1:l-1]..., fd, s[l+n:end]...)

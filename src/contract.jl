@@ -86,16 +86,80 @@ function SymMatrix(A::AbstractSymTensor,
 
     N = numoflegs(A)
     idxperm = [rowidxs; colidxs]
-    sort(idxperm) == collect(1:N) || error("Incorrect index set for conversion to SymMatrix!")
+    sort(idxperm) == collect(1:N) ||
+        error("Incorrect index set for conversion to SymMatrix!")
     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
     length(colidxs) == 0 && error("Zero col for matrix not allowed!")
 
-    pA = permutelegs(A, idxperm)
-    SymMatrix(fuselegs(
-        fuselegs(pA, -1, length(rowidxs)+1, length(colidxs)),
-        +1, 1, length(rowidxs)))
+    T = eltype(A)
 
+    n_row = length(rowidxs)
+    n_col = length(colidxs)
+    rowlegs = A.legs[rowidxs]
+    collegs = A.legs[colidxs]
+    rsigns = [leg.sign for leg in rowlegs]
+    csigns = [-leg.sign for leg in collegs]
+
+    perm1 = _sectors_sortperm(A.sects, by=x->x[idxperm])
+    csects = A.sects[perm1]
+    fsects = Vector{Tuple{Int, Int}}(undef, length(A.sects))
+    for i in eachindex(A.sects)
+        sect = csects[i]
+        c1 = sum([rsigns[i] * sect[rowidxs][i] for i=1:n_row])
+        c2 = sum([csigns[i] * sect[colidxs][i] for i=1:n_col])
+        fsects[i] = (c1, c2)
+    end
+
+    fsectperm = _sectors_sortperm(fsects)
+
+    legs = (fuse(+1, rowlegs), fuse(-1, collegs))
+
+    sects, sizes = _allsectorsandsizes(A.charge, legs)
+
+    nzblks = Vector{Matrix{T}}()
+    pointer = 1
+    for index in 1:length(sects)
+        blk = Matrix{T}(undef, sizes[index])
+        #range = [1:m for m in sizes[index]]
+
+        rlim, clim = sizes[index]
+        pc = 1
+        while pc <= clim
+            pr = 1
+            fdc = 0
+            while pr <= rlim
+                Ablk = permutedims(A.nzblks[perm1][fsectperm][pointer], idxperm)
+                s = size(Ablk)
+                fdr = prod(s[1:n_row])
+                fdc = prod(s[n_row+1:N])
+                blk[pr:pr+fdr-1, pc:pc+fdc-1] =
+                    reshape(Ablk, fdr, fdc)
+                pr += fdr
+                pointer += 1
+            end
+            pc += fdc
+        end
+        push!(nzblks, blk)
+    end
+    SymMatrix(A.charge, legs, sects, nzblks)
 end
+
+# function SymMatrix(A::AbstractSymTensor,
+#                    rowidxs::Vector{Int},
+#                    colidxs::Vector{Int})
+
+#     N = numoflegs(A)
+#     idxperm = [rowidxs; colidxs]
+#     sort(idxperm) == collect(1:N) || error("Incorrect index set for conversion to SymMatrix!")
+#     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
+#     length(colidxs) == 0 && error("Zero col for matrix not allowed!")
+
+#     pA = permutelegs(A, idxperm)
+#     SymMatrix(fuselegs(
+#         fuselegs(pA, -1, length(rowidxs)+1, length(colidxs)),
+#         +1, 1, length(rowidxs)))
+
+# end
 
 function _arecontractible(l1::STLeg, l2::STLeg)
     if l1.sign == -l2.sign
