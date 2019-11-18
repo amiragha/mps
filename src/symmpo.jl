@@ -77,7 +77,7 @@ end
 
 function MatrixProductOperator(mpo::SymMatrixProductOperator{T}) where {T<:Number}
     MatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
-                          [array(mat) for mat in mpo.tensors])
+                             [array(mat) for mat in mpo.tensors])
 end
 
 function mpo2hamiltonian(mpo::SymMatrixProductOperator)
@@ -92,4 +92,28 @@ function mpo2hamiltonian(mpo::SymMatrixProductOperator)
                      +1, 2, 2)
     end
     removedummyleg(removedummyleg(L, 3), 1)
+end
+
+function reducempo!(mpo::SymMatrixProductOperator)
+    A = mpo.tensors[1]
+    for l=1:mpo.lx-1
+        U, S, Vt = svdtrunc(fuselegs(permutelegs(A,
+                                                 [1,2,4,3]),
+                                     +1, 1, 3))
+        mpo.dims[l+1] = size(S, 1)
+        mpo.tensors[l] = permutelegs(unfuseleg(U*S, 1,
+                                               A.legs[[1,2,4]]),
+                                     [1,2,4,3])
+        A = contract(Vt, (1, -1), mpo.tensors[l+1], (-1, 2, 3, 4))
+    end
+
+    for l=mpo.lx:-1:2
+        U, S, Vt = svdtrunc(fuselegs(A, -1, 2, 3))
+        mpo.dims[l] = size(S, 1)
+        mpo.tensors[l] = unfuseleg(S*Vt, 2, A.legs[2:4])
+
+        A = contract(mpo.tensors[l-1], (1,2,-1,4), U, (-1, 3))
+    end
+    mpo.tensors[1] = A
+    mpo
 end
