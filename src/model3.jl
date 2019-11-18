@@ -137,34 +137,46 @@ function tikzlattice(model::UnitCellQModel,
     D == 2 || error("only 2D plotting is support for now!")
     lattice = model.lattice
 
+    bondcolors = [
+        "blue", "orange", "cyan", "olive", "red", "brown", "green", "yellow" ]
+    ballcolors = [
+        "green", "blue", "red", "yellow", "brown", "cyan", "orange", "olive"]
+
     open(filename, "w") do f
         write(f, """\\documentclass[tikz, border=1mm]{standalone}
   \\usepackage{tikz,pgf}
-  %\\usetikzlibrary{calc,arrows,arrows.meta}
-  %\\usetikzlibrary{decorations.markings}
+  \\usetikzlibrary{calc,arrows,arrows.meta}
+  \\usetikzlibrary{decorations.markings}
 
   \\begin{document}
 
   \\begin{tikzpicture}
   """)
+
+        write(f, "  \\tikzset{\n")
+
+        bonds  = [inter for inter in model.inters if support(inter)==2]
+        n3bodys = [inter for inter in model.inters if support(inter)==3]
+        n4odys = [inter for inter in model.inters if support(inter)==4]
+
+        for i in eachindex(bonds)
+            write(f, "    bond$i/.style={thin, double, $(bondcolors[i])!70!black},\n")
+        end
+        for i in eachindex(lattice.unitc.n)
+            write(f, "    ball$i/.style={inner color=blue, ball color=$(ballcolors[i])!20!black},\n")
+        end
+
         write(f, """
-  \\tikzset{
-    crbond/.style={thick, blue!70!black},
-    bond/.style={thin, double, brown!80!yellow},
     ball/.style={inner color=blue, ball color=green!20!black}
   }
 
   \\def\\l{1cm}
-  \\def\\h{\\l * 0.866}
-
-  \\def\\ya{0 * \\h}
-  \\def\\yb{1 * \\h}
-
   \\def\\radius{\\l/10}\n
 """)
         for is in Iterators.product([1:l for l in model.lattice.sizes]...)
-            for interaction in model.inters
-                support(interaction) == 2 || continue
+            for index in eachindex(bonds)
+                interaction = bonds[index]
+                #support(interaction) == 2 || continue
                 n1, n2 = interaction.ucidxs
                 off1, off2 = interaction.offsets
                 if lattice.bc == :OBC
@@ -180,13 +192,14 @@ function tikzlattice(model::UnitCellQModel,
                                      #[(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
                                      [reverse(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
                                      init=(0,0)).+ lattice.unitc.sites[n2]
-                        write(f, "\\draw [bond] $one -- $two;\n")
+                        write(f, "  \\draw [bond$index] ($(one[1])*\\l, $(one[2])*\\l) -- ($(two[1])*\\l, $(two[2])*\\l);\n")
                     end
                 else
                     error("boundary not supported yet!")
                 end
             end
         end
+
 
         for ls in Iterators.product([1:l for l in model.lattice.sizes]...)
             x_uc = reduce(coordsum,
@@ -195,10 +208,33 @@ function tikzlattice(model::UnitCellQModel,
                           init=(0,0))
             for n in 1:lattice.unitc.n
                 x_site = x_uc .+ lattice.unitc.sites[n]
-                write(f, "\\shade [ball] $x_site circle (\\radius);\n")
+                write(f, "  \\shade [ball$n] ($(x_site[1])*\\l, $(x_site[2])*\\l) circle (\\radius);\n")
             end
         end
-        write(f, "\\end{tikzpicture}\n")
-        write(f, "\\end{document}")
-    end
+
+        for index in eachindex(bonds)
+            interaction = bonds[index]
+            ns = interaction.ucidxs
+            offs = interaction.offsets
+            for is in Iterators.product([1:l for l in model.lattice.sizes]...)
+                x_ucs = [[offs[n][i] .+ is[i] for i=1:D] for n in 1:length(ns)]
+                if all([
+                    all([1 <= x_ucs[n][i] <= lattice.sizes[i]
+                         for i=1:D])
+                    for n in 1:length(ns)])
+                    sites = [reduce(coordsum,
+                                    #[(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                    [reverse(x_ucs[n] .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                    init=(0,0)) .+ lattice.unitc.sites[ns[n]]
+                             for n in 1:length(ns)]
+                    #write(f, "  \\draw [->, shorten >=\\radius, shorten <=\\radius] ($(sites[1][1])*\\l, $(sites[1][2])*\\l) to [out=160, in=20, looseness=1] ($(sites[2][1])*\\l, $(sites[2][2])*\\l);\n")
+                    mid = (sites[1] .+ sites[2]) ./ 2
+                    write(f, "  \\node at ($(mid[1])*\\l, $(mid[2])*\\l) {\$t_$index\$};\n")
+                    break
+                end
+            end
+        end
+write(f, "\\end{tikzpicture}\n")
+write(f, "\\end{document}")
+end
 end
