@@ -61,10 +61,13 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         AA = contract(A, (1,2,-1), mps.matrices[l+1], (-1,3,4))
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                   mpo.tensors[l], mpo.tensors[l+1]),
-                                AA, 1, :SR, ishermitian=true)
+                                AA, 1, :SR, ishermitian=true,
+                                tol=1.e-8, krylovdim=5, maxiter=8)
+
         v = vs[1]
         e = es[1]
         verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
+        verbose && println("residual = $(info.residual[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
         push!(energies, e)
 
         vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
@@ -82,10 +85,12 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     AA = contract(A, (1,2,-1), mps.matrices[l+1], (-1,3,4))
     es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                               mpo.tensors[l], mpo.tensors[l+1]),
-                            AA, 1, :SR, ishermitian=true)
+                            AA, 1, :SR, ishermitian=true,
+                            tol=1.e-8, krylovdim=5, maxiter=8)
     v = vs[1]
     e = es[1]
     verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
+    verbose && println("residual = $(info.residual[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
     push!(energies, e)
 
     for l = lx-1:-1:2
@@ -102,10 +107,12 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
 
         es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
                                                   mpo.tensors[l-1], mpo.tensors[l]),
-                                AA, 1, :SR, ishermitian=true)
+                                AA, 1, :SR, ishermitian=true,
+                                tol=1.e-8, krylovdim=5, maxiter=8)
         v = vs[1]
         e = es[1]
         verbose && println("Sweep R2L: bond $(l-1), $l -> energy $e")
+        verbose && println("residual = $(info.residual[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
         push!(energies, e)
     end
     l = 1
