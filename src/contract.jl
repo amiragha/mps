@@ -186,20 +186,20 @@ function SymTensor(A     :: SymMatrix,
 
     sectperm = sortperm(A.sects, by=x->x[2])
     csects = A.sects[sectperm]
-    oldcharge = 0
+#    oldcharge = 0
     rpats, rsizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
     cpats, csizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
     for i in eachindex(csects)
         c1 = rsign * csects[i][1]
         c2 = csign * csects[i][2]
-        if i == 1 || c2 != oldcharge
+#        if i == 1 || c2 != oldcharge
             rpats, rsizes = _allsectorsandsizes(c1, rlegs)
             cpats, csizes = _allsectorsandsizes(c2, clegs)
-            oldcharge = c2
-        end
+ #           oldcharge = c2
+ #       end
 
-        old_nzblock =  A.nzblks[i]
-        s = size(old_nzblock)
+#        old_nzblock =  A.nzblks[i]
+        #s = size(A.nzblocks[i])
         pc = 0
         for cpatidx in eachindex(cpats)
             csl = prod(csizes[cpatidx])
@@ -207,7 +207,7 @@ function SymTensor(A     :: SymMatrix,
             for rpatidx in eachindex(rpats)
                 rsl = prod(rsizes[rpatidx])
                 push!(sects, (rpats[rpatidx]..., cpats[cpatidx]...))
-                push!(nzblks, reshape(old_nzblock[pr+1:pr+rsl, pc+1:pc+csl],
+                push!(nzblks, reshape(A.nzblks[i][pr+1:pr+rsl, pc+1:pc+csl],
                                       rsizes[rpatidx]..., csizes[cpatidx]...))
                 pr += rsl
             end
