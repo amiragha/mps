@@ -67,7 +67,7 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         v = vs[1]
         e = es[1]
         verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
-        verbose && println("residual = $(info.residual[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
+        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)\n")
         push!(energies, e)
 
         vreleg = fuselegs(fuselegs(v, +1, 1, 2), -1, 2, 2)
@@ -90,7 +90,7 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     v = vs[1]
     e = es[1]
     verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
-    verbose && println("residual = $(info.residual[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
+    verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)\n")
     push!(energies, e)
 
     for l = lx-1:-1:2
@@ -112,7 +112,7 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         v = vs[1]
         e = es[1]
         verbose && println("Sweep R2L: bond $(l-1), $l -> energy $e")
-        verbose && println("residual = $(info.residual[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
+        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)\n")
         push!(energies, e)
     end
     l = 1
