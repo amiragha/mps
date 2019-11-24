@@ -134,20 +134,23 @@ end
 
 @inline size(s::SymVector) = size(nzblks[1])
 
+
+
 ##TODO: make the below three into one
+#convert(::Type{T}, A::AbstractSymTensor) where {T<:AbstractSymTensor} = T(A)
 function convert(::Type{SymTensor{T1, N}},
                  A::SymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
-    SymTensor{T1, N}(A.charge, A.legs, A.sects, convert.(Array{T2, N}, A.nzblks))
+    SymTensor{T1, N}(A.charge, A.legs, A.sects, A.nzblks)
 end
 
 function convert(::Type{SymMatrix{T1}},
                  A::SymMatrix{T2}) where {T1<:Number, T2<:Number}
-    SymMatrix{T1}(A.charge, A.legs, A.sects, convert.(Matrix{T2}, A.nzblks))
+    SymMatrix{T1}(A.charge, A.legs, A.sects, A.nzblks)
 end
 
 function convert(::Type{SymVector{T1}},
                  A::SymVector{T2}) where {T1<:Number, T2<:Number}
-    SymVector{T1}(A.charge, A.legs, A.sects, convert.(Array{T2, N}, A.nzblks))
+    SymVector{T1}(A.charge, A.legs, A.sects, A.nzblks)
 end
 
 @inline _sectors_sortperm(sects::Vector{NTuple{N, Int}};
