@@ -49,6 +49,8 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
                          maxdim::Int=200,
                          tol::Float64=1.e-9,
                          lanczostol::Float64=1.e-7,
+                         krylovdim::Int=5,
+                         krylovmaxiter::Int=8,
                          verbose::Bool=false) where {Tv<:Number}
     lx = mps.lx
     d = mps.d
@@ -63,8 +65,9 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                                   mpo.tensors[l], mpo.tensors[l+1]),
                                 AA, 1, :SR, ishermitian=true,
-                                tol=lanczostol)#, krylovdim=5, maxiter=8)
-
+                                tol=lanczostol,
+                                krylovdim=krylovdim,
+                                maxiter=krylovmaxiter)
         v = vs[1]
         e = es[1]
         verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
@@ -88,7 +91,10 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
     es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
                                               mpo.tensors[l], mpo.tensors[l+1]),
                             AA, 1, :SR, ishermitian=true,
-                            tol=lanczostol)#, krylovdim=5, maxiter=8)
+                            tol=lanczostol,
+                            krylovdim=krylovdim,
+                            maxiter=krylovmaxiter)
+
     v = vs[1]
     e = es[1]
     verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
@@ -111,7 +117,9 @@ function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
         es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
                                                   mpo.tensors[l-1], mpo.tensors[l]),
                                 AA, 1, :SR, ishermitian=true,
-                                tol=lanczostol)#, krylovdim=5, maxiter=8)
+                                tol=lanczostol,
+                                krylovdim=krylovdim,
+                                maxiter=krylovmaxiter)
         v = vs[1]
         e = es[1]
         verbose && println("Sweep R2L: bond $(l-1), $l -> energy $e")

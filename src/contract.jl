@@ -100,6 +100,7 @@ function SymMatrix(A::AbstractSymTensor,
     rsigns = [leg.sign for leg in rowlegs]
     csigns = [-leg.sign for leg in collegs]
 
+    # two consequative sorts are required because we rely on stability
     perm1 = _sectors_sortperm(A.sects, by=x->x[idxperm])
     csects = A.sects[perm1]
     fsects = Vector{Tuple{Int, Int}}(undef, length(A.sects))
@@ -109,7 +110,6 @@ function SymMatrix(A::AbstractSymTensor,
         c2 = sum([csigns[i] * sect[colidxs][i] for i=1:n_col])
         fsects[i] = (c1, c2)
     end
-
     fsectperm = _sectors_sortperm(fsects)
 
     legs = (fuse(+1, rowlegs), fuse(-1, collegs))
@@ -186,19 +186,19 @@ function SymTensor(A     :: SymMatrix,
 
     sectperm = sortperm(A.sects, by=x->x[2])
     csects = A.sects[sectperm]
-#    oldcharge = 0
+    #    oldcharge = 0
     rpats, rsizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
     cpats, csizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
     for i in eachindex(csects)
         c1 = rsign * csects[i][1]
         c2 = csign * csects[i][2]
-#        if i == 1 || c2 != oldcharge
-            rpats, rsizes = _allsectorsandsizes(c1, rlegs)
-            cpats, csizes = _allsectorsandsizes(c2, clegs)
- #           oldcharge = c2
- #       end
+        #        if i == 1 || c2 != oldcharge
+        rpats, rsizes = _allsectorsandsizes(c1, rlegs)
+        cpats, csizes = _allsectorsandsizes(c2, clegs)
+        #           oldcharge = c2
+        #       end
 
-#        old_nzblock =  A.nzblks[i]
+        #        old_nzblock =  A.nzblks[i]
         #s = size(A.nzblocks[i])
         pc = 0
         for cpatidx in eachindex(cpats)
@@ -245,8 +245,9 @@ function *(A::AbstractSymMatrix,
     _arecontractible(A.legs[2], B.legs[1]) ||
         error("not contractible! ", A.legs[2], " and ", B.legs[1])
 
-    eltype(A) == eltype(B) || error("eltypes don't match!")
-    T = eltype(A)
+    T = promote_type(eltype(A), eltype(B))
+    T == Union{} &&
+        error("can't promote_type! $(eltype(A)) , $(eltype(B))")
     ## NOTE: assume the set of charges for the vector space to be
     ## contracted is {c1,..,ci,...,cn} then each sector in A is given
     ## by (CA+ci, ci) and each sector in B by (ci, ci-CB) and since

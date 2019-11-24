@@ -12,12 +12,12 @@ sz_half = [0.5 0.0; 0.0 -.5]
     mps = MatrixProductState(lx, 2, vheis[1])
 
     @testset "ketstate to MPS to ketstate" begin
-        @test norm(ketstate)^2 ≈ norm2(randmps)
+        @test norm(ketstate) ≈ norm(randmps)
         @test ketstate ≈ mps2ketstate(randmps)
     end
 
     @testset "overlap of two MPS" begin
-        @test overlap(mps, mps) ≈ norm2(mps)
+        @test sqrt(overlap(mps, mps)) ≈ norm(mps)
         @test overlap(mps, randmps) ≈ conj.(overlap(randmps, mps))
     end
 

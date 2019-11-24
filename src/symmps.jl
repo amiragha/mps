@@ -137,6 +137,13 @@ end
 ### conversions
 ###############
 
+SymMatrixProductState{T}(mps::SymMatrixProductState{T}) where {T<:Number} = mps
+function SymMatrixProductState{T}(mps::SymMatrixProductState) where {T<:Number}
+    SymMatrixProductState{T}(mps.lx, mps.d, mps.dims,
+                             [SymTensor{T, 3}(mat) for mat in mps.matrices],
+                             mps.center)
+end
+
 function MatrixProductState(mps::SymMatrixProductState{T}) where {T<:Number}
     MatrixProductState{T}(mps.lx, mps.d, mps.dims,
                           [array(mat) for mat in mps.matrices], mps.center)
@@ -405,11 +412,11 @@ function measure_2point(mps::SymMatrixProductState{Tv},
 end
 
 function measure_2point(mps::SymMatrixProductState{ComplexF64},
-                        op1::SymTensor{Float64,2},
-                        op2::SymTensor{Float64,2}) where {Tv<:RLorCX}
+                        op1::SymMatrix{Float64},
+                        op2::SymMatrix{Float64}) where {Tv<:RLorCX}
     measure_2point(mps,
-                   convert(SymTensor{ComplexF64, 2}, op1),
-                   convert(SymTensor{ComplexF64, 2}, op2))
+                   convert(SymMatrix{ComplexF64}, op1),
+                   convert(SymMatrix{ComplexF64}, op2))
 end
 
 function measure_mpo(mps::SymMatrixProductState{Tv},
@@ -549,15 +556,13 @@ overlap(mps1::SymMatrixProductState{Float64}, mps2::SymMatrixProductState{Comple
     overlap(convert(SymMatrixProductState{ComplexF64}, mps1), mps2)
 
 """
-    norm2(mps)
+    norm(mps)
 
 calculates the norm of a matrix product state `mps` that is to
-calculate the tensor contraction corresponding to ``⟨ψ|ψ⟩``.
+calculate the sqrt tensor contraction corresponding to ``⟨ψ|ψ⟩``.
 
 """
-norm2(mps::SymMatrixProductState{Tv}) where {Tv<:RLorCX} =
-    real(overlap(mps, mps))
-
+norm(mps::SymMatrixProductState) = sqrt(Float64(overlap(mps, mps)))
 
 """
     mps_dims_are_consistent(mps)

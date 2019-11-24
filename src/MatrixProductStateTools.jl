@@ -10,7 +10,7 @@ using TensorOperations
 RLorCX = Union{Float64, ComplexF64}
 
 import Base: convert, size
-import LinearAlgebra: normalize!
+import LinearAlgebra: norm, normalize!
 
 include("mpsutils.jl")
 include("mpo.jl")
@@ -41,7 +41,7 @@ export measure_mpo
 export apply_2siteoperator!
 export apply_1siteoperator!
 export twosite_tensor
-export overlap, norm2
+export overlap
 export display_matrices
 export mps_dims_are_consistent
 

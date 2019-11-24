@@ -673,13 +673,13 @@ overlap(mps1::MatrixProductState{Float64}, mps2::MatrixProductState{ComplexF64})
     overlap(convert(MatrixProductState{ComplexF64}, mps1), mps2)
 
 """
-    norm2(mps)
+    norm(mps)
 
 calculates the norm of a matrix product state `mps` that is to
-calculate the tensor contraction corresponding to ``⟨ψ|ψ⟩``.
+calculate the sqrt of tensor contraction corresponding to ``⟨ψ|ψ⟩``.
 
 """
-norm2(mps::MatrixProductState{T}) where {T<:RLorCX} = real(overlap(mps, mps))
+norm(mps::MatrixProductState) = sqrt(Float64(overlap(mps, mps)))
 
 ### useful tools
 ################

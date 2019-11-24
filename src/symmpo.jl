@@ -75,6 +75,12 @@ end
 ### conversions
 ###############
 
+SymMatrixProductOperator{T}(mpo::SymMatrixProductOperator{T}) where {T<:Number} = mpo
+function SymMatrixProductOperator{T}(mpo::SymMatrixProductOperator) where {T<:Number}
+    SymMatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
+                             [SymTensor{T, 4}(ten) for ten in mpo.tensors])
+end
+
 function MatrixProductOperator(mpo::SymMatrixProductOperator{T}) where {T<:Number}
     MatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
                              [array(mat) for mat in mpo.tensors])

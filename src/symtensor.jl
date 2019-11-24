@@ -40,6 +40,12 @@ function SymTensor(charge :: Int,
     SymTensor{T, N}(charge, legs, sects, nzblks)
 end
 
+SymTensor{T, N}(A::SymTensor{T, N}) where {T, N} = A
+function SymTensor{T1, N}(A::SymTensor{T2, N}) where {T1, T2, N}
+    SymTensor{T1, N}(A.charge, A.legs, A.sects,
+                     [Array{T1, N}(blk) for blk in A.nzblks])
+end
+
 mutable struct SymMatrix{T<:Number} <: AbstractSymMatrix{T}
     charge :: Int
     legs   :: Tuple{STLeg, STLeg}
@@ -128,21 +134,21 @@ end
 
 @inline size(s::SymVector) = size(nzblks[1])
 
-# ##TODO: make the below three into one
-# function convert(::Type{SymTensor{T1, N}},
-#                  A::SymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
-#     SymTensor(A.charge, A.legs, A.sects, convert.(Array{T2, N}, A.nzblks))
-# end
+##TODO: make the below three into one
+function convert(::Type{SymTensor{T1, N}},
+                 A::SymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
+    SymTensor{T1, N}(A.charge, A.legs, A.sects, convert.(Array{T2, N}, A.nzblks))
+end
 
-# function convert(::Type{SymMatrix{T1}},
-#                  A::SymMatrix{T2}) where {T1<:Number, T2<:Number}
-#     SymMatrix(A.charge, A.legs, A.sects, convert.(Matrix{T2}, A.nzblks))
-# end
+function convert(::Type{SymMatrix{T1}},
+                 A::SymMatrix{T2}) where {T1<:Number, T2<:Number}
+    SymMatrix{T1}(A.charge, A.legs, A.sects, convert.(Matrix{T2}, A.nzblks))
+end
 
-# function convert(::Type{SymVector{T1}},
-#                  A::SymVector{T2}) where {T1<:Number, T2<:Number}
-#     SymVector(A.charge, A.legs, A.sects, convert.(Array{T2, N}, A.nzblks))
-# end
+function convert(::Type{SymVector{T1}},
+                 A::SymVector{T2}) where {T1<:Number, T2<:Number}
+    SymVector{T1}(A.charge, A.legs, A.sects, convert.(Array{T2, N}, A.nzblks))
+end
 
 @inline _sectors_sortperm(sects::Vector{NTuple{N, Int}};
                           by::Function=identity) where {N} =
@@ -339,7 +345,7 @@ end
 
 " compute the 2-norm of a  AbstractSymTensor"
 function norm(A::AbstractSymTensor)
-    sqrt(dot(A, A))
+    sqrt(Float64(dot(A, A)))
 end
 
 function normalize!(S::SymDiagonal)
