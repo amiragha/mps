@@ -34,7 +34,7 @@ function sitelinearindex(lattice::QLattice{D},
 
     D <= 2 || error("only up to 2D!")
     x_uc_new = Tuple([mod(x_uc[i] - 1, lattice.sizes[i]) + 1 for i in 1:D])
-    crossings = Tuple([fld(x_uc[i] - 1, lattice.sizes[i]) + 1 for i in 1:D])
+    crossings = Tuple([fld(x_uc[i] - 1, lattice.sizes[i]) for i in 1:D])
     index = ucidx + lattice.unitc.n *
         sum((x_uc_new .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
     insidechecks = [1 <= x_uc[i] <= lattice.sizes[i] for i=1:D]
@@ -45,7 +45,7 @@ function sitelinearindex(lattice::QLattice{D},
         end
 
     elseif lattice.bc == :PBCY
-        if insidecheck[2]
+        if insidechecks[2]
             return index, crossings
         end
 
