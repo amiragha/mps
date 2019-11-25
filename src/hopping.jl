@@ -60,7 +60,8 @@ end
 function generatebdg(model::UnitCellQModel)
     typeof(model.qtype) <: Fermion ||
         error("BdG Hamiltonian only for FermionType models!")
-    model.lattice.bc == :OBC || error("Only OBC for now!")
+    model.lattice.bc in [:OBC, :PBCY] ||
+        error("unrecognized boundary condition $boundary!")
 
     ft, f = fermionoperators(model.qtype)
     n_sites = prod(model.lattice.sizes)

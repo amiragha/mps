@@ -9,7 +9,9 @@ spinhalf = SpinType(2)
 sz, sp, sm = spinoperators(1/2)
 
 # example models
-function j1j2model(lx::Int, j1::Float64, j2::Float64; symmetry::Symbol=:NONE)
+function j1j2model(lx::Int, j1::Float64, j2::Float64;
+                   boundary::Symbol=:OBC,
+                   symmetry::Symbol=:NONE)
 
     heis = nbodyopexpansion(2,
                             0.25 * (ringexchangeoperator(2) - I(4)),
@@ -35,7 +37,7 @@ function j1j2model(lx::Int, j1::Float64, j2::Float64; symmetry::Symbol=:NONE)
     j2 != 0 && push!(terms, heis2)
 
     UnitCellQModel{SpinType, 1}(spinhalf,
-                                QLattice(chainunitcell, lx, :OBC),
+                                QLattice(chainunitcell, lx, boundary),
                                 terms)
 end
 
@@ -48,6 +50,7 @@ function triangularspinmodel(ls::Tuple{Int, Int},
                              k1::Float64,
                              k2::Float64,
                              k3::Float64;
+                             boundary::Symbol=:OBC,
                              symmetry::Symbol=:NONE)
 
     heis = nbodyopexpansion(2,
@@ -109,6 +112,6 @@ function triangularspinmodel(ls::Tuple{Int, Int},
     k3 != 0 && push!(terms, ring3)
 
     UnitCellQModel{SpinType, 2}(spinhalf,
-                                QLattice(triangularunitcell, (ly, lx), :OBC),
+                                QLattice(triangularunitcell, (ly, lx), boundary),
                                 terms)
 end

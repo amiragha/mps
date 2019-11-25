@@ -1,6 +1,8 @@
-function generatempo(model::UnitCellQModel)
+function generatempo(model::UnitCellQModel; verbose::Bool=false)
     typeof(model.qtype) == SpinType || error("Can generate MPO only for SpinType models.")
-    model.lattice.bc == :OBC || error("Can only generate MPO for :OBC boundary condition!")
+    model.lattice.bc in [:OBC, :PBCY] ||
+        error("unrecognized boundary condition $boundary!")
+
     D = dimension(model)
     d = model.qtype.d
     n_sites = prod(model.lattice.sizes)
@@ -15,6 +17,7 @@ function generatempo(model::UnitCellQModel)
                        for i in 1:support(interaction)]
             if all(indexes .> 0)
                 perm = sortperm(indexes)
+                verbose && println("Adding $(interaction.amp) between $(indexes[perm])")
                 terms = [term[perm] for term in interaction.terms]
                 push!(allterms,
                       QInteraction(interaction.amp, Tuple(indexes[perm]), terms))
@@ -124,7 +127,9 @@ end
 
 function generatesymmpo(model::UnitCellQModel)
     typeof(model.qtype) == SpinType || error("Can generate MPO only for SpinType models.")
-    model.lattice.bc == :OBC || error("Can only generate MPO for :OBC boundary condition!")
+    model.lattice.bc in [:OBC, :PBCY] ||
+        error("unrecognized boundary condition $boundary!")
+
     typeof(model.inters[1]) <: SymQModelInteraction || error("Only symmetric (U1) is allowed!")
 
     D = dimension(model)

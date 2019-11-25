@@ -57,6 +57,6 @@ function triangularhopping(ls::Tuple{Int, Int},
     t3 != 0 && push!(terms, hop3)
 
     UnitCellQModel{Fermion, 2}(fermion,
-                               QLattice(triangularunitcell, (ly, lx), :OBC),
+                               QLattice(triangularunitcell, (ly, lx), boundary),
                                terms)
 end

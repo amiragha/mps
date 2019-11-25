@@ -31,10 +31,17 @@ QLattice{1}(uc, (lx,), bc)
 function sitelinearindex(lattice::QLattice{D},
                          ucidx::Int,
                          x_uc::NTuple{D, Int}) where{D}
+    D <= 2 || error("only up to 2D!")
     if lattice.bc == :OBC
         if all([1 <= x_uc[i] <= lattice.sizes[i] for i=1:D])
             return ucidx + lattice.unitc.n *
                 sum((x_uc .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
+        end
+    elseif lattice.bc == :PBCY
+        if 1 <= x_uc[2] <= lattice.sizes[2]
+            x_uc_new = (mod(x_uc[1] - 1,  lattice.sizes[1]) + 1, x_uc[2])
+            return ucidx + lattice.unitc.n *
+                sum((x_uc_new .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
         end
     else
         error("boundary not supported yet!")

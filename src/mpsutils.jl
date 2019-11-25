@@ -32,8 +32,8 @@ containing the SVs.
 
 """
 function svdtrunc(A::Matrix{T};
-                  maxdim::Int=200,
-                  tol::Float64=1.e-14) where{T<:Number}
+                  maxdim::Int=size(A, 2),
+                  tol::Float64=1.e-12) where{T<:Number}
     fact = svd(A, full=false)
     n = min(maxdim, sum(fact.S .> fact.S[1]*tol))
     n == 0 && error("The largest singular value is smaller than tol! $m < $tol")
@@ -114,8 +114,8 @@ end
 ######NOTE
 ###TODO: this needs to be tested!
 function svdtrunc(A::AbstractSymTensor;
-                  maxdim::Int=200,
-                  tol::Float64=1.e-14)
+                  maxdim::Int=size(A, 2),
+                  tol::Float64=1.e-12)
     numoflegs(A) == 2 ||
         error("svd only defined for matrix like objects N = ", numoflegs(A))
     signs(A.legs) == (+1, -1) ||
