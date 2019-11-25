@@ -37,6 +37,7 @@ local (nearest-neighbor) gates.
 function generate_fishmangates(corr_matrix::Matrix{T},
                                threshold::Float64=1.e-8;
                                alternate::Bool=false) where {T<:RLorCX}
+    T <: Complex && error("correlation matrix is complex!")
     lx = size(corr_matrix)[1]
 
     #initconf = Vector{Int64}(lx)
@@ -106,7 +107,7 @@ function generate_fishmangates(corr_matrix::Matrix{T},
 
             ugate_extended = Matrix{T}(I, lx, lx)
             ugate_extended[block_range, block_range] = ugate_block
-            corr_matrix= ugate_extended' * corr_matrix * ugate_extended
+            corr_matrix= Symmetric(ugate_extended' * corr_matrix * ugate_extended)
             # display(corr_matrix)
         end
         initconf[site] = round(evalue)
