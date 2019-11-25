@@ -177,3 +177,26 @@ function mpo2hamiltonian(mpo::MatrixProductOperator)
     end
     reshape(L, d^lx, d^lx)
 end
+
+function reducempo!(mpo::MatrixProductOperator)
+    A = mpo.tensors[1]
+    for l=1:mpo.lx-1
+        U, S, Vt = svdtrunc(reshape(permutedims(A, [1,2,4,3]),
+                                     prod(size(A)[[1,2,4]]), size(A, 3)))
+        mpo.dims[l+1] = size(S, 1)
+        mpo.tensors[l] = permutedims(reshape(U*S,
+                                               size(A)[[1,2,4]]..., size(S, 1)),
+                                     [1,2,4,3])
+        @tensor A[l,o,r,o'] := Vt[l, m] * mpo.tensors[l+1][m,o,r,o']
+    end
+
+    for l=mpo.lx:-1:2
+        U, S, Vt = svdtrunc(reshape(A, size(A, 1), prod(size(A)[2:4])))
+        mpo.dims[l] = size(S, 1)
+        mpo.tensors[l] = reshape(S*Vt, size(S, 1), size(A)[2:4]...)
+
+        @tensor A[l,o,r,o'] := mpo.tensors[l-1][l,o,m,o'] *  U[m, r]
+    end
+    mpo.tensors[1] = A
+    mpo
+end
