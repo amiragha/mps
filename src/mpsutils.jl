@@ -204,3 +204,8 @@ function entropy(spectrums::Vector{Vector{T}};
     end
     return result
 end
+
+function _realwithcheck(a::Number, tol::Float64=1.e-12)
+    imag(a) > tol && error("Not real! Im = $(imag(a))")
+    real(a)
+end

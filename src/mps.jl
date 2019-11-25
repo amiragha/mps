@@ -679,7 +679,7 @@ calculates the norm of a matrix product state `mps` that is to
 calculate the sqrt of tensor contraction corresponding to ``⟨ψ|ψ⟩``.
 
 """
-norm(mps::MatrixProductState) = sqrt(Float64(overlap(mps, mps)))
+norm(mps::MatrixProductState) = sqrt(_realwithcheck(overlap(mps, mps)))
 
 ### useful tools
 ################
