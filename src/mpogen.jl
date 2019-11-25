@@ -13,8 +13,13 @@ function generatempo(model::UnitCellQModel; verbose::Bool=false)
         for interaction in model.inters
             ns = interaction.ucidxs
             offs = interaction.offsets
-            indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
-                       for i in 1:support(interaction)]
+            indexes = zeros(Int, support(interaction))
+            for i in 1:support(interaction)
+                index, crossings = sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                indexes[i] = index
+            end
+            # indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+            #            for i in 1:support(interaction)]
             if all(indexes .> 0)
                 perm = sortperm(indexes)
                 verbose && println("Adding $(interaction.amp) between $(indexes[perm])")
@@ -143,8 +148,13 @@ function generatesymmpo(model::UnitCellQModel)
         for interaction in model.inters
             ns = interaction.ucidxs
             offs = interaction.offsets
-            indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
-                       for i in 1:support(interaction)]
+            indexes = zeros(Int, support(interaction))
+            for i in 1:support(interaction)
+                index, crossings = sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                indexes[i] = index
+            end
+            # indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+            #            for i in 1:support(interaction)]
             if all(indexes .> 0)
                 perm = sortperm(indexes)
                 for ops in interaction.terms

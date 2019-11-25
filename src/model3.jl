@@ -31,22 +31,31 @@ QLattice{1}(uc, (lx,), bc)
 function sitelinearindex(lattice::QLattice{D},
                          ucidx::Int,
                          x_uc::NTuple{D, Int}) where{D}
+
     D <= 2 || error("only up to 2D!")
+    x_uc_new = Tuple([mod(x_uc[i] - 1, lattice.sizes[i]) + 1 for i in 1:D])
+    crossings = Tuple([fld(x_uc[i] - 1, lattice.sizes[i]) + 1 for i in 1:D])
+    index = ucidx + lattice.unitc.n *
+        sum((x_uc_new .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
+    insidechecks = [1 <= x_uc[i] <= lattice.sizes[i] for i=1:D]
+
     if lattice.bc == :OBC
-        if all([1 <= x_uc[i] <= lattice.sizes[i] for i=1:D])
-            return ucidx + lattice.unitc.n *
-                sum((x_uc .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
+        if all(insidechecks)
+            return index, crossings
         end
+
     elseif lattice.bc == :PBCY
-        if 1 <= x_uc[2] <= lattice.sizes[2]
-            x_uc_new = (mod(x_uc[1] - 1,  lattice.sizes[1]) + 1, x_uc[2])
-            return ucidx + lattice.unitc.n *
-                sum((x_uc_new .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
+        if insidecheck[2]
+            return index, crossings
         end
+
+    elseif lattice.bc in [:PBCYX, :PBCYAPBCX]
+        return index, crossings
+
     else
         error("boundary not supported yet!")
     end
-    return 0
+    return 0, crossings
 end
 
 abstract type AbstractQType end
