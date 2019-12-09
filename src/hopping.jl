@@ -60,8 +60,6 @@ end
 function generatebdg(model::UnitCellQModel)
     typeof(model.qtype) <: Fermion ||
         error("BdG Hamiltonian only for FermionType models!")
-    model.lattice.bc in [:OBC, :PBCY, :PBCYAPBCX] ||
-        error("unrecognized boundary condition $boundary!")
 
     ft, f = fermionoperators(model.qtype)
     n_sites = prod(model.lattice.sizes)
@@ -76,15 +74,20 @@ function generatebdg(model::UnitCellQModel)
             offs = interaction.offsets
             indexes = zeros(Int, support(interaction))
             crosses = []
+            isinside = true
             for i in 1:support(interaction)
                 index, crossings = sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                if isnothing(index)
+                    isinside = false
+                    break
+                end
                 indexes[i] = index
                 push!(crosses, crossings)
             end
             # only two-fermionic terms
-            if all(indexes .> 0) && length(indexes) < 3
+            if isinside && length(indexes) < 3
                 sign = +1
-                if model.lattice.bc == :PBCYAPBCX
+                if model.lattice.bcs[2] == :APBC
                     #println("$indexes, $crosses, $(interaction.amp)")
                     if isodd(crosses[2][2] - crosses[1][2])
                         sign = -1
@@ -98,7 +101,7 @@ function generatebdg(model::UnitCellQModel)
                         j, i  = indexes
                         H[i, j] += sign * conj(interaction.amp)
                     else
-                        error("term Not supported")
+                        error("term not supported yet!")
                     end
                 end
             end

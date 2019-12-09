@@ -10,12 +10,17 @@ indeces, so left, down, right, up.
 
 """
 struct MatrixProductOperator{T<:RLorCX}
-    lx :: Int64
-    d :: Int64
+    lx :: Int
+    d :: Int
     dims :: Vector{Int64}
     tensors :: Vector{Array{T,4}}
 end
 
+struct InfMatrixProductOperator{T<:Number, OP<:Union{Array{T, 4}, SymTensor{T, 4}}}
+    ly :: Int
+    ds :: Vector{Int}
+    Ws :: Vector{OP}
+end
 ### constructors
 ################
 

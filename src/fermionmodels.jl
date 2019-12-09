@@ -28,7 +28,7 @@ function triangularhopping(ls::Tuple{Int, Int},
                            t2::T,
                            t3::T,
                            mu::Float64;
-                           boundary::Symbol=:OBC) where{T}
+                           boundary::Tuple{Symbol, Symbol}=(:PBC, :OBC)) where{T}
 
     ly, lx = ls
 

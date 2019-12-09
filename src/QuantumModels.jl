@@ -22,9 +22,13 @@ export UnitCellQModel
 export QTerm
 
 export dimension
+export changeboundary
+export changesize
 export sitelinearindex
+export supportrange
 export support
 export removehead
+export largestxrange
 
 export Fermion
 export fermionoperators

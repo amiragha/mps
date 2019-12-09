@@ -20,42 +20,71 @@ UnitCell{1}(n::Int, sites::Vector{Float64}, a::Float64) =
 struct QLattice{D}
     unitc :: UnitCell{D}
     sizes :: NTuple{D, Int}
-    bc    :: Symbol
+    bcs   :: NTuple{D, Symbol}
 end
 
-QLattice(uc::UnitCell{D}, lx::Int, bc::Symbol) where{D}=
-QLattice{1}(uc, (lx,), bc)
+QLattice(uc::UnitCell{1}, lx::Int, bc::Symbol) where{D} =
+    QLattice{1}(uc, (lx,), (bc,))
 
-# find the linear index of a site with a particular unitcell at some
-# particular position
+@inline dimension(lattice::QLattice{D}) where{D} = D
+
+"return a changed boundary version of `lattice` in the `d`th direction"
+function changeboundary(lattice::QLattice, d::Int, boundary::Symbol)
+    1 <= d <= dimension(lattice) || error("can't change boundary!")
+    QLattice(lattice.unitc,
+             lattice.sizes,
+             Tuple([lattice.bcs[1:d-1]..., boundary, lattice.bcs[d+1:D]]))
+end
+
+"return a chaged size version of `lattice` in the `d`th direction"
+function changesize(lattice::QLattice, d::Int, dim::Int)
+    1 <= d <= dimension(lattice) || error("can't change size!")
+    QLattice(lattice.untic,
+             Tuple([lattice.sizes[1:d-1]..., dim, lattice.sizes[d+1:D]]),
+             lattice.bcs)
+end
+
+"""
+    sitelinearindex(lattice, ucidx, x_uc)
+
+for a given lattice `lattice`, unite cell site `ucidx`, and a
+corrdinate of unitcell `x_uc` which can be any integer number, find
+the site linear index of that site if allowed according to the
+boundary condition!
+
+"""
 function sitelinearindex(lattice::QLattice{D},
                          ucidx::Int,
-                         x_uc::NTuple{D, Int}) where{D}
+                         x_uc::NTuple{D, Int}) where {D}
 
-    D <= 2 || error("only up to 2D!")
-    x_uc_new = Tuple([mod(x_uc[i] - 1, lattice.sizes[i]) + 1 for i in 1:D])
-    crossings = Tuple([fld(x_uc[i] - 1, lattice.sizes[i]) for i in 1:D])
-    index = ucidx + lattice.unitc.n *
-        sum((x_uc_new .- 1) .* [1, cumprod([lattice.sizes...])[1:end-1]...])
-    insidechecks = [1 <= x_uc[i] <= lattice.sizes[i] for i=1:D]
+    x_uc_vec = zeros(Int, D)
+    crossings = zeros(Int, D)
+    for i in 1:D
+        if lattice.bcs[i] == :OBC
+            if 1 <= x_uc[i] <= lattice.sizes[i]
+                x_uc_vec[i] = x_uc[i]
+            else
+                return nothing, crossings
+            end
 
-    if lattice.bc == :OBC
-        if all(insidechecks)
-            return index, crossings
+        elseif lattice.bcs[i] in [:PBC, :APBC]
+            x_uc_vec[i] = mod(x_uc[i] - 1, lattice.sizes[i]) + 1
+            crossings[i] = fld(x_uc[i] - 1, lattice.sizes[i])
+
+        elseif lattice.bcs[i] == :INF
+            if i < D
+                error("only the last dimensions can have INF boundary conition!")
+            end
+            x_uc_vec[i] = x_uc[i]
+
+        else
+            error("Exhaustive check!")
         end
-
-    elseif lattice.bc == :PBCY
-        if insidechecks[2]
-            return index, crossings
-        end
-
-    elseif lattice.bc in [:PBCYX, :PBCYAPBCX]
-        return index, crossings
-
-    else
-        error("boundary not supported yet!")
     end
-    return 0, crossings
+    index = ucidx + lattice.unitc.n *
+        sum((x_uc_vec .- 1) .* [1, cumprod([lattice.sizes...])[1:D-1]...])
+
+    return index, Tuple(crossings)
 end
 
 abstract type AbstractQType end
@@ -107,6 +136,11 @@ struct FermionQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     terms   :: Vector{NTuple{N, FermionOp}}
 end
 
+function supportrange(inter::AbstractQModelInteraction{D, N, T}) where{D,N,T}
+    [(minimum([offset[d] for offset in offsets]),
+      maximum([offset[d] for offset in offsets])) for d in 1:D]
+end
+
 support(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = N
 eltype(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = T
 
@@ -144,7 +178,25 @@ struct UnitCellQModel{Q<:AbstractQType, D} <: AbstractQModel{Q, D}
     inters  :: Vector{AbstractQModelInteraction}
 end
 
-dimension(::AbstractQModel{Q, D}) where {Q, D} = D
+@inline dimension(::AbstractQModel{Q, D}) where {Q, D} = D
+
+function changeboundary(model::UnitCellQModel, d::Int, boundary::Symbol)
+    UnitCellQModel(model.qtype,
+                   changeboundary(model.lattice, d, boundary),
+                   model.inters)
+end
+
+function changesize(model::UnitCellQModel, d::Int, dim::Int)
+    UnitCellQModel(model.qtype,
+                   changesize(model.lattice, d, dim),
+                   model.inters)
+end
+
+function largestxrange(model::UnitCellQModel)
+    D = dimesion(model)
+    ranges = [supportrange(inter)[D] for inter in model.inters]
+    maximum([r[2] for r in ranges]) - minimum([r[1] for f in ranges])
+end
 
 function tikzlattice(model::UnitCellQModel,
                      filename::String)
@@ -250,7 +302,7 @@ function tikzlattice(model::UnitCellQModel,
                 end
             end
         end
-write(f, "\\end{tikzpicture}\n")
-write(f, "\\end{document}")
-end
+        write(f, "\\end{tikzpicture}\n")
+        write(f, "\\end{document}")
+    end
 end

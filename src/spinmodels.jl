@@ -50,7 +50,7 @@ function triangularspinmodel(ls::Tuple{Int, Int},
                              k1::Float64,
                              k2::Float64,
                              k3::Float64;
-                             boundary::Symbol=:OBC,
+                             boundary::Tuple{Symbol,Symbol}=(:PBC, :OBC),
                              symmetry::Symbol=:NONE)
 
     heis = nbodyopexpansion(2,

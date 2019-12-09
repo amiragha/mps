@@ -1,9 +1,10 @@
 function generatempo(model::UnitCellQModel; verbose::Bool=false)
-    typeof(model.qtype) == SpinType || error("Can generate MPO only for SpinType models.")
-    model.lattice.bc in [:OBC, :PBCY] ||
-        error("unrecognized boundary condition $boundary!")
-
+    typeof(model.qtype) == SpinType ||
+        error("Can generate MPO only for Bosonic models.")
     D = dimension(model)
+    model.lattice.bcs[D] == :OBC ||
+        error("Can only generate mpo for OBC in X direction")
+
     d = model.qtype.d
     n_sites = prod(model.lattice.sizes)
     T = eltype(model.inters[1])
@@ -14,13 +15,16 @@ function generatempo(model::UnitCellQModel; verbose::Bool=false)
             ns = interaction.ucidxs
             offs = interaction.offsets
             indexes = zeros(Int, support(interaction))
+            isinside = true
             for i in 1:support(interaction)
                 index, crossings = sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                if isnothing(index)
+                    isinside = false
+                    break
+                end
                 indexes[i] = index
             end
-            # indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
-            #            for i in 1:support(interaction)]
-            if all(indexes .> 0)
+            if isinside
                 perm = sortperm(indexes)
                 verbose && println("Adding $(interaction.amp) between $(indexes[perm])")
                 terms = [term[perm] for term in interaction.terms]
@@ -131,13 +135,15 @@ function generatempo(model::UnitCellQModel; verbose::Bool=false)
 end
 
 function generatesymmpo(model::UnitCellQModel)
-    typeof(model.qtype) == SpinType || error("Can generate MPO only for SpinType models.")
-    model.lattice.bc in [:OBC, :PBCY] ||
-        error("unrecognized boundary condition $boundary!")
-
-    typeof(model.inters[1]) <: SymQModelInteraction || error("Only symmetric (U1) is allowed!")
-
+    typeof(model.qtype) == SpinType ||
+        error("Can generate MPO only for Bosonic models.")
     D = dimension(model)
+    model.lattice.bcs[D] == :OBC ||
+        error("Can only generate mpo for OBC in X direction")
+
+    typeof(model.inters[1]) <: SymQModelInteraction ||
+        error("Only symmetric (U1) is allowed!")
+
     d = model.qtype.d
     d == 2 || error("only works for spin 1/2 for now!")
     n_sites = prod(model.lattice.sizes)
@@ -149,13 +155,16 @@ function generatesymmpo(model::UnitCellQModel)
             ns = interaction.ucidxs
             offs = interaction.offsets
             indexes = zeros(Int, support(interaction))
+            isinside = true
             for i in 1:support(interaction)
                 index, crossings = sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
+                if isnothing(index)
+                    isinside=false
+                    break
+                end
                 indexes[i] = index
             end
-            # indexes = [sitelinearindex(model.lattice, ns[i], offs[i] .+ is)
-            #            for i in 1:support(interaction)]
-            if all(indexes .> 0)
+            if isinside
                 perm = sortperm(indexes)
                 for ops in interaction.terms
                     permutedops = ops[perm]
@@ -322,3 +331,272 @@ lleg = STLeg(+1, rleg.chrs, rleg.dims)
 end
 SymMatrixProductOperator(n_sites, d, dims, tensors)
 end
+
+function generateinfinitempo(model::UnitCellQModel)
+    typeof(model.qtype) == SpinType ||
+        error("Can generate MPO only for Bosonic models!")
+    D = dimension(model)
+    lx = mode.lattice.sizes[D]
+    T = eltype(model.inters[1])
+    model.lattice.bcs[D] in [:APBC, :PBC, :INF] ||
+        error("infinte MPO is only for PBC, INF boundary conitions!")
+
+    typeof(model.inters[1]) <: SymQModelInteraction ||
+        error("Only symmetric (U1) is allowed!")
+
+    n_sites = prod(model.lattice.sizes[1:D-1])
+    xrange = largestxrange(model)
+    println(range)
+    mpo = generatesymmpo(changesize(model, D, 2*(xrange+1)))
+
+    b = n_sites * xrange
+    for i = 1:n_sites
+        mpo.tensors[b+i] == mpo.tensors[b+i+n_sites] ||
+            error("mpo not converged!")
+    end
+
+    tensors = Vector{SymTensor{T, 4}}()
+
+    for l = 1:lx
+        for i=1:n_sites
+            push!(dims, size(mpo.tensors[i], 1))
+            push!(tensors, mpo.tensors[i])
+        end
+    end
+    push!(dims, size(mpo.tensors[end], 2))
+    return MatrixProductOperator(n_sites * model.lattice.sizes[D], mpo.d, dims, tensors)
+end
+# function generateinfinitempo(model::UnitCellQModel)
+#     typeof(model.qtype) == SpinType ||
+#         error("Can generate MPO only for SpinType models.")
+#     model.lattice.bc in [:PBCYAPBCX, :PBCX, :PBCYPBCX] ||
+#         error("unrecognized boundary condition $boundary!")
+
+#     typeof(model.inters[1]) <: SymQModelInteraction ||
+#         error("Only symmetric (U1) is allowed!")
+
+#
+#     d = model.qtype.d
+#     d == 2 || error("only works for spin 1/2 for now!")
+#
+#     T = eltype(model.inters[1])
+
+#     ## notes: each term defined in the unit cell should be ordered by
+#     ## indexes on the -inf to +inf index system. Then is should be
+#     ## translated along the x-axis (last axis) so that the current
+#     ## x-positions can be at any position from the beginnning to the
+#     ## end, and all of those terms should be included in the infinte MPO
+#     lattice = changeboundary(model.lattice, D, :INF)
+#     allterms = Vector{QTerm{SymMatrix{T}}}()
+#     for is in Iterators.product([1:l for l in model.lattice.sizes[1:D-1]]...)
+#         for interaction in model.inters
+#             ns = interaction.ucidxs
+#             offs = interaction.offsets
+#             indexes = zeros(Int, support(interaction))
+#             isinside = true
+#             for i in 1:support(interaction)
+#                 index, crossings = sitelinearindex(lattice, ns[i], offs[i] .+ is)
+#                 if isnothing(index)
+#                     isinside = false
+#                     break
+#                 end
+#                 indexes[i] = index
+#             end
+#             if isinside
+#             perm = sortperm(indexes)
+#             permindexes = indexes[perm]
+#             if support(interaction) == 1
+#                 for ops in interaction.terms
+#                     n = mod1(indexes[1], n_sites)
+#                     push!(lterms[n], interaction.amp * ops[1])
+#                 end
+#                 break
+#             end
+#             for ops in interaction.terms
+#                 permutedops = ops[perm]
+#                 termops = (permutedops[1:end-1]..., interaction.amp * permutedops[end])
+#                 pointer = 1
+#                 n = mod1(permindexes[pointer], n_sites)
+#                 push!(sterms[n], termops[pointer])
+#                 index = permindexes[pointer] + 1
+#                 pointer += 1
+#                 while pointer < support(interation)
+#                     if index == permindexes[pointer]
+#                         pointer += 1
+#                     else
+#                         push!(cterms[n], I)
+#                     end
+#                     index += 1
+#                 end
+#                 n = mod1(permindexes[pointer], n_sites)
+#                 push!(eterms[n], termops[pointer])
+
+#                         if n == permindexes[pointer]
+#                             push!(cterms[n], termops[pointer])
+#                             pointer +=1
+#                         else
+#                             # Add I
+#                         end
+#                     end
+#                 end
+#             end
+#         end
+#         end
+#     end
+#     sort!(allterms, by=x->x.sites[1])
+
+#     dims = ones(Int, n_sites+1)
+#     pointer=1
+#     tensors = Vector{SymTensor{Float64, 4}}(undef, n_sites)
+#     chrs = [0]
+#     lleg = STLeg(+1, chrs, [1])
+#     o1leg = STLeg(+1, [0,1], [1,1])
+#     o2leg = STLeg(-1, [0,1], [1,1])
+#     symI = eye(T, collect(0:d-1), ones(Int, d))
+#     pchrs = Dict{Int, Vector{QTerm}}()
+#     for n in 1:n_sites
+#         # find the new charge for each previous-term that still
+#         # continues to the next site
+#         nextchrs = Int[0]
+#         for (pchr, pterms) in pchrs
+#             for pterm in pterms
+#                 if pterm.sites[1] > n
+#                     push!(nextchrs, pchr)
+#                 elseif support(pterm) > 1
+#                     push!(nextchrs, pchr + pterm.ops[1].charge)
+#                 end
+#             end
+#         end
+
+#         # making local-terms and starting-terms and for starting terms
+#         # that continue find the charge the go to
+#         lterms = Vector{QTerm}()
+#         sterms = Vector{QTerm}()
+#         while pointer <= length(allterms) && allterms[pointer].sites[1] == n
+#             if support(allterms[pointer]) > 1
+#                 push!(sterms, allterms[pointer])
+#                 push!(nextchrs, allterms[pointer].ops[1].charge)
+#             else
+#                 push!(lterms, allterms[pointer])
+#             end
+#             pointer += 1
+#         end
+
+#         sort!(nextchrs)
+#         chrs = Int[]
+#         chrdims = Int[]
+#         push!(chrs, nextchrs[1])
+#         push!(chrdims, 1)
+#         for c in nextchrs[2:end]
+#             if c == chrs[end]
+#                 chrdims[end] += 1
+#             else
+#                 push!(chrs, c)
+#                 push!(chrdims, 1)
+#             end
+#         end
+
+#         nextterms = Dict(chr => Vector{QTerm}() for chr in chrs)
+#         # make the new leg
+#         if n < n_sites
+#             idx = searchsortedfirst(chrs, 0)
+#             chrdims[idx] += 1
+#             rleg = STLeg(-1, chrs, chrdims)
+#         else
+#             chrs == [0] || error("$chrs")
+#             chrdims == [1] || error("$chrdims")
+#             rleg = STLeg(-1, [0], [1])
+#         end
+
+#         dims[n+1] = fulldims(rleg)
+
+
+#         W = fill(zero(T), 0, (lleg, o1leg, rleg, o2leg))
+
+#         index0000 = index_sector(W, (0,0,0,0))
+#         index0101 = index_sector(W, (0,1,0,1))
+#         l00, r00 = size(W.nzblks[index0000])[[1,3]]
+#         # better logic is needed for this!
+#         if n > 1
+#             W.nzblks[index0000][1,1,1,1] = one(T)
+#             W.nzblks[index0101][1,1,1,1] = one(T)
+#         end
+#         if n < n_sites
+#             W.nzblks[index0000][l00,1,r00,1] = one(T)
+#             W.nzblks[index0101][l00,1,r00,1] = one(T)
+#         end
+
+#         for lterm in lterms
+#             op = lterm.ops[1]
+#             op.charge == 0 || error()
+#             W.nzblks[index0000][l00, 1, 1, 1] += get_sector(op, (0,0))
+#             W.nzblks[index0101][l00, 1, 1, 1] += get_sector(op, (1,1))
+#         end
+
+#         rows = Dict(c=>1 for c in lleg.chrs)
+#         rows[0] = 2
+#         cols = Dict(c=>1 for c in chrs)
+#         cols[0] = 2
+
+#         for (pchr, pterms) in pchrs
+#             for pterm in pterms
+#                 if pterm.sites[1] == n
+#                     op = pterm.ops[1]
+#                     if support(pterm) == 1
+#                         # pchr goes to zero
+#                         row ,col = rows[pchr], cols[0]
+#                         for i in 1:length(op.sects)
+#                             c1, c2 = op.sects[i]
+#                             idx = index_sector(W, (pchr, c1, 0, c2))
+#                             size(op.nzblks[i]) == (1, 1) || error()
+#                             W.nzblks[idx][row, 1, 1, 1] = op.nzblks[i][1,1]
+#                         end
+#                         rows[pchr] += 1
+#                     else
+#                         #pchr goes to pchr+op.charge
+#                         row ,col = rows[pchr], cols[pchr+op.charge]
+#                         for i in 1:length(op.sects)
+#                             c1, c2 = op.sects[i]
+#                             idx = index_sector(W, (pchr, c1, pchr+op.charge, c2))
+#                             size(op.nzblks[i]) == (1, 1) || error()
+#                             W.nzblks[idx][row, 1, col, 1] = op.nzblks[i][1,1]
+#                         end
+#                         rows[pchr] += 1
+#                         cols[pchr+op.charge] += 1
+#                         push!(nextterms[pchr+op.charge], removehead(pterm))
+#                     end
+#                 else
+#                     # pchr goes to pchr
+#                     row, col = rows[pchr], cols[pchr]
+#                     for i in 1:length(symI.sects)
+#                         c1, c2 = symI.sects[i]
+#                         idx = index_sector(W, (pchr, c1, pchr, c2))
+#                         size(symI.nzblks[i]) == (1, 1) || error()
+#                         W.nzblks[idx][row, 1, col, 1] = symI.nzblks[i][1,1]
+#                     end
+#                     rows[pchr] += 1
+#                     cols[pchr] += 1
+#                     push!(nextterms[pchr], pterm)
+#                 end
+#             end
+#         end
+
+#         for sterm in sterms
+#             op = sterm.ops[1]
+#             row, col = rows[0], cols[op.charge]
+#             for i in 1:length(op.sects)
+#                 c1, c2 = op.sects[i]
+#                 idx = index_sector(W, (0, c1, op.charge, c2))
+#                 size(op.nzblks[i]) == (1, 1) || error()
+#                 W.nzblks[idx][getdim(lleg, 0), 1, col, 1] = op.nzblks[i][1,1]
+#             end
+#             cols[op.charge] += 1
+#             push!(nextterms[op.charge], removehead(sterm))
+#         end
+
+# tensors[n] =  W
+# pchrs = nextterms
+# lleg = STLeg(+1, rleg.chrs, rleg.dims)
+# end
+# SymMatrixProductOperator(n_sites, d, dims, tensors)
+# end

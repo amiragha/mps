@@ -97,7 +97,8 @@ end
         @test mpo2hamiltonian(legacympo) ≈ mpo2hamiltonian(mpo)
 
         tmodel = triangularspinmodel((2, n),
-                                     0.3, 1.0, 1.0, 0.0, 0.0, 0.0)
+                                     0.3, 1.0, 1.0, 0.0, 0.0, 0.0,
+                                     boundary=(:OBC, :OBC))
         tmpo = generatempo(tmodel)
         @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(mpo)
     end
@@ -127,6 +128,7 @@ end
 
             tmodel = triangularspinmodel((2, n),
                                          0.3, 1.0, 1.0, 0.0, 0.0, 0.0,
+                                         boundary=(:OBC, :OBC),
                                          symmetry=:U1)
             tmpo = generatesymmpo(tmodel)
             @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(smpo)
@@ -148,7 +150,8 @@ end
             end
         end
 
-        model = triangularspinmodel((2, n), j2, j1, j1, k1, k2, 0.)
+        model = triangularspinmodel((2, n), j2, j1, j1, k1, k2, 0.,
+                                    boundary=(:OBC, :OBC))
         mpo = generatempo(model)
         Hmpo = mpo2hamiltonian(mpo)
 
@@ -164,6 +167,7 @@ end
             smpo = generatesymmpo(smodel)
 
             model = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3)
+
             mpo = generatempo(model)
 
             sH = mpo2hamiltonian(smpo)
