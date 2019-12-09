@@ -78,7 +78,7 @@ end
 SymMatrixProductOperator{T}(mpo::SymMatrixProductOperator{T}) where {T<:Number} = mpo
 function SymMatrixProductOperator{T}(mpo::SymMatrixProductOperator) where {T<:Number}
     SymMatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
-                             [SymTensor{T, 4}(ten) for ten in mpo.tensors])
+                                [SymTensor{T, 4}(ten) for ten in mpo.tensors])
 end
 
 function MatrixProductOperator(mpo::SymMatrixProductOperator{T}) where {T<:Number}
@@ -101,6 +101,10 @@ function mpo2hamiltonian(mpo::SymMatrixProductOperator)
 end
 
 function reducempo!(mpo::SymMatrixProductOperator)
+    # this definitely needs to be better
+    if size(mpo.tensors[1], 1) != 1
+        return _reduceinfinitempo!(mpo)
+    end
     A = mpo.tensors[1]
     for l=1:mpo.lx-1
         U, S, Vt = svdtrunc(fuselegs(permutelegs(A,
@@ -121,5 +125,46 @@ function reducempo!(mpo::SymMatrixProductOperator)
         A = contract(mpo.tensors[l-1], (1,2,-1,4), U, (-1, 3))
     end
     mpo.tensors[1] = A
+    mpo
+end
+
+function _reduceinfinitempo!(mpo::SymMatrixProductOperator)
+    A = mpo.tensors[1]
+    for l=1:mpo.lx-1
+        U, S, Vt = svdtrunc(fuselegs(permutelegs(A,
+                                                 [1,2,4,3]),
+                                     +1, 1, 3))
+        mpo.dims[l+1] = size(S, 1)
+        mpo.tensors[l] = permutelegs(unfuseleg(U*S, 1,
+                                               A.legs[[1,2,4]]),
+                                     [1,2,4,3])
+        A = contract(Vt, (1, -1), mpo.tensors[l+1], (-1, 2, 3, 4))
+    end
+    U, S, Vt = svdtrunc(fuselegs(permutelegs(A,
+                                             [1,2,4,3]),
+                                 +1, 1, 3))
+    mpo.dims[mpo.lx+1] = size(S, 1)
+    mpo.dims[1] = size(S, 1)
+    mpo.tensors[mpo.lx] = permutelegs(unfuseleg(U*S, 1,
+                                            A.legs[[1,2,4]]),
+                                  [1,2,4,3])
+    A = contract(Vt, (1, -1), mpo.tensors[1], (-1, 2, 3, 4))
+
+    U, S, Vt = svdtrunc(fuselegs(A, -1, 2, 3))
+    mpo.dims[mpo.lx+1] = size(S, 1)
+    mpo.dims[1] = size(S, 1)
+    mpo.tensors[1] = unfuseleg(S*Vt, 2, A.legs[2:4])
+
+    A = contract(mpo.tensors[mpo.lx], (1,2,-1,4), U, (-1, 3))
+
+    for l=mpo.lx:-1:2
+        U, S, Vt = svdtrunc(fuselegs(A, -1, 2, 3))
+        mpo.dims[l] = size(S, 1)
+        mpo.tensors[l] = unfuseleg(S*Vt, 2, A.legs[2:4])
+
+        A = contract(mpo.tensors[l-1], (1,2,-1,4), U, (-1, 3))
+    end
+    mpo.tensors[1] = A#mpo.tensors[mpo.lx] = A
+
     mpo
 end

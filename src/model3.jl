@@ -30,17 +30,19 @@ QLattice(uc::UnitCell{1}, lx::Int, bc::Symbol) where{D} =
 
 "return a changed boundary version of `lattice` in the `d`th direction"
 function changeboundary(lattice::QLattice, d::Int, boundary::Symbol)
-    1 <= d <= dimension(lattice) || error("can't change boundary!")
+    D = dimension(lattice)
+    1 <= d <= D || error("can't change boundary!")
     QLattice(lattice.unitc,
              lattice.sizes,
-             Tuple([lattice.bcs[1:d-1]..., boundary, lattice.bcs[d+1:D]]))
+             Tuple([lattice.bcs[1:d-1]..., boundary, lattice.bcs[d+1:D]...]))
 end
 
 "return a chaged size version of `lattice` in the `d`th direction"
 function changesize(lattice::QLattice, d::Int, dim::Int)
-    1 <= d <= dimension(lattice) || error("can't change size!")
-    QLattice(lattice.untic,
-             Tuple([lattice.sizes[1:d-1]..., dim, lattice.sizes[d+1:D]]),
+    D = dimension(lattice)
+    1 <= d <= D || error("can't change size!")
+    QLattice(lattice.unitc,
+             Tuple([lattice.sizes[1:d-1]..., dim, lattice.sizes[d+1:D]...]),
              lattice.bcs)
 end
 
@@ -137,8 +139,8 @@ struct FermionQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
 end
 
 function supportrange(inter::AbstractQModelInteraction{D, N, T}) where{D,N,T}
-    [(minimum([offset[d] for offset in offsets]),
-      maximum([offset[d] for offset in offsets])) for d in 1:D]
+    [(minimum([offset[d] for offset in inter.offsets]),
+      maximum([offset[d] for offset in inter.offsets])) for d in 1:D]
 end
 
 support(::AbstractQModelInteraction{D, N, T}) where{D, N, T} = N
@@ -193,9 +195,9 @@ function changesize(model::UnitCellQModel, d::Int, dim::Int)
 end
 
 function largestxrange(model::UnitCellQModel)
-    D = dimesion(model)
+    D = dimension(model)
     ranges = [supportrange(inter)[D] for inter in model.inters]
-    maximum([r[2] for r in ranges]) - minimum([r[1] for f in ranges])
+    maximum([r[2] for r in ranges]) - minimum([r[1] for r in ranges])
 end
 
 function tikzlattice(model::UnitCellQModel,

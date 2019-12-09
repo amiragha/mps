@@ -57,6 +57,7 @@ export qitf_mpo
 export mpo2hamiltonian
 export generatempo
 export generatesymmpo
+export generateinfinitempo
 export reducempo!
 
 end

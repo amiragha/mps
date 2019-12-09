@@ -336,7 +336,7 @@ function generateinfinitempo(model::UnitCellQModel)
     typeof(model.qtype) == SpinType ||
         error("Can generate MPO only for Bosonic models!")
     D = dimension(model)
-    lx = mode.lattice.sizes[D]
+    lx = model.lattice.sizes[D]
     T = eltype(model.inters[1])
     model.lattice.bcs[D] in [:APBC, :PBC, :INF] ||
         error("infinte MPO is only for PBC, INF boundary conitions!")
@@ -346,8 +346,9 @@ function generateinfinitempo(model::UnitCellQModel)
 
     n_sites = prod(model.lattice.sizes[1:D-1])
     xrange = largestxrange(model)
-    println(range)
-    mpo = generatesymmpo(changesize(model, D, 2*(xrange+1)))
+    println(xrange)
+    mpo = generatesymmpo(changeboundary(changesize(model, D, 2*(xrange+1)),
+                                        D, :OBC))
 
     b = n_sites * xrange
     for i = 1:n_sites
@@ -357,14 +358,15 @@ function generateinfinitempo(model::UnitCellQModel)
 
     tensors = Vector{SymTensor{T, 4}}()
 
+    dims = Int[]
     for l = 1:lx
         for i=1:n_sites
-            push!(dims, size(mpo.tensors[i], 1))
-            push!(tensors, mpo.tensors[i])
+            push!(dims, size(mpo.tensors[b+i], 1))
+            push!(tensors, mpo.tensors[b+i])
         end
     end
-    push!(dims, size(mpo.tensors[end], 2))
-    return MatrixProductOperator(n_sites * model.lattice.sizes[D], mpo.d, dims, tensors)
+    push!(dims, size(tensors[end], 3))
+    return SymMatrixProductOperator(n_sites * lx, mpo.d, dims, tensors)
 end
 # function generateinfinitempo(model::UnitCellQModel)
 #     typeof(model.qtype) == SpinType ||
