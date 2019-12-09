@@ -22,7 +22,6 @@ export issimilar
 export AbstractSymTensor, AbstractSymMatrix
 export STLeg, SymTensor, SymMatrix, SymDiagonal, SymVector
 export eye
-#export randSymTensor, fillSymTensor
 export FusedCharge
 
 export symMatrix
@@ -30,23 +29,20 @@ export _allsectorsandsizes
 export _allsectorsandsizes2
 export _sectorlessthan
 export _sectorisallowed
-#export _possible_fuse_patterns
 
-#export array_representation
 export array
 export alldims, accdims, getdim, fulldims, signs
 export numoflegs
 export _sectors_sortperm
 
 export fuse_set
-#export fuse_conseqlegs
 export fuselegs
 export unfuseleg
 export permutelegs
 export removedummyleg
 export contract
 
-#export change_sign, change_legsign
+export reverseleg
 export mapcharges
 export invlegs
 

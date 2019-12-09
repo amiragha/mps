@@ -39,6 +39,8 @@ end
 @inline fulldims(legs::NTuple{N, STLeg}) where {N} =
     prod([fulldims(legs[n]) for n in eachindex(legs)])
 
+@inline reverseleg(leg::STLeg) = STLeg(-leg.sign, leg.chrs, leg.dims)
+
 function negate(leg::STLeg)
     perm = sortperm(leg.chrs, by=x -> -x)
     STLeg(-leg.sign, -1 .*(leg.chrs[perm]), leg.dims[perm])
