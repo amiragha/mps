@@ -204,13 +204,16 @@ function tikzlattice(model::UnitCellQModel,
                      filename::String)
     isfile(filename) && error("file already exists: $filename")
     D = dimension(model)
-    D == 2 || error("only 2D plotting is support for now!")
+    D == 2 || error("only 2D lattices can be drawn with tikz!")
     lattice = model.lattice
 
     bondcolors = [
         "blue", "orange", "cyan", "olive", "red", "brown", "green", "yellow" ]
     ballcolors = [
         "green", "blue", "red", "yellow", "brown", "cyan", "orange", "olive"]
+
+    a1 = lattice.unitc.as[1]
+    a2 = lattice.unitc.as[2]
 
     open(filename, "w") do f
         write(f, """\\documentclass[tikz, border=1mm]{standalone}
@@ -220,7 +223,10 @@ function tikzlattice(model::UnitCellQModel,
 
   \\begin{document}
 
-  \\begin{tikzpicture}
+  \\begin{tikzpicture}[
+        x={$a1},
+        y={$a2},
+        ]
   """)
 
         write(f, "  \\tikzset{\n")
@@ -243,30 +249,35 @@ function tikzlattice(model::UnitCellQModel,
   \\def\\l{1cm}
   \\def\\radius{\\l/10}\n
 """)
-        for is in Iterators.product([1:l for l in model.lattice.sizes]...)
+
+        pad = 0.3
+        ly, lx = model.lattice.sizes
+        write(f, "  \\clip (-$pad, -$pad) -- ++(0.0, $(ly-1+2*pad)) -- ++($(lx-1+2*pad), 0.0) -- ++(0.0, -$(ly-1+2*pad)) -- cycle;\n")
+
+        for is in Iterators.product([0:l+1 for l in model.lattice.sizes]...)
             for index in eachindex(bonds)
                 interaction = bonds[index]
                 #support(interaction) == 2 || continue
                 n1, n2 = interaction.ucidxs
                 off1, off2 = interaction.offsets
-                if lattice.bc == :OBC
-                    x_uc1 = [off1[i] .+ is[i] for i=1:D]
-                    x_uc2 = [off2[i] .+ is[i] for i=1:D]
-                    if all([1 <= x_uc1[i] <= lattice.sizes[i] for i=1:D]) &
-                        all([1 <= x_uc2[i] <= lattice.sizes[i] for i=1:D])
-                        one = reduce(coordsum,
-                                     #[(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
-                                     [reverse(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
-                                     init=(0,0)).+ lattice.unitc.sites[n1]
-                        two = reduce(coordsum,
-                                     #[(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
-                                     [reverse(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
-                                     init=(0,0)).+ lattice.unitc.sites[n2]
-                        write(f, "  \\draw [bond$index] ($(one[1])*\\l, $(one[2])*\\l) -- ($(two[1])*\\l, $(two[2])*\\l);\n")
-                    end
-                else
-                    error("boundary not supported yet!")
+                #if lattice.bc == :OBC
+                x_uc1 = [off1[i] .+ is[i] for i=1:D]
+                x_uc2 = [off2[i] .+ is[i] for i=1:D]
+                if all([0 <= x_uc1[i] <= lattice.sizes[i]+1 for i=1:D]) &
+                    all([0 <= x_uc2[i] <= lattice.sizes[i]+1 for i=1:D])
+                    one = reduce(coordsum,
+                                 #[(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                 [reverse(x_uc1 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                 init=(0,0)).+ lattice.unitc.sites[n1]
+                    two = reduce(coordsum,
+                                 #[(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                 [reverse(x_uc2 .- 1)[i] .* lattice.unitc.as[i] for i=1:D],
+                                 init=(0,0)).+ lattice.unitc.sites[n2]
+                    write(f, "  \\draw [bond$index] ($(one[1])*\\l, $(one[2])*\\l) -- ($(two[1])*\\l, $(two[2])*\\l);\n")
                 end
+                #else
+                #    error("boundary not supported yet!")
+                #end
             end
         end
 
