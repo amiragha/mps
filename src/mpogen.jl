@@ -3,7 +3,7 @@ function generatempo(model::UnitCellQModel; verbose::Bool=false)
         error("Can generate MPO only for Bosonic models.")
     D = dimension(model)
     model.lattice.bcs[D] == :OBC ||
-        error("Can only generate mpo for OBC in X direction")
+        @warn "MPO generated periodic in X direction! discouraged!"
 
     d = model.qtype.d
     n_sites = prod(model.lattice.sizes)
@@ -139,7 +139,7 @@ function generatesymmpo(model::UnitCellQModel)
         error("Can generate MPO only for Bosonic models.")
     D = dimension(model)
     model.lattice.bcs[D] == :OBC ||
-        error("Can only generate mpo for OBC in X direction")
+        @warn "MPO generated periodic in X direction! discouraged!"
 
     typeof(model.inters[1]) <: SymQModelInteraction ||
         error("Only symmetric (U1) is allowed!")

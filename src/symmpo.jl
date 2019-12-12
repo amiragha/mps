@@ -91,13 +91,17 @@ function mpo2hamiltonian(mpo::SymMatrixProductOperator)
     d = mpo.d
     mpo.d^lx > 10000 && error("model is too large for explicit Hamiltonian!")
     L = mpo.tensors[1]
-    for two in mpo.tensors[2:end]
+    for two in mpo.tensors[2:lx-1]
         L = fuselegs(fuselegs(contract(L, (1, 2, -1, 5),
                                        two, (-1, 3, 4, 6)),
                               -1, 5, 2),
                      +1, 2, 2)
     end
-    removedummyleg(removedummyleg(L, 3), 1)
+    L = fuselegs(fuselegs(contract(L, (-2, 1, -1, 3),
+                                       mpo.tensors[lx], (-1, 2, -2, 4)),
+                              -1, 3, 2),
+                 +1, 1, 2)
+    L
 end
 
 function reducempo!(mpo::SymMatrixProductOperator)

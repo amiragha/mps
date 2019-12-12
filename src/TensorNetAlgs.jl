@@ -14,6 +14,7 @@ include("dmrg.jl")
 include("idmrg.jl")
 include("tdvp.jl")
 include("symdmrg.jl")
+#include("periodicdmrg.jl")
 
 export initialenv
 

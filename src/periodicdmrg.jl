@@ -12,14 +12,14 @@ function initialenvperiodic(mps::SymMatrixProductState{Tv},
     # mpo.matrices[lx].legs[3].chrs[1]
 
     wleg = mpo.tensors[1].legs[1]
-    env[1] = SymTensor(eye(Tv, wleg.chrs, wleg.dims),
-                       (STLeg(+1, [0], [1]), wleg),
-                       (STLeg(-1, [0], [1]), reverseleg(wleg)))
+    env[1] = SymTensor(eye(Tv, wleg.chrs.+lchr, wleg.dims),
+                       (wleg, STLeg(+1, [lchr], [1])),
+                       (reverseleg(wleg), STLeg(-1, [lchr], [1])))
 
     wleg = mpo.tensors[lx].legs[3]
-    env[lx+2] = SymTensor(eye(Tv, wleg.chrs, wleg.dims),
-                          (STLeg(+1, [0], [1]), reverseleg(wleg)),
-                          (STLeg(-1, [0], [1])), wleg)
+    env[lx+2] = SymTensor(eye(Tv, wleg.chrs.-rchr, wleg.dims),
+                          (reverseleg(wleg), STLeg(-1, [rchr], [1])),
+                          (wleg, STLeg(+1, [rchr], [1])))
 
     if isometry == :R
         for l = lx:-1:1
@@ -37,24 +37,23 @@ function initialenvperiodic(mps::SymMatrixProductState{Tv},
     return env
 end
 
-function initialenv(mps::SymMatrixProductState{ComplexF64},
-                    mpo::SymMatrixProductOperator{Float64};
-                    isometry::Symbol=:R)
+function initialenvperiodic(mps::SymMatrixProductState{ComplexF64},
+                            mpo::SymMatrixProductOperator{Float64};
+                            isometry::Symbol=:R)
     initialenv(mps,
                convert(MatrixProductOperator{ComplexF64}, mpo),
                isometry=isometry)
 end
 
-
-function dmrg2sitesweep!(mps::SymMatrixProductState{Tv},
-                         mpo::SymMatrixProductOperator{Tv},
-                         env::Vector{SymTensor{Tv, 3}};
-                         maxdim::Int=200,
-                         tol::Float64=1.e-9,
-                         lanczostol::Float64=1.e-7,
-                         krylovdim::Int=5,
-                         krylovmaxiter::Int=8,
-                         verbose::Bool=false) where {Tv<:Number}
+function dmrg2sitesweep_periodic!(mps::SymMatrixProductState{Tv},
+                                  mpo::SymMatrixProductOperator{Tv},
+                                  env::Vector{SymTensor{Tv, 4}};
+                                  maxdim::Int=200,
+                                  tol::Float64=1.e-9,
+                                  lanczostol::Float64=1.e-7,
+                                  krylovdim::Int=5,
+                                  krylovmaxiter::Int=8,
+                                  verbose::Bool=false) where {Tv<:Number}
     lx = mps.lx
     d = mps.d
 
