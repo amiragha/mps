@@ -15,8 +15,11 @@ function correlationmatrix(hopmatrix::Matrix{Float64},
     lx = size(hopmatrix)[1]
     @assert 0 < n_occupied && n_occupied <= lx
 
-    vecs = eigvecs(Symmetric(hopmatrix))[:, 1:n_occupied]
-    #println(eigen(Symmetric(hopmatrix)))
+    fact = eigen(Symmetric(hopmatrix))
+    fact.values[n_occupied+1] - fact.values[n_occupied+1] < 1.e-12 &&
+        @warn "The Hamiltonian is degenerate at the given filling factor!"
+    vecs = fact.vectors[:,1:n_occupied]
+    #vecs = eigvecs(Symmetric(hopmatrix))[:, 1:n_occupied]
     return vecs * transpose(vecs)
 end
 
@@ -26,6 +29,10 @@ function correlationmatrix(hopmatrix::Matrix{ComplexF64},
     lx = size(hopmatrix)[1]
     @assert 0 < n_occupied && n_occupied <= lx
 
-    vecs = eigvecs(Hermitian(hopmatrix))[:, 1:n_occupied]
+    fact = eigen(Hermitian(hopmatrix))
+    fact.values[n_occupied+1] - fact.values[n_occupied+1] < 1.e-12 &&
+        @warn "The Hamiltonian is degenerate at the given filling factor!"
+    vecs = fact.vectors[:,1:n_occupied]
+    #vecs = eigvecs(Hermitian(hopmatrix))[:, 1:n_occupied]
     return conj(vecs) * transpose(vecs)
 end
