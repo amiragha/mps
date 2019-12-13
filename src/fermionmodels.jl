@@ -14,13 +14,13 @@ function t1t2model(lx::Int,
     chemical = FermionQModelInteraction{1, 1, Float64}(
         mu, (1,), (0,), [FermionNum])
 
-    terms = []
+    terms = FermionQModelInteraction[]
     t1 != 0 && push!(terms, hop1)
     t2 != 0 && push!(terms, hop2)
 
-    UnitCellQModel{FermionType, 1}(fermion,
-                                   QLattice(triangularunitcell, lx, boundary),
-                                   terms)
+    UnitCellQModel(fermion,
+                   QLattice(triangularunitcell, lx, boundary),
+                   terms)
 end
 
 function triangularhopping(ls::Tuple{Int, Int},
@@ -51,12 +51,12 @@ function triangularhopping(ls::Tuple{Int, Int},
         (1, 1),
         ((0, 0), (1, -1)), fhop)
 
-    terms = []
+    terms = FermionQModelInteraction[]
     t1 != 0 && push!(terms, hop1)
     t2 != 0 && push!(terms, hop2)
     t3 != 0 && push!(terms, hop3)
 
-    UnitCellQModel{Fermion, 2}(fermion,
-                               QLattice(triangularunitcell, (ly, lx), boundary),
-                               terms)
+    UnitCellQModel(fermion,
+                   QLattice(triangularunitcell, (ly, lx), boundary),
+                   terms)
 end

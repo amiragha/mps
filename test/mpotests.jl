@@ -107,7 +107,7 @@ end
         j1, j2 = 1.0, 0.3
         for lx in [3, 4]
             smodel = j1j2model(lx, j1, j2, symmetry=:U1)
-            smpo = generatesymmpo(smodel)
+            smpo = generatempo(smodel)
 
             model = j1j2model(lx, j1, j2)
             mpo = generatempo(model)
@@ -124,13 +124,13 @@ end
 
         for n in [2, 3]
             smodel = j1j2model(2*n, j1, j2, symmetry=:U1)
-            smpo = generatesymmpo(smodel)
+            smpo = generatempo(smodel)
 
             tmodel = triangularspinmodel((2, n),
                                          0.3, 1.0, 1.0, 0.0, 0.0, 0.0,
                                          boundary=(:OBC, :OBC),
                                          symmetry=:U1)
-            tmpo = generatesymmpo(tmodel)
+            tmpo = generatempo(tmodel)
             @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(smpo)
         end
     end
@@ -164,7 +164,7 @@ end
         j1, j2, j3, k1, k2, k3 = rand(6)
         for n in [2, 3]
             smodel = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3, symmetry=:U1)
-            smpo = generatesymmpo(smodel)
+            smpo = generatempo(smodel)
 
             model = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3)
 

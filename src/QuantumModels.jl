@@ -11,6 +11,7 @@ include("spin_definitions.jl")
 include("model3.jl")
 include("spinmodels.jl")
 include("fermionmodels.jl")
+include("modeldraw.jl")
 
 export UnitCell
 export QLattice

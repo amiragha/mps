@@ -45,9 +45,9 @@
             ((0,), (1,), (2,), (3,)),
             R4)
 
-        model = UnitCellQModel{SpinType, 1}(spinhalf,
-                                            QLattice(chainunitcell, 4, :OBC),
-                                            [ring1])
+        model = UnitCellQModel(spinhalf,
+                               QLattice(chainunitcell, 4, :OBC),
+                               [ring1])
         mpo = generatempo(model)
         hmpo = mpo2hamiltonian(mpo)
 

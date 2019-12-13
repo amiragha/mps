@@ -1,4 +1,26 @@
-function generatempo(model::UnitCellQModel; verbose::Bool=false)
+function generatempo(model::UnitCellQModel;
+                     symmetry::Symbol=:AUTO,
+                     verbose::Bool=false)
+    if symmetry == :AUTO
+        if eltype(model.inters) <: QModelInteraction
+            return _generatempo_nosym(model, verbose=verbose)
+
+        elseif eltype(model.inters) <: SymQModelInteraction
+            return _generatempo_sym(model, verbose=verbose)
+
+        elseif eltype(model.inters) <: FermionQModelInteraction
+            error("JW not yet implemented! Do it manually and input the spin model for the mpo!")
+
+        else
+            error("Dont' recognize $(eltype(model.inters)) for MPO generation!")
+        end
+    else
+        error("symmetry not recognized!")
+    end
+end
+
+function _generatempo_nosym(model::UnitCellQModel;
+                            verbose::Bool=false)
     typeof(model.qtype) == SpinType ||
         error("Can generate MPO only for Bosonic models.")
     D = dimension(model)
@@ -134,7 +156,8 @@ function generatempo(model::UnitCellQModel; verbose::Bool=false)
     MatrixProductOperator(n_sites, d, dims, tensors)
 end
 
-function generatesymmpo(model::UnitCellQModel)
+function _generatempo_sym(model::UnitCellQModel;
+                          verbose::Bool=false)
     typeof(model.qtype) == SpinType ||
         error("Can generate MPO only for Bosonic models.")
     D = dimension(model)
@@ -332,14 +355,15 @@ end
 SymMatrixProductOperator(n_sites, d, dims, tensors)
 end
 
-function generateinfinitempo(model::UnitCellQModel)
+function _generatempo_infinite(model::UnitCellQModel;
+                               verbose::Bool=false)
     typeof(model.qtype) == SpinType ||
         error("Can generate MPO only for Bosonic models!")
     D = dimension(model)
     lx = model.lattice.sizes[D]
     T = eltype(model.inters[1])
-    model.lattice.bcs[D] in [:APBC, :PBC, :INF] ||
-        error("infinte MPO is only for PBC, INF boundary conitions!")
+    model.lattice.bcs[D] in [:INF] ||
+        error("boundary conitions inf not :INF!")
 
     typeof(model.inters[1]) <: SymQModelInteraction ||
         error("Only symmetric (U1) is allowed!")

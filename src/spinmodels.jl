@@ -32,13 +32,13 @@ function j1j2model(lx::Int, j1::Float64, j2::Float64;
         j2,
         (1, 1),
         ((0,), (2,)), heis)
-    terms = []
+    terms = qitype[]
     j1 != 0 && push!(terms, heis1)
     j2 != 0 && push!(terms, heis2)
 
-    UnitCellQModel{SpinType, 1}(spinhalf,
-                                QLattice(chainunitcell, lx, boundary),
-                                terms)
+    UnitCellQModel(spinhalf,
+                   QLattice(chainunitcell, lx, boundary),
+                   terms)
 end
 
 # triangular
@@ -103,7 +103,7 @@ function triangularspinmodel(ls::Tuple{Int, Int},
         ((0, 0), (1, 0), (0, 1), (-1, 1)),
         R4)
 
-    terms = []
+    terms = qitype[]
     j1 != 0 && push!(terms, heis1)
     j2 != 0 && push!(terms, heis2)
     j3 != 0 && push!(terms, heis3)
@@ -111,7 +111,7 @@ function triangularspinmodel(ls::Tuple{Int, Int},
     k2 != 0 && push!(terms, ring2)
     k3 != 0 && push!(terms, ring3)
 
-    UnitCellQModel{SpinType, 2}(spinhalf,
-                                QLattice(triangularunitcell, (ly, lx), boundary),
-                                terms)
+    UnitCellQModel(spinhalf,
+                   QLattice(triangularunitcell, (ly, lx), boundary),
+                   terms)
 end
