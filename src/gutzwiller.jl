@@ -110,12 +110,8 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    if mps1.center != 1
-        move_center!(mps1, 1)
-    end
-    if mps2.center != 1
-        move_center!(mps2, 1)
-    end
+    move_center!(mps1, 1)
+    move_center!(mps2, 1)
 
     dims = ones(Int64, lx+1)
     matrices = SymTensor{Tv, 3}[]
@@ -174,12 +170,8 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    if mps1.center != 1
-        move_center!(mps1, 1)
-    end
-    if mps2.center != 1
-        move_center!(mps2, 1)
-    end
+    move_center!(mps1, 1)
+    move_center!(mps2, 1)
 
     dims = ones(Int64, lx+1)
     matrices = SymTensor{Tv, 3}[]
@@ -234,10 +226,15 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
                           (1, -1, 4, 5), G, (2, -1, 3)),
                  (1,2, -2, -1,3), B, (-1,-2, 4))
 
+    U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+    normalize!(S)
+    C = unfuseleg(U * S * Vt, 1, (E.legs[1], G.legs[1]))
+
+
     fnl = x->div(x+lx-1, 2)
     fnd = x->div(x+1, 2)
     fnr = x->div(x+lx, 2)
-    push!(matrices, mapcharges((fnl,fnd,fnr), fuselegs(C, -1, 3, 2)))
+    push!(matrices, mapcharges((fnl,fnd,fnr), C))
 
     return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
 end
