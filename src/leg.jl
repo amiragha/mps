@@ -91,6 +91,9 @@ function fuse(sign::Int, legs::NTuple{N, STLeg}) where {N}
 end
 
 function mapcharges(f::Function, l::STLeg)
+    mappedchrs = f.(l.chrs)
+    mappedchrs == unique(mappedchrs) ||
+        error("mapping charges creates duplicates! $(l.chrs) -> $mappedchrs")
     STLeg(l.sign, f.(l.chrs), l.dims)
 end
 

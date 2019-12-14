@@ -1,40 +1,12 @@
 """
-    zipandgutzwiller_exact(mps1, mps2, mode)
-
-given two MPS, with the same number of sites and 2 physical
-dimensions perform the exact gutzwiller projection of the two. The
-final result is an MPS with 2 physical dimension where the final
-matrices are the tensor product of the given ones according to the
-`mode`.
-
-This function is just for testing. It is very inefficient because it
-generates the tensor product matrices first and then applies svd on
-them, the function to use is `zipandgutzwiller`
-
-"""
-function zipandgutzwiller_exact(mps1::MatrixProductState{T},
-                                mps2::MatrixProductState{T};
-                                mode::Symbol=:B14,
-                                maxdim::Int64=200) where {T<:RLorCX}
-    @assert mps1.d = mps2.d = 2
-    lx = mps1.length
-    @assert mps2.length = lx
-    center = mps1.center
-    @assert mps2.center = center
-
-    # what should I do here exactly?!
-    # what do I mean by exact?
-
-end
-
-"""
     zipandgutzwiller(mps1, mps2, mode)
 
 given two MPS, with the same number of sites and two physical
 dimensions perform gutzwiller projection of the two by making the
 matrices using iterative SVD. The final result is an MPS with 2
 physical dimension where the final matrices are the tensor product of
-the given ones according to the `mode`.
+the given ones according to the `mode` which can be :B14 for bosonic
+or :F23 for fermionic.
 
 """
 
@@ -42,16 +14,15 @@ function zipandgutzwiller!(mps1::MatrixProductState{T},
                            mps2::MatrixProductState{T};
                            mode::Symbol=:B14,
                            maxdim::Int64=200) where {T <: RLorCX}
+    if mode != :B14
+        error("only Bosinic ↑↑ and ↓↓ is possible for no-symmetry MPSs!")
+    end
     @assert mps1.d == mps2.d == 2
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    if mps1.center != 1
-        move_center!(mps1, 1)
-    end
-    if mps2.center != 1
-        move_center!(mps2, 1)
-    end
+    move_center!(mps1, 1)
+    move_center!(mps2, 1)
 
     dims = ones(Int64, lx+1)
     matrices = Array{T, 3}[]
@@ -91,7 +62,7 @@ end
 
 function zipandgutzwiller!(mps1::SymMatrixProductState{Tv},
                            mps2::SymMatrixProductState{Tv};
-                           mode::Symbol=:B14,
+                           mode::Symbol=:F23,
                            maxdim::Int64=200) where {Tv<:RLorCX}
     if mode==:B14
         return _zipandgutzwiller_B14!(mps1, mps2, maxdim=maxdim)
@@ -162,7 +133,6 @@ function _zipandgutzwiller_B14!(mps1::SymMatrixProductState{Tv},
     return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
 end
 
-#fermionic version (have to yet implement the minus sign and charge transform)
 function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
                                 mps2::SymMatrixProductState{Tv};
                                 maxdim::Int64=200) where {Tv<:RLorCX}
@@ -237,4 +207,101 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     push!(matrices, mapcharges((fnl,fnd,fnr), C))
 
     return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
+end
+
+"""
+    gutzwillerexact(mps1, mps2, mode)
+
+given two MPS, with the same number of sites and 2 physical
+dimensions perform the exact gutzwiller projection of the two. The
+final result is an MPS with 2 physical dimension where the final
+matrices are the tensor product of the given ones according to the
+`mode`.
+
+This function is just for testing. It is very inefficient because it
+generates the tensor product matrices first and then applies svd on
+them, the function to use is `zipandgutzwiller`
+
+"""
+function gutzwillerexact(mps1::MatrixProductState{T},
+                         mps2::MatrixProductState{T};
+                         mode::Symbol=:F23,
+                         maxdim::Int64=200) where {T<:RLorCX}
+    lx = mps1.length
+    mps2.length == lx ||
+        error("Two MPS should have the same number of sites!")
+
+    @assert mps1.d == mps2.d == 2
+    center = mps1.center
+
+    @assert mps2.center == center
+
+    move_center!(mps1, 1)
+    move_center!(mps2, 1)
+
+    dims = ones(Int64, lx+1)
+    matrices = SymTensor{Tv, 3}[]
+
+    ## NOTE: in order to make the gutzwiller projector respect the U1
+    ## symmetry we need to do the follwoing. Assume the first mps
+    ## corresponds to ↑ or 1 and second mps to ↓ or -1.
+    G = fill(one(Tv), 0,
+             (STLeg(+1, [-1,1], [1,1]),
+              STLeg(-1, [0,1], [1,1]),
+              STLeg(+1, [0,1], [1,1])))
+
+    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
+                          STLeg(-1, [0], [1]),
+                          STLeg(+1, [0], [1])))
+    for l=1:lx-1
+        A = mps1.matrices[l]
+        B = invlegs(mps2.matrices[l])
+
+        fswap = fermionswapgate(A.legs[2], B.legs[1])
+        ##NOTE:
+        # contracting (E2, A1)
+        # First tensor has EA = E1 E3 A2 A3
+        # contracting with swap
+        # second tensor has EAX = E1 A2 E3 A3
+        # contracting (A2, G2)
+        # Third tensor has EAG = E1 G1 G3 E3 A3
+        # contracting (E3, B1) and (G3, B2)
+        # Final tensor has E1 G1 A3 B3
+        C = contract(contract(contract(A, (1, -1, 5), fswap, (2, 3, 4, -1)),
+                              (1, 2, -1, 5, 6), G, (3, -1, 4)),
+                     (1,2, 3,-2, -1,5), B, (-1,-2, 4))
+
+        fuselegs(fuselegs(C, +1, 1, 2), -1, 3, 2)
+        U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+        normalize!(S)
+        dims[l+1] = size(S, 1)
+
+        fnl = x->div(x+l-1, 2)
+        fnd = x->div(x+1, 2)
+        fnr = x->div(x+l, 2)
+        push!(matrices,
+              mapcharges((fnl,fnd,fnr),
+                         unfuseleg(U, 1, (E.legs[1], G.legs[1]))))
+        E = unfuseleg(S * Vt, 2, (A.legs[3], B.legs[3]))
+    end
+    A = mps1.matrices[lx]
+    B = invlegs(mps2.matrices[lx])
+    fswap = fermionswapgate(A.legs[2], B.legs[1])
+    C = contract(contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                                   (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                          (1, -1, 4, 5), G, (2, -1, 3)),
+                 (1,2, -2, -1,3), B, (-1,-2, 4))
+
+    U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+    normalize!(S)
+    C = unfuseleg(U * S * Vt, 1, (E.legs[1], G.legs[1]))
+
+
+    fnl = x->div(x+lx-1, 2)
+    fnd = x->div(x+1, 2)
+    fnr = x->div(x+lx, 2)
+    push!(matrices, mapcharges((fnl,fnd,fnr), C))
+
+    return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
+
 end

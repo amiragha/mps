@@ -35,8 +35,8 @@ function SymTensor(charge :: Int,
                    nzblks :: Vector{<:AbstractArray{T, N}}) where{T<:Number, N}
     #issorted(sects, lt=_sectorlessthan) ||  error("sectors not sorted!")
     _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-        error("The given sectors and block-sizes do not match legs!")#, charge, legs, sects, size.(nzblks))
-    #length(sects) == length(nzblks) || error("sects don't match nzblks!")
+        error("The given sectors and block-sizes do not match legs!", charge, legs, sects, size.(nzblks))
+    length(sects) == length(nzblks) || error("sects don't match nzblks!")
     SymTensor{T, N}(charge, legs, sects, nzblks)
 end
 
@@ -396,21 +396,21 @@ end
 
 # Find the index of a set of sorted elements in a sorted vector `A`.
 # """
-# function findindexes_sorted(A::Vector{T}, elements::Vector{T}) where{T}
-#     #println(A, elements)
-#     p = 1
-#     indexes = Int[]
-#     for i in eachindex(A)
-#         if A[i] == elements[p]
-#             push!(indexes, i)
-#             if p==length(elements) break end
-#             p += 1
-#         elseif A[i] < elements[p]
-#             error("findindexes_sorted ", A, elements)
-#         end
-#     end
-#     indexes
-# end
+function _findindexes_sorted(A::Vector{T}, elements::Vector{T}) where{T}
+    #println(A, elements)
+    p = 1
+    indexes = Int[]
+    for i in eachindex(A)
+        if A[i] == elements[p]
+            push!(indexes, i)
+            if p==length(elements) break end
+            p += 1
+        elseif A[i] > elements[p]
+            error("_findindexes_sorted ", A, elements)
+        end
+    end
+    indexes
+end
 
 # function _trimlegs(legs::NTuple{N, STLeg}, sects::Vector{NTuple{N, Int}}) where{N}
 #     legcharges = Tuple(BitSet() for i=1:N)
@@ -431,6 +431,21 @@ end
 #     # println(trimmedlegs)
 #     Tuple(trimmedlegs)
 # end
+
+
+function trimleg!(A::AbstractSymTensor, l::Int)
+    N = numoflegs(A)
+    1 <= l <= N || error("not a leg index!")
+    legcharges = BitSet()
+    for sect in A.sects
+        push!(legcharges, sect[l])
+    end
+    leg = A.legs[l]
+    indexes = _findindexes_sorted(leg.chrs, collect(legcharges))
+    leg = STLeg(leg.sign, leg.chrs[indexes], leg.dims[indexes])
+    A.legs = (A.legs[1:l-1]..., leg, A.legs[l+1:N]...)
+    A
+end
 
 function negateleg(A::AbstractSymTensor, l::Int)
     N = numoflegs(A)

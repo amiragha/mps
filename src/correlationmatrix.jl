@@ -16,6 +16,7 @@ function correlationmatrix(hopmatrix::Matrix{Float64},
     @assert 0 < n_occupied && n_occupied <= lx
 
     fact = eigen(Symmetric(hopmatrix))
+    println(fact.values[n_occupied-2:n_occupied+2])
     e_fermi = fact.values[n_occupied]
     n=1
     while fact.values[n_occupied+n] - e_fermi < 1.e-10

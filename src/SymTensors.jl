@@ -40,6 +40,7 @@ export fuselegs
 export unfuseleg
 export permutelegs
 export removedummyleg
+export trimleg!
 export contract
 
 export reverseleg

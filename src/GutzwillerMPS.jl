@@ -9,6 +9,6 @@ RLorCX = Union{Float64, ComplexF64}
 
 include("gutzwiller.jl")
 
-export zipandgutzwiller_exact, zipandgutzwiller!
+export gutzwillerexact, zipandgutzwiller!
 
 end
