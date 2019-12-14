@@ -35,7 +35,7 @@ export alldims, accdims, getdim, fulldims, signs
 export numoflegs
 export _sectors_sortperm
 
-export fuse_set
+export fuse
 export fuselegs
 export unfuseleg
 export permutelegs

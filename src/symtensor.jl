@@ -7,14 +7,13 @@ abstract type AbstractSymMatrix{T<:Number} <: AbstractSymTensor{T, 2} end
 @inline size(A::AbstractSymTensor) = Tuple(fulldims(l) for l in A.legs)
 @inline size(A::AbstractSymTensor, l::Int) = size(A)[l]
 
-##TODO: should the below methods be "@inline" ?
-@inline issimilar(A::T, B::T) where {T<:AbstractSymTensor} =
+@inline issimilar(A::AbstractSymTensor, B::AbstractSymTensor) =
     A.charge == B.charge && A.legs == B.legs
 
 @inline isequal(A::T, B::T) where {T<:AbstractSymTensor} =
     issimilar(A, B) &&  isequal(A.nzblks, B.nzblks)
 
-@inline isapprox(A::T, B::T) where {T<:AbstractSymTensor} =
+@inline isapprox(A::AbstractSymTensor, B::AbstractSymTensor) =
     issimilar(A, B) &&  isapprox(A.nzblks, B.nzblks)
 
 @inline ==(A::T, B::T) where {T<:AbstractSymTensor} = isequal(A, B)
