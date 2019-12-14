@@ -187,22 +187,15 @@ one.
 function entropy(P::Vector{T};
                  alpha::Int=1) where {T<:Number}
 
+    alpha < 1 && error("Renyi entropy only defined for positive alpha")
     any(P .< 0.0) && error("Negative value in P vector ", P)
     sum(P) ≈ 1 || println("P vector doesn't add up to one : $(sum(P))")
+    Pnz = filter(x->x>0.0, P)
     if alpha == 1
-        return -sum(P .* log.(P))
+        return -sum(Pnz .* log.(Pnz))
     else
-        return log(sum(P.^alpha))/(1-alpha)
+        return log(sum(Pnz.^alpha))/(1-alpha)
     end
-end
-
-function entropy(spectrums::Vector{Vector{T}};
-                 alpha::Int=1) where {T<:Number}
-    result = Vector{T}(undef, length(spectrums))
-    for i in eachindex(spectrums)
-        result[i] =  entropy(spectrums[i], alpha=alpha)
-    end
-    return result
 end
 
 function _realwithcheck(a::Number, tol::Float64=1.e-12)
