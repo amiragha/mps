@@ -287,13 +287,11 @@ function entanglementspectrum(mps::SymMatrixProductState)
 
     for l = 1:lx-1
         U, S, Vt = svdsym(fuselegs(A, +1, 1, 2))
-        mps.matrices[l] = unfuseleg(U, 1, A.legs[1:2])
         spectrum = sort(vcat([diag(blk) for blk in S.nzblks]...), rev=true)
         result[l] = spectrum
         A = contract(S*Vt, (1, -1), mps.matrices[l+1], (-1,2,3))
     end
 
-    mps.matrices[lx] = A
     move_center!(mps, center)
     result
 end

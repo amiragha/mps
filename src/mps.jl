@@ -471,7 +471,6 @@ function measure_mpo(
 end
 
 function entanglementspectrum(mps::MatrixProductState)
-
     lx = mps.lx
     result = Vector{Vector{Float64}}(undef, lx-1)
     center = mps.center
@@ -480,12 +479,10 @@ function entanglementspectrum(mps::MatrixProductState)
 
     for l = 1:lx-1
         U, S, Vt = svd(reshape(A, size(A, 1)*size(A,2), size(A,3)))
-        mps.matrices[l] = reshape(U, size(A))
         result[l] = S
         @tensor A[l,o,r] := (Diagonal(S)*Vt)[l,m] * mps.matrices[l+1][m,o,r]
     end
 
-    mps.matrices[lx] = A
     move_center!(mps, center)
     result
 end
