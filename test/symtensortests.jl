@@ -1,7 +1,11 @@
 @testset "releg" begin
 
-    @testset "generic" begin
-        legs = STLeg(+1, [0,1], [2,3]), STLeg(+1, [0,1], [1,1]), STLeg(-1, [0,1], [3,4])
+    @testset "fuse/unfuse" begin
+        legs = (
+            STLeg(+1, [0,1], [2,3]),
+            STLeg(+1, [0,1], [1,1]),
+            STLeg(-1, [0,1], [3,4])
+        )
 
         # Note that all the possible sectors are given!
         sects = [(0, 0, 0), (0, 1, 1), (1, 0, 1)]
@@ -15,7 +19,7 @@
         @test dftest == test
     end
 
-    @testset "2siteop s=1/2" begin
+    @testset "U1 unitary" begin
         A = eye(Float64, [0,1,2], [1,2,1])
         set_sector!(A, (1,1), [2. 3;4 5])
         rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
@@ -25,6 +29,30 @@
                           (1,0,0,1), (0,1,0,1), (1,1,1,1)]
         i = ones(1,1,1,1)
         @test B.nzblks == [i,2*i, 4*i, 3*i, 5*i, 1*i]
+    end
+
+    @testset "Associativity" begin
+        legs = (
+            STLeg(+1, [-1, 0, 1], [1, 2, 1]),
+            STLeg(-1, [-1, 0, 1], [1, 2, 1]),
+            STLeg(+1, [0, 1, 2], [1, 2, 1]),
+            STLeg(-1, [0, 1, 2], [1, 2, 1]),
+            # STLeg(+1, [-2,-1, 0], [1, 2, 3]),
+            # STLeg(-1, [-2,-1, 0], [1, 2, 3]),
+            # STLeg(+1, [0], [1, 2, 3]),
+            # STLeg(-1, [0], [1, 2, 3]),
+        )
+
+        A = rand(0,  legs[1:4])
+        A1 = fuselegs(A, -1, 2, 3)
+        A2 = fuselegs(A, -1, 3, 2)
+        A3 = fuselegs(A, +1, 1, 3)
+        A4 = fuselegs(A, +1, 1, 2)
+
+        @test A2 ≈ unfuseleg(A1, 2, legs[2], fuse(-1, legs[3], legs[4]))
+        @test A4 ≈ unfuseleg(A3, 1, fuse(+1, legs[1], legs[2]), legs[3])
+        @test A1 ≈ fuselegs(A2, -1, 2, 2)
+        @test A3 ≈ fuselegs(A4, +1, 1, 2)
     end
 end
 
