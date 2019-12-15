@@ -143,6 +143,7 @@ function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T
 end
 
 # defuses a leg into some given legs
+unfuseleg(A::AbstractSymTensor,  l::Int, legs::STLeg...) = unfuseleg(A, l, legs)
 function unfuseleg(A    :: AbstractSymTensor,
                    l    :: Int,
                    legs :: NTuple{M, STLeg}) where {M}

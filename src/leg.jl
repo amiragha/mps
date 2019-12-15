@@ -61,6 +61,8 @@ function intersect(l1::STLeg, l2::STLeg)
     return chrs, idxs...
 end
 
+fuse(sign::Int, legs::STLeg...) = fuse(sign, legs)
+
 function fuse(sign::Int, legs::NTuple{N, STLeg}) where {N}
 
     #signs = sign .* [leg.sign for leg in legs]
