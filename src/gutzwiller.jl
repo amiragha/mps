@@ -209,6 +209,98 @@ function _zipandgutzwiller_F23!(mps1::SymMatrixProductState{Tv},
     return SymMatrixProductState{Tv}(lx, 2, dims, matrices, lx)
 end
 
+function _tensorproductzip!(mps1::SymMatrixProductState{Tv},
+                            mps2::SymMatrixProductState{Tv};
+                            maxdim::Int64=200,
+                            verbose::Bool=true) where {Tv<:RLorCX}
+    @assert mps1.d == mps2.d == 2
+    lx = mps1.lx
+    @assert mps2.lx == lx
+
+    move_center!(mps1, 1)
+    move_center!(mps2, 1)
+
+    dims = ones(Int64, lx+1)
+    matrices = SymTensor{Tv, 3}[]
+
+    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
+                          STLeg(-1, [0], [1]),
+                          STLeg(+1, [0], [1])))
+    for l=1:lx-1
+        A = mps1.matrices[l]
+        B = invlegs(mps2.matrices[l])
+
+        fswap = fermionswapgate(A.legs[2], B.legs[1])
+        ##NOTE:
+        # contracting (E2, A1)
+        # First tensor has EA = E1 E3 A2 A3
+        # contracting with swap
+        # second tensor has EAX = E1 XA2 A3 EX3
+        # contracting (EX3, B1)
+        # Final tensor has E1 XA2 B2 A3 B3
+        C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                              (1, -1, -2, 3), fswap, (-1, 2, 4, -2)),
+                     (1,2, 4,-1), B, (-1, 3, 5))
+
+        U, S, Vt = svdtrunc(fuselegs(fuselegs(C, +1, 1, 3), -1, 2, 2),
+                            maxdim=maxdim)
+        normalize!(S)
+        dims[l+1] = size(S, 1)
+
+        push!(matrices,
+              unfuseleg(U, 1, (E.legs[1], fuse(+1, (A.legs[2], B.legs[2])))))
+
+        E = unfuseleg(S * Vt, 2, (A.legs[3], B.legs[3]))
+    end
+    A = mps1.matrices[lx]
+    B = invlegs(mps2.matrices[lx])
+    fswap = fermionswapgate(A.legs[2], B.legs[1])
+    C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+                          (1, -1, -2, 3), fswap, (-1, 2, 4, -2)),
+                 (1,2, 4,-1), B, (-1, 3, 5))
+
+    push!(matrices, fuselegs(fuselegs(C, +1, 2, 2), -1, 3, 2))
+
+    return SymMatrixProductState{Tv}(lx, 4, dims, matrices, lx)
+end
+
+function _applygutzwiller!(mps)
+    T = eltype(mps)
+    G = fill(one(T), 0,
+             (STLeg(+1, [-1,1], [1,1]),
+              STLeg(-1, [-1,0,1], [1,2,1])))
+
+    C = contract(G, (2, -1), matrices[lx], (1, -1, 3))
+    U, S, Vt = svdtrunc(fuselegs(C, -1, 2, 2))
+    dims[lx] = size(S, 1)
+    fnl = x->div(x+lx-1, 2)
+    fnd = x->div(x+1, 2)
+    fnr = x->div(x+lx, 2)
+    matrices[lx] = mapcharges((fnl,fnd,fnr),
+                              unfuseleg(Vt, 2, (G.legs[1], C.legs[3])))
+    E = U*S
+    for l=lx-1:-1:2
+        C = contract(contract(G, (2, -1), matrices[l], (1, -1, 3)),
+                     (1,2,-1), E, (-1, 3))
+        U, S, Vt = svdtrunc(fuselegs(C, -1, 2, 2))
+        dims[l] = size(S, 1)
+        fnl = x->div(x+l-1, 2)
+        fnd = x->div(x+1, 2)
+        fnr = x->div(x+l, 2)
+        matrices[l] = mapcharges((fnl,fnd,fnr),
+                                 unfuseleg(Vt, 2, (G.legs[1], C.legs[3])))
+        E = U*S
+    end
+    C = contract(contract(G, (2, -1), matrices[1], (1, -1, 3)),
+                 (1,2,-1), E, (-1, 3))
+    fnl = x->div(x+1-1, 2)
+    fnd = x->div(x+1, 2)
+    fnr = x->div(x+1, 2)
+    matrices[1] =  mapcharges((fnl,fnd,fnr), C)
+
+    return SymMatrixProductState{Tv}(lx, 2, dims, matrices, 1)
+end
+
 """
     gutzwillerexact(mps1, mps2, mode)
 

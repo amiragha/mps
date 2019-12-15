@@ -48,26 +48,26 @@ function permutelegs(A::AbstractSymTensor,
               [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]])
 end
 
-"""
-    fuse_set(sect, parts)
+# """
+#     fuse_set(sect, parts)
 
-fuse the values in the `sect` using the binary operation `op` by to
-the partitions given by `parts`
+# fuse the values in the `sect` using the binary operation `op` by to
+# the partitions given by `parts`
 
-"""
-function fuse_set(op,
-                  sect::NTuple{N, Tc},
-                  partsizes::Vector{Int}) where {N, Tc<:Number}
-    ###TODO: I should be able to code this nicer, probably using some
-    ###functional stuff like map, fold, etc
-    result = Tc[]
-    p = 0
-    for n in partsizes
-        push!(result, foldl(op, sect[p+1:p+n]))
-        p += n
-    end
-    Tuple(result)
-end
+# """
+# function fuse_set(op,
+#                   sect::NTuple{N, Tc},
+#                   partsizes::Vector{Int}) where {N, Tc<:Number}
+#     ###TODO: I should be able to code this nicer, probably using some
+#     ###functional stuff like map, fold, etc
+#     result = Tc[]
+#     p = 0
+#     for n in partsizes
+#         push!(result, foldl(op, sect[p+1:p+n]))
+#         p += n
+#     end
+#     Tuple(result)
+# end
 
 """
     fuselegs
@@ -165,6 +165,8 @@ function unfuseleg(A    :: AbstractSymTensor,
     sects = NTuple{N+M-1, Int}[]
     nzblks = Array{T, N+M-1}[]
 
+    ##We first sort the sectors based on the charge the leg to be
+    ##unfused. The for each charge find all sectors and sizes!
     sign = A.legs[l].sign
     sectperm = sortperm(A.sects, by=x->x[l])
     csects = A.sects[sectperm]
