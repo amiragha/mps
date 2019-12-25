@@ -1,4 +1,8 @@
-const Sector{C, N} = NTuple{N, C}
+struct Sector{C, N}
+    charges :: NTuple{N, C}
+end
+Sector(s...) = Sector(s)
+#const Sector{C, N} = NTuple{N, C}
 const U1Sector{N} = Sector{Int, N}
 
 @inline sum(S::Sector) = sum(S)
@@ -9,8 +13,10 @@ we always sort sectors based on charges The sorting is column
 major. That means the leftmost (first) VSpace changes charge faster
 (first)!
 """
-@inline isless(s1::Sector{N, C}, s2::Sector{N, C}) where {N, C} =
- reverse(s1) < reverse(s2)
+@inline Base.isless(s1::Sector{C, N}, s2::Sector{C, N}) where {N, C} =
+ reverse(s1.charges) < reverse(s2.charges)
+
+const SectorDict{C, N, T} = SortedDict{Sector{C, N}, T, }
 
 abstract type SectorData{N, T} end
 mutable struct SectorArray{N, T} <: SectorData{N, T}
@@ -41,7 +47,7 @@ function _allsectorsandsizes(charge::C, Vs::NTuple{N, U1Space}) where{C, N}
         end
     end
 
-    sects = NTuple{N, C}[]
+    sects = Sector{N, C}[]
     sizes = NTuple{N, Int}[]
     for (c,d) in Vs[N]
         sect_head, size_head = _allsectorsandsizes(charge - c, Vs[1:N-1])
@@ -51,4 +57,20 @@ function _allsectorsandsizes(charge::C, Vs::NTuple{N, U1Space}) where{C, N}
         end
     end
     sects, sizes
+end
+
+function Base.show(io::IO, s::Sector)
+    if !get(io, :compact, false)
+        show(io, typeof(s))
+    end
+    print(io, "(")
+    separator = ""
+    comma = ", "
+    io2 = IOContext(io, :typeinfo => typeof(s))
+     for c in s.charges
+         print(io2, separator, c)
+         separator=comma
+     end
+    print(io2, ")")
+    return nothing
 end

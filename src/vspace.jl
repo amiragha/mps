@@ -1,56 +1,60 @@
-abstract type RepVectorSpace end
-struct U1Space <: RepVectorSpace
-    sectors :: SortedDict{Int, Int}
+abstract type AbstractVectorSpace end
+struct VectorSpace{S} <: AbstractVectorSpace
+    sectors :: SortedDict{S, Int}
 
-    function U1Space(s)
+    function VectorSpace{S}(s) where {S}
         allunique([c for (c,d) in s]) ||
             error("duplicate charges! $s")
-        sectors = SortedDict{Int, Int}(s)
+        sectors = SortedDict{S, Int}(s)
         for (c, d) in sectors
             d > 0 || error("space dimension can only be positive!")
         end
-        new(sectors)
+        new{S}(sectors)
     end
+
+    #VectorSpace{S}() where{S} = VectorSpace{S}(SortedDict{S, Int}())
 end
-U1Space(sectors...) = U1Space(sectors)
 
-@inline isequal(V1::U1Space, V2::U1Space) = isequal(V1.sectors, V2.sectors)
-==(V1::U1Space, V2::U1Space) = isequal(V1, V2)
+VectorSpace{S}(sectors...) where {S} = VectorSpace{S}(sectors)
 
-@inline hascharge(V::U1Space, charge::Int) = haskey(V.sectors)
+@inline vtype(::VectorSpace{S}) where {S} = S
+
+@inline isequal(V1::VectorSpace, V2::VectorSpace) = isequal(V1.sectors, V2.sectors)
+==(V1::VectorSpace, V2::VectorSpace) = isequal(V1, V2)
+
+@inline hascharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
 
 "Find the dimension of the the given `charge`. Returns 0 if charges
 doesn't exist. Return total dimension if charge is not specified."
-@inline dim(V::U1Space, charge::Int) = get(V.sectors, charge, 0)
-@inline dim(V::U1Space) = sum(chargedims(V))
+@inline dim(V::VectorSpace{S}, charge::S) where{S}= get(V.sectors, charge, 0)
+@inline dim(V::VectorSpace) = sum(chargedims(V))
 
-@inline charges(V::U1Space) = (c for (c,d) in V.sectors)
-@inline chargedims(V::U1Space) = (d for (c,d) in V.sectors)
+@inline charges(V::VectorSpace) = (c for (c,d) in V.sectors)
+@inline chargedims(V::VectorSpace) = (d for (c,d) in V.sectors)
 
-@inline Base.iterate(V::U1Space) = iterate(V.sectors)
-@inline Base.iterate(V::U1Space, i) = iterate(V.sectors, i)
-
-
-#@inline charges(legs::NTuple{N, U1Space}) where {N} = charges.(legs)
-
-#@inline signs(legs::NTuple{N, U1Space}) where {N} =
-#    Tuple(legs[n].sign for n in eachindex(legs))
-
-#@inline alldims(legs::NTuple{N, U1Space}) where {N} =
-#    Tuple(legs[n].dims for n in eachindex(legs))
-
-#@inline accdims(legs::NTuple{N, U1Space}) where {N} =
-#    Tuple(cumsum(legs[n].dims) for n in eachindex(legs))
-
-#@inline fulldims(V::U1Space) = sum(d for (c,d) in V.sectors)
-#@inline fulldims(legs::NTuple{N, U1Space}) where {N} = prod(fulldims.legs)
+@inline Base.length(V::VectorSpace) = length(V.sectors)
+@inline Base.iterate(V::VectorSpace) = iterate(V.sectors)
+@inline Base.iterate(V::VectorSpace, i) = iterate(V.sectors, i)
 
 "Return the dual of the vector space"
-@inline dual(V::U1Space) = U1Space(-c=>d for (c,d) in V.sectors)
+@inline dual(V::VectorSpace) = VectorSpace{vtype(V)}(-c=>d for (c,d) in V.sectors)
+
+function memoryrepr(V::VectorSpace)
+    p = 0
+    S = vtype(V)
+    dict = SortedDict{S, UnitRange{Int}}()
+    for (c,d) in V
+        dict[c] = p+1:p+d
+        p+=d
+    end
+    dict
+end
+
+const U1Space = VectorSpace{Int}
 
 "Find sector intersections between two VSpace"
-function intersect(V1::U1Space, V2::U1Space)
-    sectors = SortedDict{Int, Int}()
+function intersect(V1::VectorSpace{S}, V2::VectorSpace{S}) where {S}
+    sectors = SortedDict{S, Int}()
     for (c, d) in V1.sectors
         if d == get(V2, c, 0)
             sectors[c] = d
@@ -58,7 +62,7 @@ function intersect(V1::U1Space, V2::U1Space)
             error("same charge but different dims!")
         end
     end
-    return U1Space(sectors)
+    return VectorSpace(sectors)
 end
 
 """
@@ -78,9 +82,9 @@ the associator isomorphism to change the fusion tree.
 
 """
 
-fuse(Vs::U1Space...) = fuse(Vs)
+fuse(Vs::VectorSpace...) = fuse(Vs)
 
-function fuse(Vs::NTuple{N, U1Space}) where {N}
+function fuse(Vs::NTuple{N, VectorSpace{S}}) where {N, S}
     if N < 2
         return Vs[1]
     elseif N > 2
@@ -88,7 +92,7 @@ function fuse(Vs::NTuple{N, U1Space}) where {N}
         return fuse(Vs[1:N-2]..., fuse(Vs[N-1:N]...))
     end
     # N == 2 case
-    sectors = SortedDict{Int, Int}()
+    sectors = SortedDict{S, Int}()
     for (c2, d2) in Vs[2]
         for (c1, d1) in Vs[1]
             if haskey(sectors, c1+c2)
@@ -98,25 +102,25 @@ function fuse(Vs::NTuple{N, U1Space}) where {N}
             end
         end
     end
-    U1Space(sectors)
+    VectorSpace{S}(sectors)
 end
 
 "map the charges of the VSpace by some strictly ascending function `f`"
-function mapcharges(f::Function, V::U1Space)
+function mapcharges(f::Function, V::VectorSpace)
     mappedchrs = f.(charges(V))
     issoretd(mappedchrs) ||
         error("function not strictly ascending!")
     allunique(mappedchrs) ||
         error("mapping charges creates duplicates! $(l.chrs) -> $mappedchrs")
-    U1Space(f(c)=>d for (c,d) in V.sectors)
+    VectorSpace(f(c)=>d for (c,d) in V.sectors)
 end
 
-isdummy(V::U1Space) = charges(V) == (0,) && V[0] == 1
-dummyleg() = U1Space(0 => 1)
+isdummy(V::VectorSpace) = charges(V) == (0,) && V[0] == 1
+dummyleg() = VectorSpace(0 => 1)
 
 Base.show(io::IO, ::Type{U1Space}) = print(io, "U1Space")
 
-function Base.show(io::IO, V::RepVectorSpace)
+function Base.show(io::IO, V::VectorSpace)
     show(io, typeof(V))
     print(io, "(")
     seperator = ""
