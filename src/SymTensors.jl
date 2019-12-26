@@ -3,7 +3,7 @@ module SymTensors
 using LinearAlgebra
 using Random
 
-import Base: convert, size, show, isequal, ==, isapprox, *, conj
+import Base: convert, size, show, isless, isequal, ==, isapprox, *, conj
 import Base: eltype, similar, copyto!
 import Base: fill, fill!, rand, sum
 import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!
@@ -35,8 +35,6 @@ export vtype
 
 export SectorArray, SectorDiagonal
 export _allsectorsandsizes
-export _allsectorsandsizes2
-export _sectorlessthan
 export _sectorisallowed
 
 export array
@@ -47,7 +45,7 @@ export fuse
 
 #export _sectors_sortperm
 export fuselegs
-export unfuseleg
+export splitleg
 export permutelegs
 export dropdummyleg
 export trimleg!

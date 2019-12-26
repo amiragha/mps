@@ -1,46 +1,46 @@
 @testset "releg" begin
 
     @testset "fuse/unfuse" begin
-        legs = (
-            STLeg(+1, [0,1], [2,3]),
-            STLeg(+1, [0,1], [1,1]),
-            STLeg(-1, [0,1], [3,4])
+        space = (
+            U1Space(0=>2, 1=>3),
+            U1Space(0=>1, 1=>1),
+            U1Space(0=>3, -1=>4),
         )
 
         # Note that all the possible sectors are given!
-        sects = [(0, 0, 0), (0, 1, 1), (1, 0, 1)]
-        nzblks = [rand(1:9, 2,1,3), rand(1:9, 2,1,4), rand(1:9, 3,1,4)]
+        sects = [Sector(0, 0, 0), Sector(0, 1, -1), Sector(1, 0, -1)]
+        nzblks = [reshape(collect(1:6), 2,1,3),
+                  reshape(collect(7:14), 2,1,4),
+                  reshape(collect(15:26), 3,1,4)]
 
-        perm = _sectors_sortperm(sects)
-
-        test = SymTensor(0, legs, sects[perm], nzblks[perm])
-        ftest = fuselegs(test, +1, 1, 2)
-        dftest = unfuseleg(ftest, 1, legs[1:2])
-        @test dftest == test
+        A0 = SymTensor(0, space, SortedDict(zip(sects,nzblks)))
+        A1 = fuselegs(A0, 1, 2)
+        A2 = splitleg(A1, 1, space[1:2])
+        @test A0 == A2
     end
 
     @testset "U1 unitary" begin
         A = eye(Float64, [0,1,2], [1,2,1])
-        set_sector!(A, (1,1), [2. 3;4 5])
-        rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
-        clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
+        set_sector!(A, (1,-1), [2. 3;4 5])
+        rlegs = (U1Space(+1, [0,1], [1,1]), U1Space(+1, [0,1], [1,1]))
+        clegs = (U1Space(-1, [0,1], [1,1]), U1Space(-1, [0,1], [1,1]))
         B = unfuseleg(unfuseleg(A, 2, clegs), 1, rlegs)
-        @test B.sects == [(0,0,0,0), (1,0,1,0), (0,1,1,0),
-                          (1,0,0,1), (0,1,0,1), (1,1,1,1)]
+        @test B.sects == [(1,1,-1,-1),(1,0,0,-1), (0,1,0,-1),
+                          (1,0,-1,0), (0,1,-1,0), (0,0,0,0)]
         i = ones(1,1,1,1)
         @test B.nzblks == [i,2*i, 4*i, 3*i, 5*i, 1*i]
     end
 
     @testset "Associativity" begin
         legs = (
-            STLeg(+1, [-1, 0, 1], [1, 2, 1]),
-            STLeg(-1, [-1, 0, 1], [1, 2, 1]),
-            STLeg(+1, [0, 1, 2], [1, 2, 1]),
-            STLeg(-1, [0, 1, 2], [1, 2, 1]),
-            # STLeg(+1, [-2,-1, 0], [1, 2, 3]),
-            # STLeg(-1, [-2,-1, 0], [1, 2, 3]),
-            # STLeg(+1, [0], [1, 2, 3]),
-            # STLeg(-1, [0], [1, 2, 3]),
+            U1Space(+1, [-1, 0, 1], [1, 2, 1]),
+            U1Space(-1, [-1, 0, 1], [1, 2, 1]),
+            U1Space(+1, [0, 1, 2], [1, 2, 1]),
+            U1Space(-1, [0, 1, 2], [1, 2, 1]),
+            # U1Space(+1, [-2,-1, 0], [1, 2, 3]),
+            # U1Space(-1, [-2,-1, 0], [1, 2, 3]),
+            # U1Space(+1, [0], [1, 2, 3]),
+            # U1Space(-1, [0], [1, 2, 3]),
         )
 
         A = rand(0,  legs[1:4])
@@ -60,10 +60,10 @@ end
 
     @testset "matrices" begin
         leglist = (
-            STLeg(+1, [0, 1, 2], [2,3,4]),
-            STLeg(-1, [0,1,2,3], [4,2,2,3]),
-            STLeg(+1, [0,1,2,3], [4,2,2,3]),
-            STLeg(-1, [0, 1, 2], [3,5,2]),
+            U1Space(+1, [0, 1, 2], [2,3,4]),
+            U1Space(-1, [0,1,2,3], [4,2,2,3]),
+            U1Space(+1, [0,1,2,3], [4,2,2,3]),
+            U1Space(-1, [0, 1, 2], [3,5,2]),
         )
         A = rand(Float64, 0, leglist[1:2])
         B = fill(1.0, 0, leglist[3:4])
@@ -78,14 +78,14 @@ end
 
     @testset "multi leg tensors" begin
         leglist = (
-            STLeg(+1, [0, 1, 2], [2,3,4]),
-            STLeg(-1, [0,1,2,3], [4,2,2,3]),
-            STLeg(+1, [0, 1, 2], [3,5,2]),
-            STLeg(-1, [0, 1], [6,7]),
-            STLeg(+1, [0, 1], [6,7]),
-            STLeg(+1, [0,1,2,3,4], [2,3,4,5,6]),
-            STLeg(+1, [0,1], [2,3]),
-            STLeg(-1, [0,1,2], [3,4,5])
+            U1Space(+1, [0, 1, 2], [2,3,4]),
+            U1Space(-1, [0,1,2,3], [4,2,2,3]),
+            U1Space(+1, [0, 1, 2], [3,5,2]),
+            U1Space(-1, [0, 1], [6,7]),
+            U1Space(+1, [0, 1], [6,7]),
+            U1Space(+1, [0,1,2,3,4], [2,3,4,5,6]),
+            U1Space(+1, [0,1], [2,3]),
+            U1Space(-1, [0,1,2], [3,4,5])
         )
         A = rand(Float64, 0, leglist[1:4])
         B = rand(Float64, 0, leglist[5:8])
@@ -104,14 +104,14 @@ end
 
 @testset "LA fns" begin
     leglist = (
-        STLeg(+1, [0, 1, 2], [2,3,4]),
-        STLeg(-1, [0,1,2,3], [4,2,2,3]),
-        STLeg(+1, [0, 1, 2], [3,5,2]),
-        STLeg(-1, [0, 1], [6,7]),
-        STLeg(+1, [0, 1], [6,7]),
-        STLeg(+1, [0,1,2,3,4], [2,3,4,5,6]),
-        STLeg(+1, [0,1], [2,3]),
-        STLeg(-1, [0,1,2], [3,4,5])
+        U1Space(+1, [0, 1, 2], [2,3,4]),
+        U1Space(-1, [0,1,2,3], [4,2,2,3]),
+        U1Space(+1, [0, 1, 2], [3,5,2]),
+        U1Space(-1, [0, 1], [6,7]),
+        U1Space(+1, [0, 1], [6,7]),
+        U1Space(+1, [0,1,2,3,4], [2,3,4,5,6]),
+        U1Space(+1, [0,1], [2,3]),
+        U1Space(-1, [0,1,2], [3,4,5])
     )
     @testset "dot" begin
         A = rand(ComplexF64, 0, leglist[1:4])

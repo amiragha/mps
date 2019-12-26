@@ -121,65 +121,58 @@ function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T
 end
 
 # defuses a leg into some given legs
-unfuseleg(A::AbstractSymTensor,  l::Int, legs::U1Space...) = unfuseleg(A, l, legs)
-function unfuseleg(A    :: AbstractSymTensor,
-                   l    :: Int,
-                   legs :: NTuple{M, U1Space}) where {M}
+splitleg(A::AbstractSymTensor,  l::Int, space::U1Space...) = splitleg(A, l, space)
+function splitleg(A    :: AbstractSymTensor,
+                  l    :: Int,
+                  space :: NTuple{M, VectorSpace{S}}) where {M, S}
     T = eltype(A)
     N = rank(A)
     0 < l <= N || error("integer l not in range $l, $N")
-    #println(A.legs)
-    #println(legs)
-    if length(legs) == 1
-        if legs[1].sign == A.legs[l].sign
-            A.legs[l] == legs[1] ||
-                error("Not the same legs", A.legs[l], legs[1])
-            return A
-        else
-            Aleg = negate(A.legs[l])
-            Aleg == legs[1] ||
-                (error("Not the same legs", Aleg, legs[1]))
-            return negateleg(A, l)
-        end
+    vtype(A) == S || throw("SpaceMismatch $(vtype(A)), $S")
+    if length(space) == 1
+        A.space[l] == first(space) ||
+            throw("SpaceMismatch $(A.space[l]), $(first(space))")
+        return A
     end
 
-    sects = NTuple{N+M-1, Int}[]
-    nzblks = Array{T, N+M-1}[]
+    data = SortedDict{Sector{S, N+M-1}, Array{T, N+M-1}}()
 
+    ##TODO: explain what tensor product structure change the below
+    ##procedure amounts to!
     ##We first sort the sectors based on the charge the leg to be
     ##unfused. Then for each charge find all sectors and sizes!
-    #sign = A.legs[l].sign
-    sectperm = sortperm(A.sects, by=x->x[l])
-    csects = A.sects[sectperm]
+    sects = collect(keys(A.data))
+    semits = collect(onlysemitokens(A.data))
+    sectperm = sortperm(sects, by=x->x.charges[l])
+    csects = sects[sectperm]
+    semits = semits[sectperm]
     oldcharge = 0
-    pats, sizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
+    pats, sizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
     for i in eachindex(csects)
         #charge = sign * csects[i][l]
         charge = csects[i][l]
         if i == 1 || charge != oldcharge
-            pats, sizes = _allsectorsandsizes(charge, legs)
+            pats, sizes = _allsectorsandsizes(charge, space)
             oldcharge = charge
         end
 
-        old_nzblock =  A.nzblks[sectperm][i]
+        old_nzblock =  A.data[semits[i]]
         s = size(old_nzblock)
         pivot = 0
         for patidx in eachindex(pats)
             sl = prod(sizes[patidx])
-            push!(sects, (csects[i][1:l-1]..., pats[patidx]..., csects[i][l+1:N]...))
-            push!(nzblks,
-                  reshape(old_nzblock[[1:s[n] for n=1:l-1]...,
-                                      pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
-                                  s[1:l-1]...,sizes[patidx]...,s[l+1:N]...))
+            sector = Sector(csects[i][1:l-1]..., pats[patidx]..., csects[i][l+1:N]...)
+            data[sector] = reshape(old_nzblock[[1:s[n] for n=1:l-1]...,
+                                                pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
+                                    s[1:l-1]...,sizes[patidx]...,s[l+1:N]...)
             pivot += sl
         end
     end
 
     #TODO: now check to see if the new legs can fuse into the original leg
-    new_legs = (A.legs[1:l-1]...,legs...,A.legs[l+1:end]...)
+    new_space = (A.space[1:l-1]...,space...,A.space[l+1:end]...)
 
-    sectperm = sortperm(sects)
-    SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
+    SymTensor(A.charge, new_space, data)
 end
 
 # """

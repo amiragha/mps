@@ -8,6 +8,10 @@ const U1Sector{N} = Sector{Int, N}
 @inline Base.sum(S::Sector) = sum(S)
 @inline dual(S::Sector) = Sector(dual(s) for s in S)
 
+Base.getindex(s::Sector, i) = getindex(s.charges, i)
+Base.iterate(s::Sector) = iterate(s.charges)
+Base.iterate(s::Sector, i) = iterate(s.charges, i)
+
 """
 we always sort sectors based on charges The sorting is column
 major. That means the leftmost (first) VSpace changes charge faster
