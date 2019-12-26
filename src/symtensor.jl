@@ -1,258 +1,221 @@
-abstract type AbstractSymTensor{T<:Number, N} end
-abstract type AbstractSymMatrix{T<:Number} <: AbstractSymTensor{T, 2} end
+abstract type AbstractSymTensor{S, T, N} end
+const AbstractSymMatrix{S, T} = AbstractSymTensor{S, T, 2}
 
-@inline numoflegs(::AbstractSymTensor{T, N}) where {T<:Number, N} = N
+"""
+A symmetric tensor is represented as a tensor map over the space of
+V_row (codomain) with tensor product structure of (((V1 ⊗ V2) ⊗ V3) ⊗
+...) and the space of V_col (domain) with tensor product structure of
+(...⊗ (V_{n-3} ⊗ (V_{n-1} ⊗ V_n))). The data is also represented as a
+matrix
+"""
+
+mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
+    charge   :: S
+    space    :: NTuple{N, VectorSpace{S}}
+    data     :: SortedDict{Sector{S, N}, Array{T, N}}
+
+    function SymTensor(charge :: S,
+                       space  :: NTuple{N, VectorSpace{S}},
+                       data   :: SortedDict{Sector{S, N}, Array{T, N}}) where{S,T,N}
+        sects, sizes = _allsectorsandsizes(charge, space)
+        i = 1
+        for (s,d) in data
+            s == sects[i] || throw("SectorMismatch(), $s, $sects[i]")
+            size(d) == sizes[i] || throw(SizeMismatch())
+            i += 1
+        end
+        new{S,T,N}(charge, space, data)
+    end
+    SymTensor{S,T,N}(c,s,d) where{S,T,N}= SymTensor(c,s,d)
+end
+
+# function SymTensor{S,T1,N}(A::SymTensor{S,T2,N}) where {S,T1, T2, N}
+#     SymTensor{S,T1,N}(A.charge, A.space, SortedDict{Sector{S,N}, T1}(A.data))
+# end
+
+const SymMatrix{S, T} = SymTensor{S, T, 2}
+const SymVector{S, T} = SymTensor{S, T, 1}
+
+const U1Tensor{T, N} = SymTensor{Int, T, N}
+const U1Matrix{T} = SymMatrix{Int, T}
+const U1Vector{T} = SymVector{Int, T}
+
+mutable struct SymDiagonal{S, T<:Number} <: AbstractSymMatrix{S, T}
+    charge :: S
+    space  :: NTuple{2, VectorSpace{S}}
+    data   :: SortedDict{Sector{S, 2}, Diagonal{T}}
+
+    function SymDiagonal(charge :: S,
+                         space  :: NTuple{2, VectorSpace{S}},
+                         data   :: SortedDict{Sector{S,2}, Diagonal{T}}) where{S,T}
+        sects, sizes = _allsectorsandsizes(charge, space)
+        i = 1
+        for (s,d) in data
+            s == sects[i] || throw{SectorMismatch()}
+            size(d) == sizes[i] || throw(SizeMismatch())
+            i += 1
+        end
+        chargedims(first(space)) == chargedims(last(space)) ||
+            throw("SymDiagonal has to be square")
+        new{S,T}(charge, space, data)
+    end
+end
+
+const U1Diagonal{T} = SymDiagonal{Int, T}
+
+function SymVector(charge::S, v::Vector{T}) where{S, T}
+    V = VectorSpace{S}(charge => length(v))
+    SymVector{S, T}(charge, (V,), SortedDict(Sector(charge) => v))
+end
+
+function convert(::Type{SymTensor{S, T1, N}},
+                 A::SymTensor{S, T2, N}) where {S, T1, T2, N}
+    SymTensor{S, T1, N}(A.charge, A.space, A.data)
+end
+
+@inline rank(::AbstractSymTensor{S, T, N}) where {S, T, N} = N
 @inline charge(A::AbstractSymTensor) = A.charge
 
-@inline size(A::AbstractSymTensor) = Tuple(fulldims(l) for l in A.legs)
-@inline size(A::AbstractSymTensor, l::Int) = size(A)[l]
+@inline size(A::AbstractSymTensor) = Tuple(dim(V) for V in A.space)
+@inline size(A::AbstractSymTensor, l::Int) = dim(A.space[l])
 
-@inline issimilar(A::AbstractSymTensor, B::AbstractSymTensor) =
-    A.charge == B.charge && A.legs == B.legs
+@inline issimilar(A::T, B::T) where {T<:AbstractSymTensor} =
+    A.charge == B.charge && A.space == B.space
 
 @inline isequal(A::T, B::T) where {T<:AbstractSymTensor} =
-    issimilar(A, B) &&  isequal(A.nzblks, B.nzblks)
+    issimilar(A, B) && isequal(A.data, B.data)
 
 @inline isapprox(A::AbstractSymTensor, B::AbstractSymTensor) =
-    issimilar(A, B) &&  isapprox(A.nzblks, B.nzblks)
+    issimilar(A, B) && isapprox(A.nzblks, B.nzblks)
 
 @inline ==(A::T, B::T) where {T<:AbstractSymTensor} = isequal(A, B)
 
-mutable struct SymTensor{T<:Number, N} <: AbstractSymTensor{T, N}
-    charge :: Int
-    legs   :: NTuple{N, STLeg}
-    sects  :: Vector{NTuple{N, Int}}
-    nzblks :: Vector{Array{T, N}}
-    function SymTensor{T, N}(c,l,s,n) where {T<:Number, N}
-        new{T, N}(c,l,s,n)
-    end
-end
+@inline eltype(::AbstractSymTensor{S, T}) where {S, T} = T
+@inline eltype(::Type{<:AbstractSymTensor{S, T}}) where {S, T} = T
 
-function SymTensor(charge :: Int,
-                   legs   :: NTuple{N, STLeg},
-                   sects  :: Vector{NTuple{N, Int}},
-                   nzblks :: Vector{<:AbstractArray{T, N}}) where{T<:Number, N}
-    #issorted(sects, lt=_sectorlessthan) ||  error("sectors not sorted!")
-    _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-        error("The given sectors and block-sizes do not match legs!", charge, legs, sects, size.(nzblks))
-    length(sects) == length(nzblks) || error("sects don't match nzblks!")
-    SymTensor{T, N}(charge, legs, sects, nzblks)
-end
+@inline vtype(::AbstractSymTensor{S, T}) where {S, T} = S
+@inline vtype(::Type{<:AbstractSymTensor{S, T}}) where {S, T} = S
 
-SymTensor{T, N}(A::SymTensor{T, N}) where {T, N} = A
-function SymTensor{T1, N}(A::SymTensor{T2, N}) where {T1, T2, N}
-    SymTensor{T1, N}(A.charge, A.legs, A.sects,
-                     [Array{T1, N}(blk) for blk in A.nzblks])
-end
+#@inline size(A::SymVector) = size(nzblks[1])
 
-mutable struct SymMatrix{T<:Number} <: AbstractSymMatrix{T}
-    charge :: Int
-    legs   :: Tuple{STLeg, STLeg}
-    sects  :: Vector{Tuple{Int, Int}}
-    nzblks :: Vector{Matrix{T}}
-    function SymMatrix{T}(c,l,s,n) where {T<:Number}
-        new{T}(c,l,s,n)
-    end
-end
+# function index_sector(A::AbstractSymTensor{T, N},
+#                       s::NTuple{N, Int}) where{T<:Number, N}
+#     index = searchsortedfirst(A.sects, s, lt=_sectorlessthan)
+#     (index > length(A.sects) || s != A.sects[index]) &&
+#         error("sector not found!")
+#     index
+# end
 
-function SymMatrix(charge :: Int,
-                   legs   :: Tuple{STLeg, STLeg},
-                   sects  :: Vector{Tuple{Int, Int}},
-                   nzblks :: Vector{Matrix{T}}) where {T<:Number}
-    signs(legs) == (+1, -1) || error("SymMatrix signs should be (+1,-1) ", signs(legs))
-    #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
-    _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-        error("The given sectors and block-sizes do not match legs!")
-    #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
-    SymMatrix{T}(charge, legs, sects, nzblks)
-end
-
-##TODO: see if this should be a convert function!
-SymMatrix(A::AbstractSymMatrix) = A
-function SymMatrix(A::SymTensor{T, 2}) where {T<:Number}
-    signs(A.legs) == (+1, -1) ||
-        error("SymTensor{T, 2} doesn't have correct signs to convert to SymMatrix")
-    SymMatrix{T}(A.charge, A.legs, A.sects, A.nzblks)
-end
-
-mutable struct SymDiagonal{T<:Number} <: AbstractSymMatrix{T}
-    charge :: Int
-    legs   :: Tuple{STLeg, STLeg}
-    sects  :: Vector{Tuple{Int, Int}}
-    nzblks :: Vector{Diagonal{T,Vector{T}}}
-    function SymDiagonal{T}(c,l,s,n) where {T<:Number}
-        new{T}(c,l,s,n)
-    end
-end
-
-function SymDiagonal(charge :: Int,
-                     legs   :: Tuple{STLeg, STLeg},
-                     sects  :: Vector{Tuple{Int, Int}},
-                     nzblks :: Vector{Diagonal{T,Vector{T}}}) where {T<:Number}
-    signs(legs) == (+1, -1) || error("SyDiagonal signs should be (+1,-1) ", signs(legs))
-    #issorted(sects, lt=_sectorlessthan) || error("sectors not sorted!")
-    _allsectorsandsizes(charge, legs) == (sects, size.(nzblks)) ||
-        error("The given sectors and block-sizes do not match legs!")
-    #lenth(sects) == length(nzblks) || error("sects don't match nzblks!")
-    legs[1].dims == legs[2].dims || error("SymDiagonal is not square!")
-    SymDiagonal{T}(charge, legs, sects, nzblks)
-end
-
-struct SymVector{T<:Number} <: AbstractSymTensor{T, 1}
-    charge :: Int
-    legs   :: Tuple{STLeg}
-    sects  :: Vector{Tuple{Int}}
-    nzblks :: Vector{Vector{T}}
-    function SymVector{T}(c,l,s,n) where {T<:Number}
-        new{T}(c,l,s,n)
-    end
-end
-
-function SymVector(charge :: Int,
-                   legs   :: Tuple{STLeg},
-                   sects  :: Vector{Tuple{Int}},
-                   nzblks :: Vector{Vector{T}}) where {T<:Number}
-    length(sects) == length(nzblks) == 1 ||
-        error("SymVector accepts only one sector or nzblk!")
-    size(nzblks, 1) == legs[1].dims[1] || error("")
-    legs[1].chrs = [charge]
-    legs[1].dims = [size(nzblks[1], 1)]
-    SymVector{T}(charge, legs, sects, nzblks)
-end
-
-SymVector(A::SymVector{T}) where{T<:Number} = A
-function SymVector(sign::Int, charge::Int, v::Vector{T}) where{T<:Number}
-    leg = STLeg(sign, [charge], [length(v)])
-    SymVector{T}(charge, (leg,), [(charge,)], [v])
-end
-
-##TODO: see if this should be a convert function!
-function SymVector(A::SymTensor{T, 1}) where {T<:Number}
-    SymVector{T}(A.charge, A.legs, A.sects, A.nzblks)
-end
-
-@inline size(s::SymVector) = size(nzblks[1])
-
-
-
-##TODO: make the below three into one
-#convert(::Type{T}, A::AbstractSymTensor) where {T<:AbstractSymTensor} = T(A)
-function convert(::Type{SymTensor{T1, N}},
-                 A::SymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
-    SymTensor{T1, N}(A.charge, A.legs, A.sects, A.nzblks)
-end
-
-function convert(::Type{SymMatrix{T1}},
-                 A::SymMatrix{T2}) where {T1<:Number, T2<:Number}
-    SymMatrix{T1}(A.charge, A.legs, A.sects, A.nzblks)
-end
-
-function convert(::Type{SymVector{T1}},
-                 A::SymVector{T2}) where {T1<:Number, T2<:Number}
-    SymVector{T1}(A.charge, A.legs, A.sects, A.nzblks)
-end
-
-@inline _sectors_sortperm(sects::Vector{NTuple{N, Int}};
-                          by::Function=identity) where {N} =
-                              sortperm(sects, by=by, lt=_sectorlessthan)
-
-function index_sector(A::AbstractSymTensor{T, N},
-                      s::NTuple{N, Int}) where{T<:Number, N}
-    index = searchsortedfirst(A.sects, s, lt=_sectorlessthan)
-    index > length(A.sects) && s != A.sects[index] && error("sector not found!")
-    index
-end
-
-function get_sector(A::AbstractSymTensor{T, N},
-                    s::NTuple{N, Int}) where {T<:Number, N}
-    A.nzblks[index_sector(A, s)]
-end
-
+@inline get_sector(A::AbstractSymTensor{T, N},
+                   S::U1Sector{N}) where {T<:Number, N} = get(A.data, S)
 function set_sector!(A::AbstractSymTensor{T, N},
-                     s::NTuple{N, Int},
-                     nzblk::Array{T, N}) where {T<:Number, N}
-    A.nzblks[index_sector(A, s)] = nzblk
+                     S::U1Sector{N},
+                     blk::Array{T, N}) where {T<:Number, N}
+    A.data[S] = blk
     A
 end
 
-function rand(::Type{T}, charge::Int, legs::NTuple{N, STLeg};
+function rand(::Type{T}, charge::Int, space::NTuple{N, U1Space};
               seed::Int=1911) where {T<:Number, N}
-    sects, sizes = _allsectorsandsizes(charge, legs)
+    sects, sizes = _allsectorsandsizes(charge, space)
     rng = MersenneTwister(seed)
-    nzblks = [rand(rng, T, dims) for dims in sizes]
-    SymTensor(charge, legs, sects, nzblks)
+    data = SortedDict(sects[i] => rand(rng, T, sizes[i]) for i=1:length(sects))
+    SymTensor(charge, space, data)
 end
 
-rand(charge::Int, legs::NTuple{N, STLeg}) where {N} = rand(Float64, charge, legs)
+rand(charge::Int, space::NTuple{N, U1Space}) where {N} = rand(Float64, charge, space)
 
-function fill(x::T, charge::Int, legs::NTuple{N, STLeg}) where {T<:Number, N}
-    sects, sizes = _allsectorsandsizes(charge, legs)
-    nzblks = [fill(x, dims) for dims in sizes]
-    SymTensor(charge, legs, sects, nzblks)
+function fill(x::T, charge::Int, space::NTuple{N, VectorSpace{S}}) where {S,T<:Number,N}
+    sects, sizes = _allsectorsandsizes(charge, space)
+    data = SortedDict(sects[i] => fill(x, sizes[i]) for i=1:length(sects))
+    SymTensor(charge, space, data)
 end
 
-function fill!(A::SymTensor{T, N}, x::T) where {T<:Number, N}
+function fill!(A::SymTensor{S,T,N}, x::T) where {S,T,N}
     for i in eachindex(A.nzblks)
         fill!(A.nzblks[i], x)
     end
     A
 end
 
+function fill_linearindex(charge::Int, space::NTuple{N, U1Space}) where {N}
+    sects, sizes = _allsectorsandsizes(charge, legs)
+    nzblks = Vector{Array{Int, N}}()
+    p = 0
+    for dims in sizes
+        push!(nzblks, reshape(collect(p+1:p+prod(dims)), dims...))
+        p += prod(dims)
+    end
+    SymTensor(charge, legs, SectorArray(sects[i]=>nzblks[i] for i=1:length(sects)))
+end
+
 ##TODO: Mix this with the usual UnitScaling
 function eye(::Type{T}, chrs::Vector{Int}, dims::Vector{Int}) where {T<:Number}
-    l1 = STLeg(+1, chrs, dims)
-    l2 = STLeg(-1, chrs, dims)
+    V1 = U1Space(chrs, dims)
+    V2 = U1Space(-1 .* chrs, dims)
 
-    sects, sizes = _allsectorsandsizes(zero(Int), (l1,l2))
-    nzblks = [Matrix{T}(I, dims) for dims in sizes]
-    SymMatrix(zero(Int), (l1,l2), sects, nzblks)
+    sects, sizes = _allsectorsandsizes(zero(Int), (V1,V2))
+    SymMatrix(zero(Int), (l1,l2), sects,
+              SectorArray(sects[i] => I(sizes[i]) for i=1:length(sects)))
 end
 
 eye(cs::Vector{Int}, ds::Vector{Int}) = eye(Float64, cs, ds)
 
 """
-    invlegs(sten)
+    tensordual(A)
 
-invert the direction (sign) of all legs of the tensor therefore
-negative the total charge of the tensor as well!
+Change the direction (sign) of all legs of the tensor to make the dual
+of tensor. This operation negates the: tensor charge, leg signs,
+sectors as well! One can set whether or not it also conjugates the
+data with `conjugate` which is true by default.
+
 """
 # This function seems to be not respecting the (+1, -1) convention for
 # SymMatrix objects, should I change the convention then?
-function invlegs(A::AbstractSymTensor)
-    legs = Tuple([STLeg(-l.sign, l.chrs, l.dims) for l in A.legs])
-    typeof(A)(-A.charge, legs, A.sects, A.nzblks)
+function dual(A::AbstractSymTensor; conjugate::Bool=true)
+    if !conjugate
+        return typeof(A)(-A.charge,
+                         dual.(A.space),
+                         typeof(A.data)(dual(s), d for (s,d) in A.data))
+    end
+    typeof(A)(-A.charge,
+              dual.(A.space),
+              typeof(A.data)(dual(s), conj(d) for (s,d) in A.data))
 end
 
 function mapcharges(f::Function, A::AbstractSymTensor)
     SymTensor(f(A.charge),
-              mapcharges.(f, A.legs),
-              [f.(s) for s in A.sects],
-              A.nzblks)
+              mapcharges.(f, A.space),
+              typeof(A.data)(mapcharge(f, s),d for (s,d) in A.data))
 end
 
 function mapcharges(f::NTuple{N, Function},
                     A::AbstractSymTensor{T, N}) where{T<:Number, N}
-    legs = Tuple(mapcharges(f[i], A.legs[i]) for i in 1:N)
+    space = Tuple(mapcharges(f[i], A.space[i]) for i in 1:N)
+
     sects = [Tuple(f[i](s[i]) for i in 1:N) for s in A.sects]
     sgns = signs(legs)
-    charges = [sum(sgns .* s) for s in sects]
-    !all(charges .== charges[1]) && error("mapcharges function is inconsistent!")
-    SymTensor(charges[1], legs, sects, A.nzblks)
+    charges = [sum(s) for s in sectors(A.data)]
+    !all(charges .== charges[1]) &&
+        error("mapcharges functions are inconsistent!")
+    SymTensor(charges[1], space,
+              typeof(A.data)(mapcharge(f, s),d for (s,d) in A.data))
 end
 
 conj(A::AbstractSymTensor) =
-    typeof(A)(A.charge, A.legs, A.sects, [conj(blk) for blk in A.nzblks])
+    typeof(A)(A.charge, A.space, conj(A.data))
 
+#TODO: to make this work!
 function array(A::AbstractSymTensor)
-    arrep = zeros(eltype(A), sum.(alldims(A.legs)))
-    adims = Tuple([0;s] for s in accdims(A.legs))
+    arrep = zeros(eltype(A), dims.(A.space)...)
+    adims = Tuple([0;s] for s in accdims(A.space))
     chrs = [0, 1]
     for idx in eachindex(A.sects)
         sect = A.sects[idx]
         nzblk = A.nzblks[idx]
         ranges = []
         for n in eachindex(sect)
-            i = findfirst(sect[n].== A.legs[n].chrs)
+            i = findfirst(isequal(legs[n].sign*sect[n]), A.legs[n].chrs)
             push!(ranges, adims[n][i]+1:adims[n][i+1])
         end
         arrep[Tuple(ranges)...] = nzblk
@@ -262,35 +225,21 @@ end
 
 
 @inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
-    typeof(A)(A.charge, A.legs, A.sects, [a .* blk for blk in A.nzblks])
+    typeof(A)(A.charge, A.space, *(A.data, a))
 
 @inline *(a::T, A::AbstractSymTensor) where {T<:Number} = *(A, a)
-
-function removedummyleg(A::AbstractSymTensor, l::Int)
-    isdummy(A.legs[l]) || error("leg is not dummy!")
-
-    N = numoflegs(A)
-    SymTensor(A.charge,
-              (A.legs[1:l-1]..., A.legs[l+1:N]...),
-              [(s[1:l-1]...,s[l+1:N]...) for s in A.sects],
-              [reshape(blk, size(blk)[1:l-1]...,size(blk)[l+1:N]...) for blk in A.nzblks])
-end
-
-##TODO: this stuff should go up
-@inline eltype(::AbstractSymTensor{T}) where {T<:Number} = T
-@inline eltype(::Type{<:AbstractSymTensor{T}}) where {T<:Number} = T
 
 "construct an additional SymTensor similar to A, possibly with a
 different scalar type T."
 function similar(A::AbstractSymTensor, T::Type=eltype(A))
-    typeof(A)(A.charge, A.legs, A.sects, [similar(blk, T) for blk in A.nzblks])
+    typeof(A)(A.charge, A.legs, typeof(A)((s, similar(d, T)) for (s,d) in A.data))
 end
 
 "copy the contents of A to a preallocated SymTensor B"
 function copyto!(B::T, A::T) where {T<:AbstractSymTensor}
     issimilar(B, A) && error("Can not copy to a  non-similar SymTensor!")
-    for i in eachindex(A.nzblks)
-        copyto!(B.nzblks[i], A.nzblks[i])
+    for i in eachindex(B.data.values)
+        copyto!(B.data.values[i], A.data.values[i])
     end
     B
 end
@@ -298,15 +247,17 @@ end
 "out of place scalar multiplication; multiply SymTensor A with scalar α
 and store the result in B"
 function mul!(B::T, A::T, α) where {T<:AbstractSymTensor}
-    B.nzblks = [α .* blk for blk in A.nzblks]
+    for i in eachindex(B.data.values)
+        mul!(B.data.values[i], A.data.values[i], α)
+    end
     B
 end
 
 "in-place scalar multiplication of A with α; in particular with α =
 false, A is initialized with all zeros"
 function rmul!(A::T, α) where {T<:AbstractSymTensor}
-    for i in eachindex(A.nzblks)
-        rmul!(A.nzblks[i],  α)
+    for i in eachindex(A.data.values)
+        rmul!(A.data.values[i],  α)
     end
     A
 end
@@ -316,8 +267,8 @@ function axpy!(α,
                A::AbstractSymTensor{T1, N},
                B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
-    for i in eachindex(A.nzblks)
-        B.nzblks[i] = α .* A.nzblks[i] + B.nzblks[i]
+    for i in eachindex(A.data.values)
+        B.data.values[i] = α .* A.data.values[i] + B.data.values[i]
     end
     B
 end
@@ -328,8 +279,8 @@ function axpby!(α,
                 β,
                 B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
-    for i in eachindex(A.nzblks)
-        B.nzblks[i] = α .* A.nzblks[i] + B.nzblks[i]
+    for i in eachindex(A.data.values)
+        B.data.values[i] = α .* A.data.values[i] + β .* B.data.values[i]
     end
     B
 end
@@ -340,9 +291,8 @@ the second one
 """
 function dot(A::AbstractSymTensor{T1, N},
              B::AbstractSymTensor{T2, N}) where{T1<:Number, T2<:Number, N}
-    #contract(A, .-Tuple(1:N), invlegs(conj(B)), .-Tuple(1:N))
     issimilar(A, B) || error("The two SymTensors have to be similar to dot!")
-    sum([dot(A.nzblks[i], B.nzblks[i]) for i in eachindex(A.nzblks)])
+    sum([dot(A.data.values[i], B.data.values[i]) for i in eachindex(A.data.values)])
 end
 
 " compute the 2-norm of a  AbstractSymTensor"
@@ -350,23 +300,66 @@ function norm(A::AbstractSymTensor)
     sqrt(Float64(dot(A, A)))
 end
 
-function normalize!(S::SymDiagonal)
-    s = norm(S)
-    for i in eachindex(S.nzblks)
-        rmul!(S.nzblks[i], 1/s)
-    end
-    S
-end
+normalize!(S::SymDiagonal) = rmul!(S, 1/norm(S))
+
+# function dropdummyleg(A::AbstractSymTensor, l::Int)
+#     isdummy(A.space[l]) || error("space is not dummy!")
+
+#     N = rank(A)
+#     SymTensor(A.charge,
+#               (A.space[1:l-1]..., A.space[l+1:N]...),
+#               typeof(A.data)((s[1:l-1]...,s[l+1:N]...),
+#     reshape(d, size(d)[1:l-1]...,size(d)[l+1:N]...) for (s,d) in A.data)
+#               end
+#               end
 
 function show(A::AbstractSymTensor)
-    num_ch = length(A.legs)
+    num_ch = length(A.space)
     println("$(size(A)) $(typeof(A)) with $(length(A.sects)) blocks: ")
-    for i in eachindex(A.sects)
-        print("sector: $(A.sects[i]) size: ")
-        show(stdout, "text/plain", A.nzblks[i])
+    for i in eachindex(A.data.values)
+        print("sector: $(A.data.keys[i]) size: ")
+        show(stdout, "text/plain", A.data.values[i])
         println()
     end
     nothing
+end
+
+function trimspace!(A::AbstractSymTensor, l::Int)
+    N = rank(A)
+    1 <= l <= N || error("not a leg index!")
+    leg = A.legs[l]
+    s = leg.sign
+    legcharges = BitSet()
+    for sect in A.sects
+        push!(legcharges, s*sect[l])
+    end
+    indexes = _findindexes_sorted(leg.chrs, collect(legcharges))
+    leg = U1Space(leg.sign, leg.chrs[indexes], leg.dims[indexes])
+    A.legs = (A.legs[1:l-1]..., leg, A.legs[l+1:N]...)
+    A
+end
+
+# function negateleg(A::AbstractSymTensor, l::Int)
+#     N = rank(A)
+#     0 < l <= N || error("leg $l doesn't exist!")
+#     legs = (A.legs[1:l-1]..., negate(A.legs[l]), A.legs[l+1:N]...)
+#     SymTensor{eltype(A),N}(A.charge, legs, sects, A.nzblks)
+# end
+
+function _findindexes_sorted(A::Vector{T}, elements::Vector{T}) where{T}
+    #println(A, elements)
+    p = 1
+    indexes = Int[]
+    for i in eachindex(A)
+        if A[i] == elements[p]
+            push!(indexes, i)
+            if p==length(elements) break end
+            p += 1
+        elseif A[i] > elements[p]
+            error("_findindexes_sorted ", A, elements)
+        end
+    end
+    indexes
 end
 
 # """
@@ -384,8 +377,8 @@ end
 #     charge = sum(signs .* sector)
 #     _sector_is_allowed(charge, signs, sector) ||
 #         error("sector is not allowed ", sector)
-#     legs = STLeg[]
-#     legs = Tuple([STLeg(signs[n], [sector[n]], [size(nzblock, n)])
+#     legs = U1Space[]
+#     legs = Tuple([U1Space(signs[n], [sector[n]], [size(nzblock, n)])
 #                   for n in eachindex(sector)])
 #     SymTensor(charge, Tuple(legs), [sector], [nzblock])
 # end
@@ -395,23 +388,7 @@ end
 
 # Find the index of a set of sorted elements in a sorted vector `A`.
 # """
-function _findindexes_sorted(A::Vector{T}, elements::Vector{T}) where{T}
-    #println(A, elements)
-    p = 1
-    indexes = Int[]
-    for i in eachindex(A)
-        if A[i] == elements[p]
-            push!(indexes, i)
-            if p==length(elements) break end
-            p += 1
-        elseif A[i] > elements[p]
-            error("_findindexes_sorted ", A, elements)
-        end
-    end
-    indexes
-end
-
-# function _trimlegs(legs::NTuple{N, STLeg}, sects::Vector{NTuple{N, Int}}) where{N}
+# function _trimlegs(legs::NTuple{N, U1Space}, sects::Vector{NTuple{N, Int}}) where{N}
 #     legcharges = Tuple(BitSet() for i=1:N)
 #     for sect in sects
 #         for i in 1:N
@@ -419,44 +396,14 @@ end
 #         end
 #     end
 #     #print(legcharges)
-#     trimmedlegs = STLeg[]
+#     trimmedlegs = U1Space[]
 #     for lidx in 1:N
 #         leg = legs[lidx]
 #         indexes = findindexes_sorted(leg.chrs, collect(legcharges[lidx]))
-#         push!(trimmedlegs, STLeg(leg.sign, leg.chrs[indexes], leg.dims[indexes]))
+#         push!(trimmedlegs, U1Space(leg.sign, leg.chrs[indexes], leg.dims[indexes]))
 #     end
 #     # println("trimming :")
 #     # println(legs)
 #     # println(trimmedlegs)
 #     Tuple(trimmedlegs)
 # end
-
-
-function trimleg!(A::AbstractSymTensor, l::Int)
-    N = numoflegs(A)
-    1 <= l <= N || error("not a leg index!")
-    legcharges = BitSet()
-    for sect in A.sects
-        push!(legcharges, sect[l])
-    end
-    leg = A.legs[l]
-    indexes = _findindexes_sorted(leg.chrs, collect(legcharges))
-    leg = STLeg(leg.sign, leg.chrs[indexes], leg.dims[indexes])
-    A.legs = (A.legs[1:l-1]..., leg, A.legs[l+1:N]...)
-    A
-end
-
-function negateleg(A::AbstractSymTensor, l::Int)
-    N = numoflegs(A)
-    0 < l <= N || error("leg $l doesn't exist!")
-    legs = (A.legs[1:l-1]..., negate(A.legs[l]), A.legs[l+1:N]...)
-
-    n_sectors = length(A.sects)
-    sects = Vector{NTuple{N, Int}}(undef, n_sectors)
-    for i = 1:n_sectors
-        sect = A.sects[i]
-        sects[i] = (sect[1:l-1]..., -sect[l], sect[l+1:N]...)
-    end
-    perm = _sectors_sortperm(sects)
-    SymTensor{eltype(A),N}(A.charge, legs, sects[perm], A.nzblks[perm])
-end

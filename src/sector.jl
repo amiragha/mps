@@ -5,7 +5,7 @@ Sector(s...) = Sector(s)
 #const Sector{C, N} = NTuple{N, C}
 const U1Sector{N} = Sector{Int, N}
 
-@inline sum(S::Sector) = sum(S)
+@inline Base.sum(S::Sector) = sum(S)
 @inline dual(S::Sector) = Sector(dual(s) for s in S)
 
 """
@@ -16,7 +16,18 @@ major. That means the leftmost (first) VSpace changes charge faster
 @inline Base.isless(s1::Sector{C, N}, s2::Sector{C, N}) where {N, C} =
  reverse(s1.charges) < reverse(s2.charges)
 
-const SectorDict{C, N, T} = SortedDict{Sector{C, N}, T, }
+const SymSectorData{S, N, T} = SortedDict{Sector{S, N}, T}
+
+function _check_sectordatadict(charge, space, data)
+    sects, sizes = _allsectorsandsizes(charge, space)
+    i = 1
+    for (s,d) in data
+        s == sects[i] || throw{SectorMismatch()}
+        size(d) == sizes[i] || throw(SizeMismatch())
+        i += 1
+    end
+end
+
 
 abstract type SectorData{N, T} end
 mutable struct SectorArray{N, T} <: SectorData{N, T}
@@ -41,18 +52,19 @@ sector is sorted by construction.
 """
 function _allsectorsandsizes(charge::C, Vs::NTuple{N, U1Space}) where{C, N}
     if length(Vs) < 2
-        d = getdim(Vs[1], charge)
+        d = dim(Vs[1], charge)
         if d > 0
-            return [(charge,)], [(d,)]
+            return [Sector(charge)], [(d,)]
         end
+        return Sector{C, 1}[], NTuple{1, Int}[]
     end
 
-    sects = Sector{N, C}[]
+    sects = Sector{C, N}[]
     sizes = NTuple{N, Int}[]
     for (c,d) in Vs[N]
         sect_head, size_head = _allsectorsandsizes(charge - c, Vs[1:N-1])
         for i in eachindex(sect_head)
-            push!(sects, (sect_head[i]..., c))
+            push!(sects, Sector(sect_head[i].charges..., c))
             push!(sizes, (size_head[i]..., d))
         end
     end

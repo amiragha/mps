@@ -5,11 +5,16 @@ using Random
 
 import Base: convert, size, show, isequal, ==, isapprox, *, conj
 import Base: eltype, similar, copyto!
-import Base: fill, fill!, rand
+import Base: fill, fill!, rand, sum
 import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!
 import Base.intersect
 
-include("leg.jl")
+using DataStructures
+#include("sorteddict.jl")
+
+include("vspace.jl")
+include("sector.jl")
+include("productspace.jl")
 include("symtensor.jl")
 include("symreleg.jl")
 include("contract.jl")
@@ -20,11 +25,15 @@ export isequal, ==
 export isapprox
 export issimilar
 export AbstractSymTensor, AbstractSymMatrix
-export STLeg, SymTensor, SymMatrix, SymDiagonal, SymVector
+export VectorSpace, ProductSpace
+export U1Space
+export Sector
+export SymTensor, SymMatrix, SymDiagonal, SymVector
 export eye
-export FusedCharge
 
-export symMatrix
+export vtype
+
+export SectorArray, SectorDiagonal
 export _allsectorsandsizes
 export _allsectorsandsizes2
 export _sectorlessthan
@@ -32,20 +41,22 @@ export _sectorisallowed
 
 export array
 export alldims, accdims, getdim, fulldims, signs
-export numoflegs
-export _sectors_sortperm
-
+export rank
 export fuse
+
+
+#export _sectors_sortperm
 export fuselegs
 export unfuseleg
 export permutelegs
-export removedummyleg
+export dropdummyleg
 export trimleg!
 export contract
 
-export reverseleg
+export memoryrepr
+export dual
 export mapcharges
-export invlegs
+#export invlegs
 
 export index_sector
 export get_sector!
@@ -57,6 +68,7 @@ export eltype, similar, copyto!
 export mul!, rmul!, axpy!, axpby!, dot, norm
 export normalize!
 export fill, fill!
+export fill_linearindex
 
 export fermionswapgate
 
