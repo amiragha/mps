@@ -56,8 +56,10 @@ end
 fuses two or `n` consequative legs of SymTensor `A` starting at leg `l`
 into a new leg with sign (direction) `sign`.
 
-The fuse operation works as follows: We have assumed the sectors are
-sorted, so they stay sorted even after the fusion is done!
+Fusion or tensor product is only defined for two vector spaces so for
+larger ones it has to be preformed in a recursive fashion. Here we
+follow the convention of tensor producting pairs from left to right,
+which is (...((V1 ⊗ V2) ⊗ V3) ⊗ ...) ⊗ Vn)
 
 """
 function fuselegs(A::AbstractSymTensor,
@@ -74,8 +76,8 @@ function fuselegs(A::AbstractSymTensor,
 
     T = eltype(A)
 
-    csects = collect(keys(A.data))
-    semits = collect(onlysemitokens(A.data))
+    csects = collect(keys(A.blocks))
+    semits = collect(onlysemitokens(A.blocks))
     S = vtype(A)
     fsects = Vector{Sector{S, N-n+1}}(undef, length(csects))
     for i in eachindex(csects)
@@ -93,7 +95,7 @@ function fuselegs(A::AbstractSymTensor,
 
     sects, sizes = _allsectorsandsizes(A.charge, space)
 
-    data = SortedDict{Sector{S, N-n+1}, Array{T, N-n+1}}()
+    blocks = SortedDict{Sector{S, N-n+1}, Array{T, N-n+1}}()
     pointer = 1
     for index in 1:length(sects)
         block = Array{T, N-n+1}(undef, sizes[index])
@@ -102,18 +104,18 @@ function fuselegs(A::AbstractSymTensor,
         sizel = sizes[index][l]
         p = 1
         while p <= sizel
-            s = size(A.data[semits[pointer]])
+            s = size(A.blocks[semits[pointer]])
             fd = prod(s[l:l+n-1])
             range[l] = p:p+fd-1
             block[range...] =
-                reshape(A.data[semits[pointer]], s[1:l-1]..., fd, s[l+n:end]...)
+                reshape(A.blocks[semits[pointer]], s[1:l-1]..., fd, s[l+n:end]...)
             p += fd
             pointer += 1
         end
         sector = sects[index]
-        data[sector] = block
+        blocks[sector] = block
     end
-    SymTensor(A.charge, space, data)
+    SymTensor(A.charge, space, blocks)
 end
 
 function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T, N, M}
@@ -135,14 +137,14 @@ function splitleg(A    :: AbstractSymTensor,
         return A
     end
 
-    data = SortedDict{Sector{S, N+M-1}, Array{T, N+M-1}}()
+    blocks = SortedDict{Sector{S, N+M-1}, Array{T, N+M-1}}()
 
     ##TODO: explain what tensor product structure change the below
     ##procedure amounts to!
     ##We first sort the sectors based on the charge the leg to be
     ##unfused. Then for each charge find all sectors and sizes!
-    sects = collect(keys(A.data))
-    semits = collect(onlysemitokens(A.data))
+    sects = collect(keys(A.blocks))
+    semits = collect(onlysemitokens(A.blocks))
     sectperm = sortperm(sects, by=x->x.charges[l])
     csects = sects[sectperm]
     semits = semits[sectperm]
@@ -156,13 +158,13 @@ function splitleg(A    :: AbstractSymTensor,
             oldcharge = charge
         end
 
-        old_nzblock =  A.data[semits[i]]
+        old_nzblock =  A.blocks[semits[i]]
         s = size(old_nzblock)
         pivot = 0
         for patidx in eachindex(pats)
             sl = prod(sizes[patidx])
             sector = Sector(csects[i][1:l-1]..., pats[patidx]..., csects[i][l+1:N]...)
-            data[sector] = reshape(old_nzblock[[1:s[n] for n=1:l-1]...,
+            blocks[sector] = reshape(old_nzblock[[1:s[n] for n=1:l-1]...,
                                                 pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
                                     s[1:l-1]...,sizes[patidx]...,s[l+1:N]...)
             pivot += sl
@@ -172,7 +174,7 @@ function splitleg(A    :: AbstractSymTensor,
     #TODO: now check to see if the new legs can fuse into the original leg
     new_space = (A.space[1:l-1]...,space...,A.space[l+1:end]...)
 
-    SymTensor(A.charge, new_space, data)
+    SymTensor(A.charge, new_space, blocks)
 end
 
 # """

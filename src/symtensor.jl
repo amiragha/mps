@@ -5,35 +5,37 @@ const AbstractSymMatrix{S, T} = AbstractSymTensor{S, T, 2}
 A symmetric tensor is represented as a tensor map over the space of
 V_row (codomain) with tensor product structure of (((V1 ⊗ V2) ⊗ V3) ⊗
 ...) and the space of V_col (domain) with tensor product structure of
-(...⊗ (V_{n-3} ⊗ (V_{n-1} ⊗ V_n))). The data is also represented as a
+(...⊗ (V_{n-3} ⊗ (V_{n-1} ⊗ V_n))). The blocks is also represented as a
 matrix
 """
 
 mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
     charge   :: S
     space    :: NTuple{N, VectorSpace{S}}
-    data     :: SortedDict{Sector{S, N}, Array{T, N}}
+    blocks     :: SortedDict{Sector{S, N}, Array{T, N}}
 
     function SymTensor(charge :: S,
                        space  :: NTuple{N, VectorSpace{S}},
-                       data   :: SortedDict{Sector{S, N}, Array{T, N}}) where{S,T,N}
+                       blocks   :: SortedDict{Sector{S, N}, Array{T, N}}) where{S,T,N}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
-        for (s,d) in data
+        for (s,d) in blocks
             s == sects[i] || throw("SectorMismatch(), $s, $sects[i]")
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
-        new{S,T,N}(charge, space, data)
+        new{S,T,N}(charge, space, blocks)
     end
-    SymTensor{S,T,N}(c,s,d) where{S,T,N}= SymTensor(c,s,d)
+    SymTensor{S,T,N}(c,s,d) where{S,T,N} = SymTensor(c,s,d)
 end
 
 # function SymTensor{S,T1,N}(A::SymTensor{S,T2,N}) where {S,T1, T2, N}
-#     SymTensor{S,T1,N}(A.charge, A.space, SortedDict{Sector{S,N}, T1}(A.data))
+#     SymTensor{S,T1,N}(A.charge, A.space, SortedDict{Sector{S,N}, T1}(A.blocks))
 # end
 
 const SymMatrix{S, T} = SymTensor{S, T, 2}
+SymMatrix(c::S, s::NTuple{2,T}, d) where{S, T} = SymMatrix{S,T}(c,s,d)
+
 const SymVector{S, T} = SymTensor{S, T, 1}
 
 const U1Tensor{T, N} = SymTensor{Int, T, N}
@@ -43,21 +45,21 @@ const U1Vector{T} = SymVector{Int, T}
 mutable struct SymDiagonal{S, T<:Number} <: AbstractSymMatrix{S, T}
     charge :: S
     space  :: NTuple{2, VectorSpace{S}}
-    data   :: SortedDict{Sector{S, 2}, Diagonal{T}}
+    blocks   :: SortedDict{Sector{S, 2}, Diagonal{T}}
 
     function SymDiagonal(charge :: S,
                          space  :: NTuple{2, VectorSpace{S}},
-                         data   :: SortedDict{Sector{S,2}, Diagonal{T}}) where{S,T}
+                         blocks   :: SortedDict{Sector{S,2}, Diagonal{T}}) where{S,T}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
-        for (s,d) in data
+        for (s,d) in blocks
             s == sects[i] || throw{SectorMismatch()}
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
         chargedims(first(space)) == chargedims(last(space)) ||
             throw("SymDiagonal has to be square")
-        new{S,T}(charge, space, data)
+        new{S,T}(charge, space, blocks)
     end
 end
 
@@ -70,11 +72,13 @@ end
 
 function convert(::Type{SymTensor{S, T1, N}},
                  A::SymTensor{S, T2, N}) where {S, T1, T2, N}
-    SymTensor{S, T1, N}(A.charge, A.space, A.data)
+    SymTensor{S, T1, N}(A.charge, A.space, A.blocks)
 end
 
 @inline rank(::AbstractSymTensor{S, T, N}) where {S, T, N} = N
 @inline charge(A::AbstractSymTensor) = A.charge
+@inline sectors(A::AbstractSymTensor) = collect(keys(A.blocks))
+@inline blocks(A::AbstractSymTensor) = A.blocks
 
 @inline size(A::AbstractSymTensor) = Tuple(dim(V) for V in A.space)
 @inline size(A::AbstractSymTensor, l::Int) = dim(A.space[l])
@@ -83,10 +87,10 @@ end
     A.charge == B.charge && A.space == B.space
 
 @inline isequal(A::T, B::T) where {T<:AbstractSymTensor} =
-    issimilar(A, B) && isequal(A.data, B.data)
+    issimilar(A, B) && isequal(A.blocks, B.blocks)
 
 @inline isapprox(A::AbstractSymTensor, B::AbstractSymTensor) =
-    issimilar(A, B) && isapprox(A.nzblks, B.nzblks)
+    issimilar(A, B) && all(isapprox(A.blocks[c], B.blocks[c]) for c in keys(A.blocks))
 
 @inline ==(A::T, B::T) where {T<:AbstractSymTensor} = isequal(A, B)
 
@@ -106,29 +110,36 @@ end
 #     index
 # end
 
-@inline get_sector(A::AbstractSymTensor{T, N},
-                   S::U1Sector{N}) where {T<:Number, N} = get(A.data, S)
-function set_sector!(A::AbstractSymTensor{T, N},
-                     S::U1Sector{N},
-                     blk::Array{T, N}) where {T<:Number, N}
-    A.data[S] = blk
+@inline Base.getindex(A::AbstractSymTensor{S,T,N},
+                      s::Sector{S, N}) where {S,T,N} = getindex(A.blocks, s)
+
+function Base.setindex!(A::AbstractSymTensor{S,T,N},
+                        blk::Array{T, N},
+                        s::Sector{S, N}) where {S,T,N}
+    haskey(A.blocks, s) || throw("Block doesn't exist")
+    A.blocks[s] = blk
     A
 end
 
-function rand(::Type{T}, charge::Int, space::NTuple{N, U1Space};
-              seed::Int=1911) where {T<:Number, N}
+function rand(::Type{T}, charge::S, space::NTuple{N, VectorSpace{S}};
+              seed::Int=1911) where {S,T,N}
     sects, sizes = _allsectorsandsizes(charge, space)
     rng = MersenneTwister(seed)
-    data = SortedDict(sects[i] => rand(rng, T, sizes[i]) for i=1:length(sects))
-    SymTensor(charge, space, data)
+    blocks = SortedDict([sects[i] => rand(rng, T, sizes[i]) for i in eachindex(sects)])
+    SymTensor(charge, space, blocks)
 end
 
-rand(charge::Int, space::NTuple{N, U1Space}) where {N} = rand(Float64, charge, space)
+rand(::Type{T}, space::NTuple{N, VectorSpace{S}}) where {S,T,N} =
+    rand(T, zero(S), space)
+rand(charge::Int, space::NTuple{N, VectorSpace{S}}) where {S,N} =
+    rand(Float64, charge, space)
+rand(space::NTuple{N, VectorSpace{S}}) where {S,N} =
+    rand(Float64, zero(0), space)
 
-function fill(x::T, charge::Int, space::NTuple{N, VectorSpace{S}}) where {S,T<:Number,N}
+function fill(x::T, charge::S, space::NTuple{N, VectorSpace{S}}) where {S,T,N}
     sects, sizes = _allsectorsandsizes(charge, space)
-    data = SortedDict(sects[i] => fill(x, sizes[i]) for i=1:length(sects))
-    SymTensor(charge, space, data)
+    blocks = SortedDict([sects[i] => fill(x, sizes[i]) for i in eachindex(sects)])
+    SymTensor(charge, space, blocks)
 end
 
 function fill!(A::SymTensor{S,T,N}, x::T) where {S,T,N}
@@ -138,25 +149,23 @@ function fill!(A::SymTensor{S,T,N}, x::T) where {S,T,N}
     A
 end
 
-function fill_linearindex(charge::Int, space::NTuple{N, U1Space}) where {N}
-    sects, sizes = _allsectorsandsizes(charge, legs)
-    nzblks = Vector{Array{Int, N}}()
+function fill_linearindex(charge::S, space::NTuple{N, VectorSpace{S}}) where {S,N}
+    sects, sizes = _allsectorsandsizes(charge, space)
+    blocks = SortedDict{Sector{S, N}, Array{Int, N}}()
     p = 0
-    for dims in sizes
-        push!(nzblks, reshape(collect(p+1:p+prod(dims)), dims...))
-        p += prod(dims)
+    for i in eachindex(sects)
+        sz = sizes[i]
+        blocks[sects[i]] = reshape(collect(p+1:p+prod(sz)), sz...)
+        p += prod(sz)
     end
-    SymTensor(charge, legs, SectorArray(sects[i]=>nzblks[i] for i=1:length(sects)))
+    SymTensor(charge, space, blocks)
 end
 
 ##TODO: Mix this with the usual UnitScaling
-function eye(::Type{T}, chrs::Vector{Int}, dims::Vector{Int}) where {T<:Number}
-    V1 = U1Space(chrs, dims)
-    V2 = U1Space(-1 .* chrs, dims)
-
-    sects, sizes = _allsectorsandsizes(zero(Int), (V1,V2))
-    SymMatrix(zero(Int), (l1,l2), sects,
-              SectorArray(sects[i] => I(sizes[i]) for i=1:length(sects)))
+function eye(::Type{T}, V::VectorSpace{S}) where {S, T}
+    space = (V, dual(V))
+    SymMatrix(zero(S), space,
+              SortedDict([Sector(c,-c)=>Matrix{T}(I,d,d) for (c,d) in V]))
 end
 
 eye(cs::Vector{Int}, ds::Vector{Int}) = eye(Float64, cs, ds)
@@ -167,7 +176,7 @@ eye(cs::Vector{Int}, ds::Vector{Int}) = eye(Float64, cs, ds)
 Change the direction (sign) of all legs of the tensor to make the dual
 of tensor. This operation negates the: tensor charge, leg signs,
 sectors as well! One can set whether or not it also conjugates the
-data with `conjugate` which is true by default.
+blocks with `conjugate` which is true by default.
 
 """
 # This function seems to be not respecting the (+1, -1) convention for
@@ -176,17 +185,17 @@ function dual(A::AbstractSymTensor; conjugate::Bool=true)
     if !conjugate
         return typeof(A)(-A.charge,
                          dual.(A.space),
-                         typeof(A.data)(dual(s), d for (s,d) in A.data))
+                         typeof(A.blocks)(dual(s), d for (s,d) in A.blocks))
     end
     typeof(A)(-A.charge,
               dual.(A.space),
-              typeof(A.data)(dual(s), conj(d) for (s,d) in A.data))
+              typeof(A.blocks)(dual(s), conj(d) for (s,d) in A.blocks))
 end
 
 function mapcharges(f::Function, A::AbstractSymTensor)
     SymTensor(f(A.charge),
               mapcharges.(f, A.space),
-              typeof(A.data)(mapcharge(f, s),d for (s,d) in A.data))
+              typeof(A.blocks)(mapcharge(f, s),d for (s,d) in A.blocks))
 end
 
 function mapcharges(f::NTuple{N, Function},
@@ -195,51 +204,50 @@ function mapcharges(f::NTuple{N, Function},
 
     sects = [Tuple(f[i](s[i]) for i in 1:N) for s in A.sects]
     sgns = signs(legs)
-    charges = [sum(s) for s in sectors(A.data)]
+    charges = [sum(s) for s in sectors(A.blocks)]
     !all(charges .== charges[1]) &&
         error("mapcharges functions are inconsistent!")
     SymTensor(charges[1], space,
-              typeof(A.data)(mapcharge(f, s),d for (s,d) in A.data))
+              typeof(A.blocks)(mapcharge(f, s),d for (s,d) in A.blocks))
 end
 
 conj(A::AbstractSymTensor) =
-    typeof(A)(A.charge, A.space, conj(A.data))
+    typeof(A)(A.charge, A.space, conj(A.blocks))
 
 #TODO: to make this work!
 function array(A::AbstractSymTensor)
-    arrep = zeros(eltype(A), dims.(A.space)...)
+    sizes = dim.(A.space)
+    arrep = zeros(eltype(A), dim.(A.space)...)
     adims = Tuple([0;s] for s in accdims(A.space))
     chrs = [0, 1]
-    for idx in eachindex(A.sects)
-        sect = A.sects[idx]
-        nzblk = A.nzblks[idx]
+    for (s,b) in A.blocks
         ranges = []
-        for n in eachindex(sect)
-            i = findfirst(isequal(legs[n].sign*sect[n]), A.legs[n].chrs)
+        for n in eachindex(s)
+            i = findfirst(isequal(sect[n]), A.space[n].charges)
             push!(ranges, adims[n][i]+1:adims[n][i+1])
         end
-        arrep[Tuple(ranges)...] = nzblk
+        arrep[Tuple(ranges)...] = b
     end
     arrep
 end
 
 
 @inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
-    typeof(A)(A.charge, A.space, *(A.data, a))
+    typeof(A)(A.charge, A.space, *(A.blocks, a))
 
 @inline *(a::T, A::AbstractSymTensor) where {T<:Number} = *(A, a)
 
 "construct an additional SymTensor similar to A, possibly with a
 different scalar type T."
 function similar(A::AbstractSymTensor, T::Type=eltype(A))
-    typeof(A)(A.charge, A.legs, typeof(A)((s, similar(d, T)) for (s,d) in A.data))
+    typeof(A)(A.charge, A.legs, typeof(A)((s, similar(d, T)) for (s,d) in A.blocks))
 end
 
 "copy the contents of A to a preallocated SymTensor B"
 function copyto!(B::T, A::T) where {T<:AbstractSymTensor}
     issimilar(B, A) && error("Can not copy to a  non-similar SymTensor!")
-    for i in eachindex(B.data.values)
-        copyto!(B.data.values[i], A.data.values[i])
+    for i in eachindex(B.blocks.values)
+        copyto!(B.blocks.values[i], A.blocks.values[i])
     end
     B
 end
@@ -247,8 +255,8 @@ end
 "out of place scalar multiplication; multiply SymTensor A with scalar α
 and store the result in B"
 function mul!(B::T, A::T, α) where {T<:AbstractSymTensor}
-    for i in eachindex(B.data.values)
-        mul!(B.data.values[i], A.data.values[i], α)
+    for i in eachindex(B.blocks.values)
+        mul!(B.blocks.values[i], A.blocks.values[i], α)
     end
     B
 end
@@ -256,8 +264,8 @@ end
 "in-place scalar multiplication of A with α; in particular with α =
 false, A is initialized with all zeros"
 function rmul!(A::T, α) where {T<:AbstractSymTensor}
-    for i in eachindex(A.data.values)
-        rmul!(A.data.values[i],  α)
+    for i in eachindex(A.blocks.values)
+        rmul!(A.blocks.values[i],  α)
     end
     A
 end
@@ -267,8 +275,8 @@ function axpy!(α,
                A::AbstractSymTensor{T1, N},
                B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
-    for i in eachindex(A.data.values)
-        B.data.values[i] = α .* A.data.values[i] + B.data.values[i]
+    for i in eachindex(A.blocks.values)
+        B.blocks.values[i] = α .* A.blocks.values[i] + B.blocks.values[i]
     end
     B
 end
@@ -279,8 +287,8 @@ function axpby!(α,
                 β,
                 B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
-    for i in eachindex(A.data.values)
-        B.data.values[i] = α .* A.data.values[i] + β .* B.data.values[i]
+    for i in eachindex(A.blocks.values)
+        B.blocks.values[i] = α .* A.blocks.values[i] + β .* B.blocks.values[i]
     end
     B
 end
@@ -292,7 +300,7 @@ the second one
 function dot(A::AbstractSymTensor{T1, N},
              B::AbstractSymTensor{T2, N}) where{T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("The two SymTensors have to be similar to dot!")
-    sum([dot(A.data.values[i], B.data.values[i]) for i in eachindex(A.data.values)])
+    sum([dot(A.blocks.values[i], B.blocks.values[i]) for i in eachindex(A.blocks.values)])
 end
 
 " compute the 2-norm of a  AbstractSymTensor"
@@ -308,17 +316,17 @@ normalize!(S::SymDiagonal) = rmul!(S, 1/norm(S))
 #     N = rank(A)
 #     SymTensor(A.charge,
 #               (A.space[1:l-1]..., A.space[l+1:N]...),
-#               typeof(A.data)((s[1:l-1]...,s[l+1:N]...),
-#     reshape(d, size(d)[1:l-1]...,size(d)[l+1:N]...) for (s,d) in A.data)
+#               typeof(A.blocks)((s[1:l-1]...,s[l+1:N]...),
+#     reshape(d, size(d)[1:l-1]...,size(d)[l+1:N]...) for (s,d) in A.blocks)
 #               end
 #               end
 
 function show(A::AbstractSymTensor)
     num_ch = length(A.space)
     println("$(size(A)) $(typeof(A)) with $(length(A.sects)) blocks: ")
-    for i in eachindex(A.data.values)
-        print("sector: $(A.data.keys[i]) size: ")
-        show(stdout, "text/plain", A.data.values[i])
+    for i in eachindex(A.blocks.values)
+        print("sector: $(A.blocks.keys[i]) size: ")
+        show(stdout, "text/plain", A.blocks.values[i])
         println()
     end
     nothing

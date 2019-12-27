@@ -23,14 +23,13 @@ VectorSpace{S}(sectors...) where {S} = VectorSpace{S}(sectors)
 ==(V1::VectorSpace, V2::VectorSpace) = isequal(V1, V2)
 
 @inline hascharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
+@inline charges(V::VectorSpace) = (c for (c,d) in V.sectors)
+@inline dims(V::VectorSpace) = (d for (c,d) in V.sectors)
 
 "Find the dimension of the the given `charge`. Returns 0 if charges
 doesn't exist. Return total dimension if charge is not specified."
 @inline dim(V::VectorSpace{S}, charge::S) where{S}= get(V.sectors, charge, 0)
-@inline dim(V::VectorSpace) = sum(chargedims(V))
-
-@inline charges(V::VectorSpace) = (c for (c,d) in V.sectors)
-@inline chargedims(V::VectorSpace) = (d for (c,d) in V.sectors)
+@inline dim(V::VectorSpace) = sum(dims(V))
 
 @inline Base.length(V::VectorSpace) = length(V.sectors)
 @inline Base.iterate(V::VectorSpace) = iterate(V.sectors)
