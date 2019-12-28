@@ -8,24 +8,24 @@ example if there are l negative numbers in both A and B (should
 be numbered from -1 to -l) then the rest of the indexes in A and B
 combined should be 1:N+M-2n.
 """
-function contract(A     :: AbstractSymTensor{T1, N},
+function contract(A     :: AbstractSymTensor{S,T1,N},
                   idxA  :: NTuple{N, Int},
-                  B     :: AbstractSymTensor{T2, M},
+                  B     :: AbstractSymTensor{S,T2,M},
                   idxB  :: NTuple{M, Int};
-                  debug :: Bool=false) where{T1<:Number, T2<:Number, N, M}
+                  debug :: Bool=false) where{S,T1,T2, N, M}
 
     remsA, consA, tofinalsA = _contract_index_perm(idxA)
     remsB, consB, tofinalsB = _contract_index_perm(idxB)
 
     ## TODO: techniqually here the contraction vector space should be made
-    ## once! But now is made twice, so find a way fix this!
+    ## once! But now is made twice, so can we do better!
 
     # TODO: check
     # compatibility println(remsA, consA, remsB, consB)
     if length(remsA) == 0
-        _A = SymVector(A, -1, consA)
+        _A = SymVector(A, consA)
         if length(remsB) == 0
-            _B = SymVector(B, +1, consB)
+            _B = SymVector(B, consB)
             return _A * _B
         else
             _B = SymMatrix(B, remsB, consB)
@@ -37,14 +37,13 @@ function contract(A     :: AbstractSymTensor{T1, N},
     _A = SymMatrix(A, remsA, consA)
 
     if length(remsB) == 0
-        _B = SymVector(B, +1, consB)
+        _B = SymVector(B, consB)
         return permutelegs(unfuseleg(_A*_B, 1, A.legs[remsA]),
                            invperm(tofinalsA))
-
     end
 
     _B = SymMatrix(B, consB, remsB)
-    return permutelegs(SymTensor(_A * _B, A.legs[remsA], B.legs[remsB]),
+    return permutelegs(SymTensor(_A * _B, A.space[remsA], B.space[remsB]),
                        #unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
                        invperm([tofinalsA; tofinalsB]))
 end
@@ -70,53 +69,48 @@ function _contract_index_perm(indexset; mode::Symbol=:MINUS)
 end
 
 function SymVector(A::AbstractSymTensor,
-                   sign::Int,
                    perm::Vector{Int})
-    N = numoflegs(A)
+    N = rank(A)
     abs(sign) == 1 || error("Incorrect sign $sign")
-    sort(perm) == collect(1:N) || error("Incorrect index set for conversion to SymVector!")
+    sort(perm) == collect(1:N) ||
+        error("Incorrect index set for conversion to SymVector!")
 
     pA = permutelegs(A, perm)
-    SymVector(fuselegs(pA, sign, 1, N))
+    SymVector(fuselegs(pA, 1, N))
 end
 
 function SymMatrix(A::AbstractSymTensor,
                    rowidxs::Vector{Int},
                    colidxs::Vector{Int})
 
-    N = numoflegs(A)
+    N = rank(A)
     idxperm = [rowidxs; colidxs]
     sort(idxperm) == collect(1:N) ||
         error("Incorrect index set for conversion to SymMatrix!")
-    length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
-    length(colidxs) == 0 && error("Zero col for matrix not allowed!")
+    length(rowidxs) == 0 && error("empty row for matrix not allowed!")
+    length(colidxs) == 0 && error("empty col for matrix not allowed!")
+    n = length(rowidxs)
 
     T = eltype(A)
+    S = vtype(A)
 
-    n_row = length(rowidxs)
-    n_col = length(colidxs)
-    rowlegs = A.legs[rowidxs]
-    collegs = A.legs[colidxs]
-    rsigns = [leg.sign for leg in rowlegs]
-    csigns = [-leg.sign for leg in collegs]
-
-    # two consequative sorts are required because we rely on stability
-    perm1 = _sectors_sortperm(A.sects, by=x->x[idxperm])
-    csects = A.sects[perm1]
-    fsects = Vector{Tuple{Int, Int}}(undef, length(A.sects))
-    for i in eachindex(A.sects)
-        sect = csects[i]
-        c1 = sum([rsigns[i] * sect[rowidxs][i] for i=1:n_row])
-        c2 = sum([csigns[i] * sect[colidxs][i] for i=1:n_col])
-        fsects[i] = (c1, c2)
+    csects = sectors(A)
+    sperm1 = sortperm(csects, by=x->Sector(x[idxperm]))
+    fsects = Vector{Sector{S, 2}}(undef, length(csects))
+    for i in eachindex(csects)
+        sector = csects[sperm1][i]
+        c1 = sum(sector[rowidxs])
+        c2 = sum(sector[colidxs])
+        fsects[i] = Sector(c1, c2)
     end
-    fsectperm = _sectors_sortperm(fsects)
+    sperm2 = sortperm(fsects)
+    semits = collect(onlysemitokens(A.blocks))[sperm1][sperm2]
 
-    legs = (fuse(+1, rowlegs), fuse(-1, collegs))
+    space = (fuse(A.space[rowidxs]), fuse(A.space[colidxs]))
 
-    sects, sizes = _allsectorsandsizes(A.charge, legs)
+    sects, sizes = _allsectorsandsizes(A.charge, space)
 
-    nzblks = Vector{Matrix{T}}()
+    blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
     pointer = 1
     for index in 1:length(sects)
         blk = Matrix{T}(undef, sizes[index])
@@ -128,10 +122,10 @@ function SymMatrix(A::AbstractSymTensor,
             pr = 1
             fdc = 0
             while pr <= rlim
-                Ablk = permutedims(A.nzblks[perm1][fsectperm][pointer], idxperm)
+                Ablk = permutedims(A.blocks[semits[pointer]], idxperm)
                 s = size(Ablk)
-                fdr = prod(s[1:n_row])
-                fdc = prod(s[n_row+1:N])
+                fdr = prod(s[1:n])
+                fdc = prod(s[n+1:N])
                 blk[pr:pr+fdr-1, pc:pc+fdc-1] =
                     reshape(Ablk, fdr, fdc)
                 pr += fdr
@@ -139,16 +133,17 @@ function SymMatrix(A::AbstractSymTensor,
             end
             pc += fdc
         end
-        push!(nzblks, blk)
+        sector = sects[index]
+        blocks[sector] = blk
     end
-    SymMatrix(A.charge, legs, sects, nzblks)
+    SymMatrix(A.charge, space, blocks)
 end
 
 # function SymMatrix(A::AbstractSymTensor,
 #                    rowidxs::Vector{Int},
 #                    colidxs::Vector{Int})
 
-#     N = numoflegs(A)
+#     N = rank(A)
 #     idxperm = [rowidxs; colidxs]
 #     sort(idxperm) == collect(1:N) || error("Incorrect index set for conversion to SymMatrix!")
 #     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
@@ -162,53 +157,31 @@ end
 # end
 
 function SymTensor(A     :: SymMatrix,
-                   rlegs :: NTuple{N, STLeg},
-                   clegs :: NTuple{M, STLeg}) where {N, M}
-    #0 < l <= N || error("integer l not in range $l, $N")
-    #println(A.legs)
-    #println(legs)
-    # if length(rlegs) == 1
-    #     if legs[1].sign == A.legs[1].sign
-    #         A.legs[l] == legs[1] || error("Not the same legs", A.legs[l], legs[1])
-    #         return A
-    #     else
-    #         Aleg = negate(A.legs[l])
-    #         Aleg == legs[1] || (error("Not the same legs", Aleg, legs[1]))
-    #         return negateleg(A, l)
-    #     end
-    # end
+                   rlegs :: NTuple{N, VectorSpace{S}},
+                   clegs :: NTuple{M, VectorSpace{S}}) where {S, N, M}
     T = eltype(A)
-    sects = NTuple{N+M, Int}[]
-    nzblks = Array{T, N+M}[]
-
-    rsign = A.legs[1].sign
-    csign = A.legs[2].sign
-
-    sectperm = sortperm(A.sects, by=x->x[2])
-    csects = A.sects[sectperm]
+    #sperm = sortperm(A.sects, by=x->x[2])
+    #csects = A.sects[sectperm]
+    blocks = SortedDict{Sector{S, N+M}, Array{T, N+M}}()
+    csects = sectors(A)
     #    oldcharge = 0
-    rpats, rsizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
-    cpats, csizes = Vector{NTuple{M, Int}}(), Vector{NTuple{M, Int}}()
-    for i in eachindex(csects)
-        c1 = rsign * csects[i][1]
-        c2 = csign * csects[i][2]
-        #        if i == 1 || c2 != oldcharge
+    rpats, rsizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
+    cpats, csizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
+    for (s,blk) in A.blocks
+        c1, c2 = s.charges
+
         rpats, rsizes = _allsectorsandsizes(c1, rlegs)
         cpats, csizes = _allsectorsandsizes(c2, clegs)
-        #           oldcharge = c2
-        #       end
 
-        #        old_nzblock =  A.nzblks[i]
-        #s = size(A.nzblocks[i])
         pc = 0
         for cpatidx in eachindex(cpats)
             csl = prod(csizes[cpatidx])
             pr = 0
             for rpatidx in eachindex(rpats)
                 rsl = prod(rsizes[rpatidx])
-                push!(sects, (rpats[rpatidx]..., cpats[cpatidx]...))
-                push!(nzblks, reshape(A.nzblks[i][pr+1:pr+rsl, pc+1:pc+csl],
-                                      rsizes[rpatidx]..., csizes[cpatidx]...))
+                blocks[Sector(rpats[rpatidx]..., cpats[cpatidx]...)] =
+                    reshape(blk[pr+1:pr+rsl, pc+1:pc+csl],
+                            rsizes[rpatidx]..., csizes[cpatidx]...)
                 pr += rsl
             end
             pc += csl
@@ -216,41 +189,30 @@ function SymTensor(A     :: SymMatrix,
     end
 
     #TODO: now check to see if the new legs can fuse into the original leg
-    new_legs = (rlegs...,clegs...)
-
-    sectperm = _sectors_sortperm(sects)
-    SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
+    space = (rlegs...,clegs...)
+    SymTensor(A.charge, space, blocks)
 end
 
-function _arecontractible(l1::STLeg, l2::STLeg)
-    if l1.sign == -l2.sign
-        return l1.chrs == l2.chrs && l1.dims == l2.dims
-    end
-    false
-end
+function *(A::SymVector, B::SymVector)
+    isdual(A.space[1], B.space[1]) ||
+        error("not contractible!", A.space[1], " and ", B.space[1])
 
-function *(A::SymVector, B::SymVector) where {T<:Number}
-
-    _arecontractible(A.legs[1], B.legs[1]) ||
-        error("not contractible!", A.legs[1], " and ", B.legs[1])
-    signs(A.legs) == (-1,) && signs(B.legs) == (+1,) ||
-        error("* for SymVector only defined for contraction!")
-
-    return sum(A.nzblks[1] .* B.nzblks[1])
+    return sum(A.blocks.values[1] .* B.blocks.values[1])
 end
 
 function *(A::AbstractSymMatrix,
            B::AbstractSymMatrix)
 
-    _arecontractible(A.legs[2], B.legs[1]) ||
-        error("not contractible! ", A.legs[2], " and ", B.legs[1])
+    isdual(A.space[2], B.space[1]) ||
+        error("not contractible! ", A.space[2], " and ", B.space[1])
 
+    S = vtype(A)
     T = promote_type(eltype(A), eltype(B))
     T == Union{} &&
         error("can't promote_type! $(eltype(A)) , $(eltype(B))")
     ## NOTE: assume the set of charges for the vector space to be
     ## contracted is {c1,..,ci,...,cn} then each sector in A is given
-    ## by (CA+ci, ci) and each sector in B by (ci, ci-CB) and since
+    ## by (CA+ci, -ci) and each sector in B by (ci, -ci+CB) and since
     ## both are sorted based on the last charge in sector, then they
     ## are sorted the same. So we simply need to multiply them here
     ## but take into account that it is possible for the matrices to
@@ -266,30 +228,33 @@ function *(A::AbstractSymMatrix,
     ## well they are allowed sectors anyways, right! Still don't know
     ## what is the best approach.
 
+    ## TODO: Also it would be nice if there is the option of dropping
+    ## the charges that only show up in complete zero sectors! This is
+    ## particularly useful is Gutzwiller projection thing
+
     charge = A.charge + B.charge
-    legs = (A.legs[1], B.legs[2])
+    space = (A.space[1], B.space[2])
 
-    sects, sizes = _allsectorsandsizes(charge, legs)
+    sects, sizes = _allsectorsandsizes(charge, space)
     n_sectors = length(sects)
-    nzblks = Vector{Matrix{T}}(undef, n_sectors)
+    blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
 
-    bmax = length(B.sects)
-    amax = length(A.sects)
+    semitsA = collect(onlysemitokens(A.blocks))
+    semitsB = collect(onlysemitokens(B.blocks))
+    bmax = length(semitsB)
+    amax = length(semitsA)
     a, b = 1, 1
     #println(A)
     #println(B)
     for i=1:n_sectors
-        c1, c2 = sects[i]
-        a += searchsortedfirst(A.sects[a:end], (c1, c1-A.charge)) - 1
-        b += searchsortedfirst(B.sects[b:end], (B.charge+c2, c2)) - 1
-
-        if a <=amax && b <=bmax && c1 == A.sects[a][1] && c2 == B.sects[b][2]
-            nzblks[i] = A.nzblks[a] * B.nzblks[b]
+        sector = sects[i]
+        if haskey(A.blocks, sector) && haskey(B.blocks, sector)
+            blocks[sects[i]] = A.blocks[sector] * B.blocks[sector]
         else
-            nzblks[i] = zeros(T, sizes[i])
+            blocks[sects[i]] = zeros(T, sizes[i])
         end
     end
-    SymMatrix(charge, legs, sects, nzblks)
+    SymMatrix(charge, space, blocks)
 end
 
 ###TODO: This is the above function with a version of fuselegs (that fuses both of them at once!)
@@ -338,14 +303,14 @@ function SymMatrix2(A::AbstractSymTensor{T, N},
     #         push!(patranges, patrange)
     #     end
 
-    #     fusedsectperm = _sectors_sortperm(fusedsectors)
+    #     fusedsectperm = sortperm(fusedsectors)
     #     new_sectors, refs = uniquesorted(fusedsectors[fusedsectperm])
     #     refs = refs[invperm(fusedsectperm)]
 
     #     # the infos are: new_sectors, refs, patranges
 
     #     # make the new leg
-    #     fleg = STLeg(sign, unzip([(k, fchrdict[k].dim) for k in sort(collect(keys(fchrdict)))])...)
+    #     fleg = U1Space(sign, unzip([(k, fchrdict[k].dim) for k in sort(collect(keys(fchrdict)))])...)
 
     #     new_legs = Tuple(vcat([sten.legs[1:l-1]...], fleg, [sten.legs[l+n:end]...]))
 
@@ -397,7 +362,7 @@ end
 #     *(convert(SymTensor{ComplexF64, 2}, sten1), sten2)
 # end
 
-# function _arecontractible(l1::STLeg, l2::STLeg)
+# function _arecontractible(l1::U1Space, l2::U1Space)
 #     if l1.sign == -l2.sign
 #         # find conciding charges
 #         chrs, idx1, idx2 = intersect(l1, l2)

@@ -1,5 +1,5 @@
-struct Sector{C, N}
-    charges :: NTuple{N, C}
+struct Sector{S, N}
+    charges :: NTuple{N, S}
 end
 Sector(s...) = Sector(s)
 #const Sector{C, N} = NTuple{N, C}
@@ -12,6 +12,9 @@ Base.getindex(s::Sector, i) = getindex(s.charges, i)
 Base.iterate(s::Sector) = iterate(s.charges)
 Base.iterate(s::Sector, i) = iterate(s.charges, i)
 
+@inline layout(space::NTuple{N, VectorSpace{S}}, s::Sector{S, N}) where {S, N} =
+    Tuple(layout(space[i])[s[i]] for i=1:N)
+
 """
 we always sort sectors based on charges The sorting is column
 major. That means the leftmost (first) VSpace changes charge faster
@@ -19,8 +22,6 @@ major. That means the leftmost (first) VSpace changes charge faster
 """
 @inline Base.isless(s1::Sector{C, N}, s2::Sector{C, N}) where {N, C} =
  reverse(s1.charges) < reverse(s2.charges)
-
-const SymSectorData{S, N, T} = SortedDict{Sector{S, N}, T}
 
 function _check_sectordatadict(charge, space, data)
     sects, sizes = _allsectorsandsizes(charge, space)
@@ -33,18 +34,18 @@ function _check_sectordatadict(charge, space, data)
 end
 
 
-abstract type SectorData{N, T} end
-mutable struct SectorArray{N, T} <: SectorData{N, T}
-    data :: SortedDict{U1Sector{N}, Array{T, N}}
-end
-mutable struct SectorDiagonal{T} <: SectorData{2, T}
-    data :: SortedDict{U1Sector{2}, Diagonal{T}}
-end
+# abstract type SectorData{N, T} end
+# mutable struct SectorArray{N, T} <: SectorData{N, T}
+#     data :: SortedDict{U1Sector{N}, Array{T, N}}
+# end
+# mutable struct SectorDiagonal{T} <: SectorData{2, T}
+#     data :: SortedDict{U1Sector{2}, Diagonal{T}}
+# end
 
-SectorArray(data...) = SectorData(data)
-SectorDiagonal(data...) = SectorData(data)
+# SectorArray(data...) = SectorData(data)
+# SectorDiagonal(data...) = SectorData(data)
 
-@inline sectors(A::SectorData) = [s for (s,d) in A.data]
+# @inline sectors(A::SectorData) = [s for (s,d) in A.data]
 
 """
     _allsectorsandsizes(charge, Vs)

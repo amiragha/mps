@@ -23,8 +23,9 @@ VectorSpace{S}(sectors...) where {S} = VectorSpace{S}(sectors)
 ==(V1::VectorSpace, V2::VectorSpace) = isequal(V1, V2)
 
 @inline hascharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
-@inline charges(V::VectorSpace) = (c for (c,d) in V.sectors)
-@inline dims(V::VectorSpace) = (d for (c,d) in V.sectors)
+@inline findcharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
+@inline charges(V::VectorSpace) = [c for (c,d) in V.sectors]
+@inline dims(V::VectorSpace) = [d for (c,d) in V.sectors]
 
 "Find the dimension of the the given `charge`. Returns 0 if charges
 doesn't exist. Return total dimension if charge is not specified."
@@ -38,7 +39,10 @@ doesn't exist. Return total dimension if charge is not specified."
 "Return the dual of the vector space"
 @inline dual(V::VectorSpace) = VectorSpace{vtype(V)}(-c=>d for (c,d) in V.sectors)
 
-function memoryrepr(V::VectorSpace)
+@inline isdual(V1::T, V2::T) where {T<:VectorSpace} =
+    charges(V1) == -reverse(charges(V2)) && dims(V1) == reverse(dims(V2))
+
+function layout(V::VectorSpace)
     p = 0
     S = vtype(V)
     dict = SortedDict{S, UnitRange{Int}}()

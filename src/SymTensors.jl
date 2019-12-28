@@ -38,8 +38,9 @@ export _allsectorsandsizes
 export _sectorisallowed
 
 export array
-export alldims, accdims, getdim, fulldims, signs
-export rank
+export dim, dims
+#export alldims, accdims, getdim, fulldims, signs
+export rank, sectors, blocks
 export fuse
 
 

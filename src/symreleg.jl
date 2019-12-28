@@ -30,36 +30,46 @@ unzip(a) = map(x->getfield.(a,x), fieldnames(eltype(a)))
 #### RELEG #####################
 ################################
 
-"permute legs, It is important to bring the tensor into some
-cononical(convention) tensor product fusion tree"
+"permute legs"
 function permutelegs(A::AbstractSymTensor,
                      perm::Vector{Int})
     N = rank(A)
     sort(perm) == collect(1:N) || error("Not a valid permutation!")
     perm == collect(1:N) && return A
 
-    sectperm = sortperm(A.sects,  by=x->x[perm])
-    sects = [sect[perm] for sect in A.sects[sectperm]]
+    # sectperm = sortperm(A.sects,  by=x->x[perm])
+    # sects = [sect[perm] for sect in A.sects[sectperm]]
 
     ## NOTE: The line below because for some reason the permutedims of
     ## Diagonal returns a sparse matrix in Julia 1.2.x
     typeof(A) <: SymDiagonal &&
-        return typeof(A)(A.charge, A.legs[perm], sects, A.nzblks)
+        return typeof(A)(A.charge, A.space[perm], A.blocks)
 
-    typeof(A)(A.charge, A.legs[perm], sects,
-              [permutedims(nzblk, perm) for nzblk in A.nzblks[sectperm]])
+    typeof(A)(A.charge, A.space[perm],
+              SortedDict([Sector(s[perm]) => permutedims(blk, perm)
+                         for (s,blk) in A.blocks]))
 end
 
 """
-        fuselegs(A, sign, l, n)
+        fuselegs(A, l, n)
 
 fuses two or `n` consequative legs of SymTensor `A` starting at leg `l`
-into a new leg with sign (direction) `sign`.
+into a new leg.
 
+Below not correct!----
 Fusion or tensor product is only defined for two vector spaces so for
 larger ones it has to be preformed in a recursive fashion. Here we
 follow the convention of tensor producting pairs from left to right,
 which is (...((V1 ⊗ V2) ⊗ V3) ⊗ ...) ⊗ Vn)
+----
+
+We just pick the convention of sorting the blocks according to the
+above tensor product rule and then lay the the memory for each
+sector. Note that this is not equal to the recursive fusion protocol
+but should be fine, because here the only thing that matters is
+consistency! So we should only fuse and unfuse consistency, mix and
+match leads to incorrect results obviously (I should think of a way to
+prevent this).
 
 """
 function fuselegs(A::AbstractSymTensor,
@@ -76,19 +86,18 @@ function fuselegs(A::AbstractSymTensor,
 
     T = eltype(A)
 
-    csects = collect(keys(A.blocks))
-    semits = collect(onlysemitokens(A.blocks))
+    csects = sectors(A)
     S = vtype(A)
     fsects = Vector{Sector{S, N-n+1}}(undef, length(csects))
     for i in eachindex(csects)
-        csect = csects[i]
-        fsects[i] = Sector(csect.charges[1:l-1]...,
-                           sum(csect.charges[l:l+n-1]),
-                           csect.charges[l+n:end]...)
+        sector = csects[i]
+        fsects[i] = Sector(sector[1:l-1]...,
+                           sum(sector[l:l+n-1]),
+                           sector[l+n:N]...)
     end
 
-    fsectperm = sortperm(fsects)
-    semits = semits[fsectperm]
+    sperm = sortperm(fsects)
+    semits = collect(onlysemitokens(A.blocks))[sperm]
 
     fspace = fuse(A.space[l:l+n-1])
     space = Tuple([A.space[1:l-1]..., fspace, A.space[l+n:end]...])
@@ -98,7 +107,7 @@ function fuselegs(A::AbstractSymTensor,
     blocks = SortedDict{Sector{S, N-n+1}, Array{T, N-n+1}}()
     pointer = 1
     for index in 1:length(sects)
-        block = Array{T, N-n+1}(undef, sizes[index])
+        blk = Array{T, N-n+1}(undef, sizes[index])
         range = [1:m for m in sizes[index]]
 
         sizel = sizes[index][l]
@@ -107,13 +116,13 @@ function fuselegs(A::AbstractSymTensor,
             s = size(A.blocks[semits[pointer]])
             fd = prod(s[l:l+n-1])
             range[l] = p:p+fd-1
-            block[range...] =
+            blk[range...] =
                 reshape(A.blocks[semits[pointer]], s[1:l-1]..., fd, s[l+n:end]...)
             p += fd
             pointer += 1
         end
         sector = sects[index]
-        blocks[sector] = block
+        blocks[sector] = blk
     end
     SymTensor(A.charge, space, blocks)
 end

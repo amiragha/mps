@@ -75,6 +75,7 @@ function convert(::Type{SymTensor{S, T1, N}},
     SymTensor{S, T1, N}(A.charge, A.space, A.blocks)
 end
 
+@inline space(A::AbstractSymTensor) = A.space
 @inline rank(::AbstractSymTensor{S, T, N}) where {S, T, N} = N
 @inline charge(A::AbstractSymTensor) = A.charge
 @inline sectors(A::AbstractSymTensor) = collect(keys(A.blocks))
@@ -160,6 +161,8 @@ function fill_linearindex(charge::S, space::NTuple{N, VectorSpace{S}}) where {S,
     end
     SymTensor(charge, space, blocks)
 end
+fill_linearindex(space::NTuple{N, VectorSpace{S}}) where{S,N} =
+    fill_linearindex(zero(S), space)
 
 ##TODO: Mix this with the usual UnitScaling
 function eye(::Type{T}, V::VectorSpace{S}) where {S, T}
@@ -214,23 +217,14 @@ end
 conj(A::AbstractSymTensor) =
     typeof(A)(A.charge, A.space, conj(A.blocks))
 
-#TODO: to make this work!
 function array(A::AbstractSymTensor)
-    sizes = dim.(A.space)
-    arrep = zeros(eltype(A), dim.(A.space)...)
-    adims = Tuple([0;s] for s in accdims(A.space))
-    chrs = [0, 1]
+    arrep = zeros(eltype(A), dim.(space(A))...)
+    layouts = [layout(V) for V in space(A)]
     for (s,b) in A.blocks
-        ranges = []
-        for n in eachindex(s)
-            i = findfirst(isequal(sect[n]), A.space[n].charges)
-            push!(ranges, adims[n][i]+1:adims[n][i+1])
-        end
-        arrep[Tuple(ranges)...] = b
+        arrep[layout(A.space, s)...] = b
     end
     arrep
 end
-
 
 @inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
     typeof(A)(A.charge, A.space, *(A.blocks, a))
@@ -321,13 +315,15 @@ normalize!(S::SymDiagonal) = rmul!(S, 1/norm(S))
 #               end
 #               end
 
-function show(A::AbstractSymTensor)
+function Base.show(io::IO, A::AbstractSymTensor)
+    show(io, typeof(A))
     num_ch = length(A.space)
-    println("$(size(A)) $(typeof(A)) with $(length(A.sects)) blocks: ")
-    for i in eachindex(A.blocks.values)
-        print("sector: $(A.blocks.keys[i]) size: ")
-        show(stdout, "text/plain", A.blocks.values[i])
-        println()
+    println(io)
+    #println("$(size(A)) $(typeof(A)) with $(length(A.sects)) blocks: ")
+    for (s,b) in A.blocks
+        print(io, "$s with size: ")
+        show(io, "text/plain", b)
+        println(io)
     end
     nothing
 end
