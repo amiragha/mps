@@ -217,11 +217,11 @@ end
 conj(A::AbstractSymTensor) =
     typeof(A)(A.charge, A.space, conj(A.blocks))
 
-function array(A::AbstractSymTensor)
+function array(A::AbstractSymTensor{S,T,N};
+               rev::NTuple{N,Bool}=Tuple(zeros(Bool, N))) where {S,T,N}
     arrep = zeros(eltype(A), dim.(space(A))...)
-    layouts = [layout(V) for V in space(A)]
     for (s,b) in A.blocks
-        arrep[layout(A.space, s)...] = b
+        arrep[layout(A.space, s, rev=rev)...] = b
     end
     arrep
 end
@@ -294,7 +294,7 @@ the second one
 function dot(A::AbstractSymTensor{T1, N},
              B::AbstractSymTensor{T2, N}) where{T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("The two SymTensors have to be similar to dot!")
-    sum([dot(A.blocks.values[i], B.blocks.values[i]) for i in eachindex(A.blocks.values)])
+    sum([dot(A.blocks[i], B.blocks[i]) for i in onlysemitokens(A.blocks)])
 end
 
 " compute the 2-norm of a  AbstractSymTensor"
@@ -388,7 +388,7 @@ end
 # end
 
 # """
-#     findindexes_sorted(A, elements)
+#     findindexes_sorted(A, elements
 
 # Find the index of a set of sorted elements in a sorted vector `A`.
 # """

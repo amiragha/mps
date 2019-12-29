@@ -42,13 +42,21 @@ doesn't exist. Return total dimension if charge is not specified."
 @inline isdual(V1::T, V2::T) where {T<:VectorSpace} =
     charges(V1) == -reverse(charges(V2)) && dims(V1) == reverse(dims(V2))
 
-function layout(V::VectorSpace)
-    p = 0
+function layout(V::VectorSpace; rev::Bool=false)
     S = vtype(V)
     dict = SortedDict{S, UnitRange{Int}}()
-    for (c,d) in V
-        dict[c] = p+1:p+d
-        p+=d
+    if rev
+        p = dim(V)
+        for (c, d) in V
+            dict[c] = p-d+1:p
+            p -= d
+        end
+    else
+        p = 0
+        for (c,d) in V
+            dict[c] = p+1:p+d
+            p+=d
+        end
     end
     dict
 end

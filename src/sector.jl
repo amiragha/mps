@@ -12,8 +12,10 @@ Base.getindex(s::Sector, i) = getindex(s.charges, i)
 Base.iterate(s::Sector) = iterate(s.charges)
 Base.iterate(s::Sector, i) = iterate(s.charges, i)
 
-@inline layout(space::NTuple{N, VectorSpace{S}}, s::Sector{S, N}) where {S, N} =
-    Tuple(layout(space[i])[s[i]] for i=1:N)
+@inline layout(space::NTuple{N, VectorSpace{S}},
+               s::Sector{S, N};
+               rev::NTuple{N,Bool}=zeros(Bool,N)) where {S, N} =
+    Tuple(layout(space[i], rev=rev[i])[s[i]] for i=1:N)
 
 """
 we always sort sectors based on charges The sorting is column
