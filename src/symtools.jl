@@ -1,57 +1,31 @@
-function svdsym(A::AbstractSymTensor; debug::Bool=false)
-    numoflegs(A) == 2 ||
-        error("svd only defined for matrix like objects N = ", numoflegs(A))
-    signs(A.legs) == (+1, -1) ||
-        error("svdsym only accepts a SymMatrix (+1,-1) but ", signs(A.legs))
+function svd(A::AbstractSymTensor)
+    rank(A) == 2 ||
+        error("svdsym only defined for matrix like objects rank is $(rank(A))")
     T = eltype(A)
+    S = vtype(A)
 
-    debug && println(A)
+    u_blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
+    s_blocks = SortedDict{Sector{S, 2}, Diagonal{T}}()
+    v_blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
 
-    n_sectors = length(A.sects)
-
-    sects_U   = Vector{Tuple{Int, Int}}(undef, n_sectors)
-    nzblks_U  = Vector{Matrix{T}}(undef, n_sectors)
-    sects_S   = Vector{Tuple{Int, Int}}(undef, n_sectors)
-    nzblks_S  = Vector{Vector{Float64}}(undef, n_sectors)
-    nzblks_Vt = Vector{Matrix{T}}(undef, n_sectors)
-    sects_Vt  = Vector{Tuple{Int, Int}}(undef, n_sectors)
-    middle_dims = Int[]
-
-    for idx in eachindex(A.sects)
-        c1, c2 = A.sects[idx]
-        sects_U[idx]  = (c1, c1)
-        sects_S[idx]  = (c1, c2)
-        sects_Vt[idx] = (c2, c2)
-
-        nzblk = A.nzblks[idx]
-        fact = svd(nzblk, full=false)
-        nzblks_U[idx] = fact.U
-        nzblks_S[idx] = fact.S
-        nzblks_Vt[idx] = fact.Vt
-
-        push!(middle_dims, length(fact.S))
+    mid = SortedDict{S, Int}()
+    for (sect,blk) in A.blocks
+        c1, c2 = sect
+        fact = svd(blk, full=false)
+        u_blocks[Sector(c1, -c1)] = fact.U
+        s_blocks[Sector(c1,  c2)] = Diagonal(fact.S)
+        v_blocks[Sector(-c2, c2)] = fact.Vt
+        mid[c2] = length(fact.S)
     end
 
-    ls, rs = zip(sects_S...)
-    lchrs = [ls...]
-    rchrs = [rs...]
+    Vr = VectorSpace{S}(mid)
+    Vl = mapcharges(x->x+A.charge, dual(Vr))
 
-    if debug
-        println(middle_dims)
-        println(lchrs)
-        println(rchrs)
-    end
+    u  = SymMatrix{S,T}(zero(S), (A.space[1], dual(Vl)), u_blocks)
+    s  = SymDiagonal{S,Float64}(A.charge, (Vl, Vr), s_blocks)
+    v = SymMatrix{S,T}(zero(S), (dual(Vr), A.space[2]), v_blocks)
 
-    Uleg2 = STLeg(-1, lchrs, middle_dims)
-    Sleg1 = STLeg(+1, lchrs, middle_dims)
-    Sleg2 = STLeg(-1, rchrs, middle_dims)
-    Vtleg1 = STLeg(+1, rchrs, middle_dims)
-
-    U  = SymMatrix{T}(0, (A.legs[1], Uleg2), sects_U, nzblks_U)
-    S  = SymDiagonal{Float64}(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in nzblks_S])
-    Vt = SymMatrix{T}(0, (Vtleg1, A.legs[2]), sects_Vt, nzblks_Vt)
-
-    U, S, Vt
+    u, s, v
 end
 
 
@@ -63,11 +37,13 @@ which is `-1` if the two legs has charge odd and `+1` otherwise.
 
 The output legs are l2_afterX, l1_afterX, l2, l1
 """
-function fermionswapgate(l1::STLeg, l2::STLeg)
+function fermionswapgate(l1::U1Space, l2::U1Space)
     (l1.chrs != [0, 1] || l1.dims != [1,1]) && error("fermionswap oops!")
 
-    l1X = STLeg(-l1.sign, l1.chrs, l1.dims)
-    l2X = STLeg(-l2.sign, l2.chrs, l2.dims)
+    #l1X = U1Space(-l1.sign, l1.chrs, l1.dims)
+    l1X = legdual(l1)
+    #l2X = U1Space(-l2.sign, l2.chrs, l2.dims)
+    l2X = legdual(l2)
     legs = (l2, l1, l2X, l1X)
 
     sects, sizes = _allsectorsandsizes(0, legs)
@@ -87,18 +63,18 @@ function fermionswapgate(l1::STLeg, l2::STLeg)
 end
 
 # function isrightisometry(A::SymTensor)
-#     N = numoflegs(A)
+#     N = rank(A)
 
 # end
 
 function isrightisometry(A::SymMatrix)
     leg = A.legs[1]
-    eye(eltype(A), leg.chrs, leg.dims) ≈ SymMatrix(contract(A, (1, -1), invlegs(conj(A)), (2, -1)))
+    eye(eltype(A), leg.chrs, leg.dims) ≈ SymMatrix(contract(A, (1, -1), tensordual(A), (2, -1)))
 end
 
 function isleftisometry(A::SymMatrix)
     leg = A.legs[2]
-    eye(eltype(A), leg.chrs, leg.dims) ≈ SymMatrix(contract(invlegs(conj(A)), (-1, 1), A, (-1, 2)))
+    eye(eltype(A), leg.chrs, leg.dims) ≈ SymMatrix(contract(tensordual(A), (-1, 1), A, (-1, 2)))
 end
 
 isunitary(A::SymMatrix) = isrightisometry(A) && isleftisometry(A)

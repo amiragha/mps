@@ -53,16 +53,17 @@ mutable struct SymDiagonal{S, T<:Number} <: AbstractSymMatrix{S, T}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
         for (s,d) in blocks
-            s == sects[i] || throw{SectorMismatch()}
+            s == sects[i] || throw("SectorMismatch()")
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
-        chargedims(first(space)) == chargedims(last(space)) ||
+        dims(first(space)) == dims(last(space)) ||
             throw("SymDiagonal has to be square")
         new{S,T}(charge, space, blocks)
     end
 end
 
+SymDiagonal{S, T}(c,s,b) where{S,T} = SymDiagonal(c,s,b)
 const U1Diagonal{T} = SymDiagonal{Int, T}
 
 function SymVector(charge::S, v::Vector{T}) where{S, T}

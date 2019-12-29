@@ -11,11 +11,8 @@ struct VectorSpace{S} <: AbstractVectorSpace
         end
         new{S}(sectors)
     end
-
-    #VectorSpace{S}() where{S} = VectorSpace{S}(SortedDict{S, Int}())
 end
-
-VectorSpace{S}(sectors...) where {S} = VectorSpace{S}(sectors)
+VectorSpace{S}(pairs::Pair{S,Int}...) where {S} = VectorSpace{S}(pairs)
 
 @inline vtype(::VectorSpace{S}) where {S} = S
 
@@ -119,11 +116,11 @@ end
 "map the charges of the VSpace by some strictly ascending function `f`"
 function mapcharges(f::Function, V::VectorSpace)
     mappedchrs = f.(charges(V))
-    issoretd(mappedchrs) ||
+    issorted(mappedchrs) ||
         error("function not strictly ascending!")
     allunique(mappedchrs) ||
         error("mapping charges creates duplicates! $(l.chrs) -> $mappedchrs")
-    VectorSpace(f(c)=>d for (c,d) in V.sectors)
+    VectorSpace{vtype(V)}(f(c)=>d for (c,d) in V.sectors)
 end
 
 isdummy(V::VectorSpace) = charges(V) == (0,) && V[0] == 1

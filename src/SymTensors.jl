@@ -6,7 +6,7 @@ using Random
 import Base: convert, size, show, isless, isequal, ==, isapprox, *, conj
 import Base: eltype, similar, copyto!
 import Base: fill, fill!, rand, sum
-import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!
+import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!, svd
 import Base.intersect
 
 using DataStructures
@@ -61,7 +61,7 @@ export index_sector
 export get_sector!
 export set_sector!
 
-export svdsym
+export svd
 
 export eltype, similar, copyto!
 export mul!, rmul!, axpy!, axpby!, dot, norm
