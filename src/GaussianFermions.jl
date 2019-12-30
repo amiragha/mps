@@ -4,13 +4,11 @@ using MatrixProductStateTools
 using SymTensors
 using LinearAlgebra
 
-RLorCX = Union{Float64, ComplexF64}
+include("gmps.jl")
+include("gmps2mps.jl")
 
-include("fishman.jl")
-include("fishman2mps.jl")
-
-export FishmanGateSet
-export generate_fishmangates
-export fishman2mps
+export GaussianMPS
+export corrmat2gmps
+export gmps2mps
 
 end

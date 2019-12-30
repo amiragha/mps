@@ -8,25 +8,25 @@ the `positions` vector and each gate can be constructed using the
 `θs` or possibly `ϕs`.
 
 """
-struct FishmanGateSet
-    lx :: Int64
-    initconf :: Vector{Int64}
-    positions :: Vector{Int64}
+struct GaussianMPS
+    lx :: Int
+    initconf :: Vector{Int}
+    xs :: Vector{Int}
     θs :: Vector{Float64}
 
-    function FishmanGateSet(lx::Int64,
-                            initconf::Vector{Int64},
-                            positions::Vector{Int64},
-                            θs::Vector{Float64})
+    function GaussianMPS(lx::Int,
+                         initconf::Vector{Int},
+                         xs::Vector{Int},
+                         θs::Vector{Float64})
         @assert length(initconf) == lx
-        @assert length(positions) == length(θs)
+        @assert length(xs) == length(θs)
 
-        new(lx, initconf, positions, θs)
+        new(lx, initconf, xs, θs)
     end
 end
 
 """
-    generate_fishmangates(corr_matrix, threshold, verbose)
+    corrmat2gmps(corr_matrix, threshold, verbose)
 
 For a given two-point correlation matrix `corr_matrix` called lambda
 perform the approach explained in arxiv:1504.07701 and generate the
@@ -34,15 +34,15 @@ local (nearest-neighbor) gates.
 
 """
 
-function generate_fishmangates(corr_matrix::Matrix{T},
-                               threshold::Float64=1.e-8;
-                               alternate::Bool=false) where {T<:RLorCX}
+function corrmat2gmps(corrmat::Matrix{T},
+                      threshold::Float64=1.e-8;
+                      alternate::Bool=false) where {T}
     T <: Complex && error("correlation matrix is complex!")
     lx = size(corr_matrix)[1]
 
-    #initconf = Vector{Int64}(lx)
-    initconf = zeros(Int64, lx)
-    positions = Int64[]
+    #initconf = Vector{Int}(lx)
+    initconf = zeros(Int, lx)
+    positions = Int[]
     θs = Float64[]
 
     expected_next_evalue = 1
@@ -114,5 +114,5 @@ function generate_fishmangates(corr_matrix::Matrix{T},
         expected_next_evalue = (round(evalue) == 1) ? 0 : 1
     end
     # display(corr_matrix)
-    FishmanGateSet(lx, initconf, positions, θs)
+    GaussianMPS(lx, initconf, positions, θs)
 end
