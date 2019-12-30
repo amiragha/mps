@@ -3,7 +3,7 @@ module SymTensors
 using LinearAlgebra
 using Random
 
-import Base: convert, size, show, isless, isequal, ==, isapprox, *, conj
+import Base: convert, size, show, isless, isequal, ==, isapprox, *, conj, zero, inv
 import Base: eltype, similar, copyto!
 import Base: fill, fill!, rand, sum
 import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!, svd
@@ -12,6 +12,7 @@ import Base.intersect
 using DataStructures
 #include("sorteddict.jl")
 
+include("group.jl")
 include("vspace.jl")
 include("sector.jl")
 include("productspace.jl")
@@ -20,13 +21,13 @@ include("symreleg.jl")
 include("contract.jl")
 include("symtools.jl")
 
-export +, *
+export +, *, zero, inv
 export isequal, ==
 export isapprox
 export issimilar
 export AbstractSymTensor, AbstractSymMatrix
 export VectorSpace, ProductSpace
-export U1Space
+export U1Space, U1, U1Charge
 export Sector
 export SymTensor, SymMatrix, SymDiagonal, SymVector
 export eye

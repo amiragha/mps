@@ -58,7 +58,8 @@ function layout(V::VectorSpace; rev::Bool=false)
     dict
 end
 
-const U1Space = VectorSpace{Int}
+const U1Space = VectorSpace{U1Charge}
+U1Space(pairs::Pair{Int, Int}...) = U1Space(U1(c)=>d for (c,d) in pairs)
 
 "Find sector intersections between two VSpace"
 function intersect(V1::VectorSpace{S}, V2::VectorSpace{S}) where {S}

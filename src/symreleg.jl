@@ -56,7 +56,7 @@ end
 fuses two or `n` consequative legs of SymTensor `A` starting at leg `l`
 into a new leg.
 
-Below not correct!----
+Below is not the current implementation!----
 Fusion or tensor product is only defined for two vector spaces so for
 larger ones it has to be preformed in a recursive fashion. Here we
 follow the convention of tensor producting pairs from left to right,

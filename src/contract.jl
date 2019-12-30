@@ -95,7 +95,7 @@ function SymMatrix(A::AbstractSymTensor,
     S = vtype(A)
 
     csects = sectors(A)
-    sperm1 = sortperm(csects, by=x->Sector(x[idxperm]))
+    sperm1 = sortperm(csects, by=x->reverse(x[idxperm]))
     fsects = Vector{Sector{S, 2}}(undef, length(csects))
     for i in eachindex(csects)
         sector = csects[sperm1][i]

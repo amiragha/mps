@@ -187,11 +187,11 @@ blocks with `conjugate` which is true by default.
 # SymMatrix objects, should I change the convention then?
 function dual(A::AbstractSymTensor; conjugate::Bool=true)
     if !conjugate
-        return typeof(A)(-A.charge,
+        return typeof(A)(inv(A.charge),
                          dual.(A.space),
                          typeof(A.blocks)(dual(s), d for (s,d) in A.blocks))
     end
-    typeof(A)(-A.charge,
+    typeof(A)(inv(A.charge),
               dual.(A.space),
               typeof(A.blocks)(dual(s), conj(d) for (s,d) in A.blocks))
 end
@@ -203,7 +203,7 @@ function mapcharges(f::Function, A::AbstractSymTensor)
 end
 
 function mapcharges(f::NTuple{N, Function},
-                    A::AbstractSymTensor{T, N}) where{T<:Number, N}
+                    A::AbstractSymTensor{S,T,N}) where{S,T<:Number,N}
     space = Tuple(mapcharges(f[i], A.space[i]) for i in 1:N)
 
     sects = [Tuple(f[i](s[i]) for i in 1:N) for s in A.sects]
@@ -267,8 +267,8 @@ end
 
 "Stores in B the result of α*A + B"
 function axpy!(α,
-               A::AbstractSymTensor{T1, N},
-               B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
+               A::AbstractSymTensor{S,T1,N},
+               B::AbstractSymTensor{S,T2,N}) where {S,T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
     for i in eachindex(A.blocks.values)
         B.blocks.values[i] = α .* A.blocks.values[i] + B.blocks.values[i]
@@ -278,9 +278,9 @@ end
 
 "Stores in B the result of α*A + β*B"
 function axpby!(α,
-                A::AbstractSymTensor{T1, N},
+                A::AbstractSymTensor{S,T1,N},
                 β,
-                B::AbstractSymTensor{T2, N}) where {T1<:Number, T2<:Number, N}
+                B::AbstractSymTensor{S,T2,N}) where {S,T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
     for i in eachindex(A.blocks.values)
         B.blocks.values[i] = α .* A.blocks.values[i] + β .* B.blocks.values[i]
@@ -292,8 +292,8 @@ end
 compute the inner product of two similar SymTensors which conjugates
 the second one
 """
-function dot(A::AbstractSymTensor{T1, N},
-             B::AbstractSymTensor{T2, N}) where{T1<:Number, T2<:Number, N}
+function dot(A::AbstractSymTensor{S,T1,N},
+             B::AbstractSymTensor{S,T2,N}) where{S,T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("The two SymTensors have to be similar to dot!")
     sum([dot(A.blocks[i], B.blocks[i]) for i in onlysemitokens(A.blocks)])
 end

@@ -8,12 +8,14 @@
         )
 
         # Note that all the possible sectors are given!
-        sects = [Sector(0, 0, 0), Sector(0, 1, -1), Sector(1, 0, -1)]
+        sects = [Sector{U1}(0, 0, 0),
+                 Sector{U1}(0, 1, -1),
+                 Sector{U1}(1, 0, -1)]
         nzblks = [reshape(collect(1:6), 2,1,3),
                   reshape(collect(7:14), 2,1,4),
                   reshape(collect(15:26), 3,1,4)]
 
-        A0 = SymTensor(0, space, SortedDict(zip(sects,nzblks)))
+        A0 = SymTensor(zero(U1), space, SortedDict(zip(sects,nzblks)))
         A1 = fuselegs(A0, 1, 2)
         A2 = splitleg(A1, 1, space[1:2])
         @test A0 == A2
@@ -21,14 +23,14 @@
 
     @testset "U1 unitary" begin
         A = eye(Float64, U1Space(0=>1, 1=>2, 2=>1))
-        A[Sector(1,-1)] =  [2. 3;4 5]
+        A[Sector{U1}(1,-1)] =  [2. 3;4 5]
         d = U1Space(0=>1, 1=>1)
         cod = (d, d)
         dom = (dual(d), dual(d))
         B = splitleg(splitleg(A, 2, dom), 1, cod)
-        @test sectors(B) == [Sector(1,1,-1,-1), Sector(1,0,0,-1),
-                             Sector(0,1,0,-1), Sector(1,0,-1,0),
-                             Sector(0,1,-1,0), Sector(0,0,0,0)]
+        @test sectors(B) == [Sector{U1}(1,1,-1,-1), Sector{U1}(1,0,0,-1),
+                             Sector{U1}(0,1,0,-1), Sector{U1}(1,0,-1,0),
+                             Sector{U1}(0,1,-1,0), Sector{U1}(0,0,0,0)]
         i = ones(1,1,1,1)
         @test collect(values(B.blocks)) == [i,2*i, 4*i, 3*i,5*i, 1*i]
     end
@@ -37,7 +39,7 @@
         d = U1Space(-1=>1, 0=>2, 1=>1)
         space = (d, dual(d), d, dual(d))
 
-        A = fill_linearindex(0,  space[1:4])
+        A = fill_linearindex(zero(U1),  space[1:4])
         A1 = fuselegs(A, 2, 3)
         A2 = fuselegs(A, 3, 2)
         A3 = fuselegs(A, 1, 3)
@@ -80,7 +82,7 @@ end
             U1Space(0=>3, -1=>5, -2=>2),
         )
         A = fill_linearindex(vlist[1:2])
-        B = fill(1.0, 0, vlist[3:4])
+        B = fill(1.0, zero(U1), vlist[3:4])
 
         A_ = array(A)
         B_ = array(B, rev=(true,false))
@@ -101,8 +103,8 @@ end
             U1Space(0=>2, 1=>2),
             U1Space(0=>2, -1=>2, -2=>2)
         )
-        A = rand(Float64, 0, vlist[1:4])
-        B = rand(Float64, 0, vlist[5:8])
+        A = rand(Float64, zero(U1), vlist[1:4])
+        B = rand(Float64, zero(U1), vlist[5:8])
 
         @test splitleg(fuselegs(A, 1, 3), 1, vlist[1:3]) ≈ A
         @test splitleg(fuselegs(A, 2, 2), 2, vlist[2:3]) ≈ A
@@ -130,7 +132,7 @@ end
         U1Space(0=>3, -1=>4, -2=>5)
     )
     @testset "dot" begin
-        A = rand(ComplexF64, 0, vlist[1:4])
+        A = rand(ComplexF64, zero(U1), vlist[1:4])
         A_ = array(A)
         @test dot(A_,A_) ≈ dot(A, A)
     end
@@ -143,7 +145,7 @@ end
             U1Space(0=>4, 1=>2, 2=>2, 3=>3),
             U1Space(0=>3, -1=>5, -2=>2),
         )
-        A = rand(Float64, 0, vlist[1:2])
+        A = rand(Float64, zero(U1), vlist[1:2])
     U,S,Vt = svd(A)
     @test U*S*Vt ≈ A
 end

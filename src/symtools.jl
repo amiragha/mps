@@ -37,29 +37,24 @@ which is `-1` if the two legs has charge odd and `+1` otherwise.
 
 The output legs are l2_afterX, l1_afterX, l2, l1
 """
-function fermionswapgate(l1::U1Space, l2::U1Space)
-    (l1.chrs != [0, 1] || l1.dims != [1,1]) && error("fermionswap oops!")
+function fermionswapgate(l1::VectorSpace{S}, l2::VectorSpace{S}) where{S}
 
-    #l1X = U1Space(-l1.sign, l1.chrs, l1.dims)
-    l1X = legdual(l1)
-    #l2X = U1Space(-l2.sign, l2.chrs, l2.dims)
-    l2X = legdual(l2)
-    legs = (l2, l1, l2X, l1X)
+    space = (l2, l1, dual(l2), dual(l1))
 
-    sects, sizes = _allsectorsandsizes(0, legs)
-    nzblks = Vector{Array{Float64, 4}}(undef, length(sizes))
+    sects, sizes = _allsectorsandsizes(0, space)
+    blocks = SortedDict{Sector{S, 4}, Array{Float64, 4}}()
 
     for index in eachindex(sects)
         c2, c1, c2X, c1X = sects[index]
         if c1 == c1X && c2 == c2X
             d2, d1 = sizes[index][1:2]
             s = isodd(c1) && isodd(c2) ? -1 : +1
-            nzblks[index] =  s * reshape(I(d1*d2), d2, d1, d2, d1)
+            blocks[sects] =  s * reshape(I(d1*d2), d2, d1, d2, d1)
         else
-            nzblks[index] = zeros(sizes[index])
+            blocks[sects] = zeros(sizes[index])
         end
     end
-    SymTensor(0, legs, sects, nzblks)
+    SymTensor(zero(s), space, blocks)
 end
 
 # function isrightisometry(A::SymTensor)
@@ -68,13 +63,11 @@ end
 # end
 
 function isrightisometry(A::SymMatrix)
-    leg = A.legs[1]
-    eye(eltype(A), leg.chrs, leg.dims) ≈ SymMatrix(contract(A, (1, -1), tensordual(A), (2, -1)))
+    eye(eltype(A), A.space[1]) ≈ SymMatrix(contract(A, (1, -1), dual(A), (2, -1)))
 end
 
 function isleftisometry(A::SymMatrix)
-    leg = A.legs[2]
-    eye(eltype(A), leg.chrs, leg.dims) ≈ SymMatrix(contract(tensordual(A), (-1, 1), A, (-1, 2)))
+    eye(eltype(A), A.space[2]) ≈ SymMatrix(contract(dual(A), (-1, 1), A, (-1, 2)))
 end
 
 isunitary(A::SymMatrix) = isrightisometry(A) && isleftisometry(A)
