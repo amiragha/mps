@@ -1,27 +1,21 @@
-struct SymMatrixProductOperator{Tv<:RLorCX}
-    lx :: Int
-    d  :: Int
-    dims :: Vector{Int}
-    tensors :: Vector{SymTensor{Tv, 4}}
+struct MPOperator{S, T}
+    Ws :: Vector{SymTensor{S,T,4}}
 end
 
-function xxz_symmpo(Tv::DataType, lx::Int, d::Int, delta::Float64=1.0)
-    legs = (
-        STLeg(+1, [-1,0,+1], [1,3,1]),
-        STLeg(+1, [0,+1], [1,1]),
-        STLeg(-1, [-1,0,+1], [1,3,1]),
-        STLeg(-1, [0,+1], [1,1]),
-    )
+const U1MPO{T} = MPOperator{Int, T}
 
-    legbeg = STLeg(+1, [0], [1])
-    legend = STLeg(-1, [0], [1])
+"function to explicitly make the xxz mpo (for test and example)"
+function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
 
-    Abeg = fill(zero(Tv), 0, (legbeg, legs[2:4]...))
-    A = fill(zero(Tv), 0, legs)
-    Aend = fill(zero(Tv), 0, (legs[1:2]...,legend, legs[4]))
+    V0 = U1Space(0=>1)
+    V = U1Space(-1=>1, 0=>3, +1=>1)
+    d = U1Space(0=>1, 1=>1)
 
-    ###NOTE: here we need nice functions for symtensor which we don't have!!!
-    ###TODO: Make the nice functions (slicing and indexing, etc) for SymTensors!
+    space = (V, d, dual(V), dual(d))
+
+    Wbeg = fill(zero(T), 0, (V0, space[2:4]...))
+    W    = fill(zero(T), 0, space)
+    Wend = fill(zero(T), 0, (space[1:2]...,V0, space[4]))
 
     # making the generic MPO tensor
     mat0 = [
@@ -34,59 +28,51 @@ function xxz_symmpo(Tv::DataType, lx::Int, d::Int, delta::Float64=1.0)
         delta*.5   0.   0.;
         0.   0.5  1
     ]
-    set_sector!(A, (0,0,0,0), reshape(mat0, 3,1,3,1))
-    set_sector!(A, (0,1,0,1), reshape(mat1, 3,1,3,1))
+    W[Sector{U1}(0,0,0,0)] =  reshape(mat0, 3,1,3,1)
+    W[Sector{U1}(0,1,0,1)] =  reshape(mat1, 3,1,3,1)
 
-    set_sector!(A, (0,1,1,0), reshape([0. 0. 1.], 3,1,1,1))
-    set_sector!(A, (0,0,-1,1), reshape([0. 0. 1.], 3,1,1,1))
-    set_sector!(A, (1,0,0,1), 0.5*reshape([1. 0. 0.], 1,1,3,1))
-    set_sector!(A, (-1,1,0,0), 0.5*reshape([1. 0. 0.], 1,1,3,1))
+    W[Sector{U1}(0,1,1,0)] = reshape([0. 0. 1.], 3,1,1,1)
+    W[Sector{U1}(0,0,-1,1)] = reshape([0. 0. 1.], 3,1,1,1)
+    W[Sector{U1}(1,0,0,1)] = 0.5*reshape([1. 0. 0.], 1,1,3,1)
+    W[Sector{U1}(-1,1,0,0)] = 0.5*reshape([1. 0. 0.], 1,1,3,1)
 
     # making the begging tensor
-    set_sector!(Abeg, (0,0,0,0), reshape(mat0[3,:], 1,1,3,1))
-    set_sector!(Abeg, (0,1,0,1), reshape(mat1[3,:], 1,1,3,1))
+    Wbeg[Sector{U1}(0,0,0,0)] =  reshape(mat0[3,:], 1,1,3,1)
+    Wbeg[Sector{U1}(0,1,0,1)] =  reshape(mat1[3,:], 1,1,3,1)
 
-    set_sector!(Abeg, (0,1,1,0), ones(Tv,1,1,1,1))
-    set_sector!(Abeg, (0,0,-1,1), ones(Tv,1,1,1,1))
+    Wbeg[Sector{U1}(0,1,1,0)] =  ones(T,1,1,1,1)
+    Wbeg[Sector{U1}(0,0,-1,1)] =  ones(T,1,1,1,1)
 
     # making the end tensor
-    set_sector!(Aend, (0,0,0,0), reshape(mat0[:,1], 3,1,1,1))
-    set_sector!(Aend, (0,1,0,1), reshape(mat1[:,1], 3,1,1,1))
+    Wend[Sector{U1}(0,0,0,0)] =  reshape(mat0[:,1], 3,1,1,1)
+    Wend[Sector{U1}(0,1,0,1)] =  reshape(mat1[:,1], 3,1,1,1)
 
-    set_sector!(Aend, (-1,1,0,0), 0.5*ones(Tv,1,1,1,1))
-    set_sector!(Aend, (1,0,0,1), 0.5*ones(Tv,1,1,1,1))
+    Wend[Sector{U1}(-1,1,0,0)] =  0.5*ones(T,1,1,1,1)
+    Wend[Sector{U1}(1,0,0,1)] =  0.5*ones(T,1,1,1,1)
 
-    tensors = SymTensor{Tv, 4}[]
-    dims = zeros(Int, lx+1)
-
-    dims[1] = 1
-    push!(tensors, Abeg)
-    dims[2] = 5
+    mpo = MPOperator{S,T}()
+    push!(mpo, Wbeg)
     for site=2:lx-1
-        push!(tensors, A)
-        dims[site+1] = 5
+        push!(mpo, W)
     end
-    push!(tensors, Aend)
-    dims[lx+1] = 1
-
-    SymMatrixProductOperator{Tv}(lx, d, dims, tensors)
+    push!(mpo, Wend)
+    mpo
 end
 
 ### conversions
 ###############
 
-SymMatrixProductOperator{T}(mpo::SymMatrixProductOperator{T}) where {T<:Number} = mpo
-function SymMatrixProductOperator{T}(mpo::SymMatrixProductOperator) where {T<:Number}
-    SymMatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
-                                [SymTensor{T, 4}(ten) for ten in mpo.tensors])
+MPOperator{T}(mpo::MPOperator{T}) where {T<:Number} = mpo
+function MPOperator{S,T}(mpo::MPOperator) where {S,T}
+    MPOperator{S,T}([SymTensor{S, T, 4}(W) for W in mpo])
 end
 
-function MatrixProductOperator(mpo::SymMatrixProductOperator{T}) where {T<:Number}
-    MatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
-                             [array(mat) for mat in mpo.tensors])
-end
+# function MatrixProductOperator(mpo::MPOperator{T}) where {T<:Number}
+#     MatrixProductOperator{T}(mpo.lx, mpo.d, mpo.dims,
+#                              [array(mat) for mat in mpo.tensors])
+# end
 
-function mpo2hamiltonian(mpo::SymMatrixProductOperator)
+function mpo2hamiltonian(mpo::MPOperator)
     lx = mpo.lx
     d = mpo.d
     mpo.d^lx > 10000 && error("model is too large for explicit Hamiltonian!")
@@ -104,7 +90,7 @@ function mpo2hamiltonian(mpo::SymMatrixProductOperator)
     L
 end
 
-function reducempo!(mpo::SymMatrixProductOperator)
+function reducempo!(mpo::MPOperator)
     # this definitely needs to be better
     if size(mpo.tensors[1], 1) != 1
         return _reduceinfinitempo!(mpo)
@@ -132,7 +118,7 @@ function reducempo!(mpo::SymMatrixProductOperator)
     mpo
 end
 
-function _reduceinfinitempo!(mpo::SymMatrixProductOperator)
+function _reduceinfinitempo!(mpo::MPOperator)
     A = mpo.tensors[1]
     for l=1:mpo.lx-1
         U, S, Vt = svdtrunc(fuselegs(permutelegs(A,

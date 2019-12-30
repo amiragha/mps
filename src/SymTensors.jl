@@ -27,6 +27,7 @@ export isapprox
 export issimilar
 export AbstractSymTensor, AbstractSymMatrix
 export VectorSpace, ProductSpace
+export AbstractCharge
 export U1Space, U1, U1Charge
 export Sector
 export SymTensor, SymMatrix, SymDiagonal, SymVector

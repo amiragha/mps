@@ -7,27 +7,28 @@ using Random
 using LinearAlgebra
 using KrylovKit
 using TensorOperations
-RLorCX = Union{Float64, ComplexF64}
 
 import Base: convert, size
 import LinearAlgebra: norm, normalize!
 
 include("mpsutils.jl")
-include("mpo.jl")
+#include("mpo.jl")
 include("symmpo.jl")
 include("mpogen.jl")
-include("mps.jl")
-include("imps.jl")
+#include("mps.jl")
+#include("imps.jl")
 include("symmps.jl")
 
-export MatrixProductOperator
-export MatrixProductState
-export SymMatrixProductState
-export SymMatrixProductOperator
-export InfiniteMatrixProductState
+export MPState
+export MPOperator
+#export MatrixProductOperator
+#export MatrixProductState
+#export SymMatrixProductState
+#export SymMatrixProductOperator
+#export InfiniteMatrixProductState
 
 export svdtrunc
-export randmps
+#export randmps
 
 export normalize!
 export canonicalize_at!, move_center!

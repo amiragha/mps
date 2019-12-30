@@ -116,10 +116,8 @@ end
 function svdtrunc(A::AbstractSymTensor;
                   maxdim::Int=size(A, 2),
                   tol::Float64=1.e-12)
-    numoflegs(A) == 2 ||
-        error("svd only defined for matrix like objects N = ", numoflegs(A))
-    signs(A.legs) == (+1, -1) ||
-        error("svdsym only accepts a SymMatrix (+1,-1) but ", signs(A.legs))
+    rank(A) == 2 ||
+        error("svd only defined for matrix like objects N = ", rank(A))
     T = eltype(A)
 
     n_sects = length(A.sects)
@@ -158,8 +156,12 @@ function svdtrunc(A::AbstractSymTensor;
     middledims = ns[indices]
 
     ls, rs = zip(sects_S...)
-    lchrs = [ls...]
-    rchrs = [rs...]
+    lchrs = reverse([ls...])
+    rchrs = reverse(-[rs...])
+    middledims = reverse(middledims)
+
+    println(lchrs)
+    println(rchrs)
 
     Uleg2  = STLeg(-1, lchrs, middledims)
     Sleg1  = STLeg(+1, lchrs, middledims)
