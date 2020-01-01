@@ -23,9 +23,9 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
     # TODO: check
     # compatibility println(remsA, consA, remsB, consB)
     if length(remsA) == 0
-        _A = SymVector(A, consA)
+        _A = SymVector(A, consA, false)
         if length(remsB) == 0
-            _B = SymVector(B, consB)
+            _B = SymVector(B, consB, true)
             return _A * _B
         else
             _B = SymMatrix(B, remsB, consB)
@@ -37,12 +37,14 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
     _A = SymMatrix(A, remsA, consA)
 
     if length(remsB) == 0
-        _B = SymVector(B, consB)
+        _B = SymVector(B, consB, true)
         return permutelegs(unfuseleg(_A*_B, 1, A.legs[remsA]),
                            invperm(tofinalsA))
     end
 
     _B = SymMatrix(B, consB, remsB)
+    # println(_A)
+    # println(_B)
     return permutelegs(SymTensor(_A * _B, A.space[remsA], B.space[remsB]),
                        #unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
                        invperm([tofinalsA; tofinalsB]))
@@ -69,14 +71,14 @@ function _contract_index_perm(indexset; mode::Symbol=:MINUS)
 end
 
 function SymVector(A::AbstractSymTensor,
-                   perm::Vector{Int})
+                   perm::Vector{Int},
+                   _dual::Bool)
     N = rank(A)
-    abs(sign) == 1 || error("Incorrect sign $sign")
     sort(perm) == collect(1:N) ||
         error("Incorrect index set for conversion to SymVector!")
 
     pA = permutelegs(A, perm)
-    SymVector(fuselegs(pA, 1, N))
+    fuselegs(pA, 1, N, _dual)
 end
 
 function SymMatrix(A::AbstractSymTensor,
@@ -94,25 +96,29 @@ function SymMatrix(A::AbstractSymTensor,
     T = eltype(A)
     S = vtype(A)
 
+    rowdualinfo = isdual.(A.space[rowidxs])
+    coldualinfo = isdual.(A.space[colidxs])
     csects = sectors(A)
     sperm1 = sortperm(csects, by=x->reverse(x[idxperm]))
     fsects = Vector{Sector{S, 2}}(undef, length(csects))
     for i in eachindex(csects)
         sector = csects[sperm1][i]
-        c1 = sum(sector[rowidxs])
-        c2 = sum(sector[colidxs])
+        c1 = sum(Sector(sector[rowidxs]), rowdualinfo)
+        c2 = inv(sum(Sector(sector[colidxs]), coldualinfo))
         fsects[i] = Sector(c1, c2)
     end
     sperm2 = sortperm(fsects)
     semits = collect(onlysemitokens(A.blocks))[sperm1][sperm2]
 
-    space = (fuse(A.space[rowidxs]), fuse(A.space[colidxs]))
+    space = (fuse(false, A.space[rowidxs]), fuse(true, A.space[colidxs]))
+    #println(space)
 
     sects, sizes = _allsectorsandsizes(A.charge, space)
 
     blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
     pointer = 1
     for index in 1:length(sects)
+        #println("SymMat for sector $(sects[index])")
         blk = Matrix{T}(undef, sizes[index])
         #range = [1:m for m in sizes[index]]
 
@@ -122,6 +128,7 @@ function SymMatrix(A::AbstractSymTensor,
             pr = 1
             fdc = 0
             while pr <= rlim
+                #println("sector $(sectors(A)[sperm1][sperm2][pointer])")
                 Ablk = permutedims(A.blocks[semits[pointer]], idxperm)
                 s = size(Ablk)
                 fdr = prod(s[1:n])
@@ -167,9 +174,11 @@ function SymTensor(A     :: SymMatrix,
     #    oldcharge = 0
     rpats, rsizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
     cpats, csizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
+    isduals = isdual.(A.space)
     for (s,blk) in A.blocks
         c1, c2 = s.charges
-
+        c1 = isdual(A.space[1]) ? inv(c1) : c1
+        c2 = isdual(A.space[2]) ? inv(c2) : c2
         rpats, rsizes = _allsectorsandsizes(c1, rlegs)
         cpats, csizes = _allsectorsandsizes(c2, clegs)
 
@@ -197,7 +206,8 @@ function *(A::SymVector, B::SymVector)
     isdual(A.space[1], B.space[1]) ||
         error("not contractible!", A.space[1], " and ", B.space[1])
 
-    return sum(A.blocks.values[1] .* B.blocks.values[1])
+    semits = collect(onlysemitokens(A.blocks))
+    return sum(A.blocks[semits[1]] .* B.blocks[semits[1]])
 end
 
 function *(A::AbstractSymMatrix,
@@ -247,9 +257,18 @@ function *(A::AbstractSymMatrix,
     #println(A)
     #println(B)
     for i=1:n_sectors
-        sector = sects[i]
-        if haskey(A.blocks, sector) && haskey(B.blocks, sector)
-            blocks[sects[i]] = A.blocks[sector] * B.blocks[sector]
+        c1, c2 = sects[i]
+        _c1 = isdual(A.space[1]) ? inv(c1) : c1
+        _c2 = isdual(B.space[2]) ? inv(c2) : c2
+        if isdual(A.space[2])
+            sectorA = Sector(c1, inv(A.charge)+_c1)
+            sectorB = Sector(B.charge-_c2, c2)
+        else
+            sectorA = Sector(c1, A.charge-_c1)
+            sectorB = Sector(inv(B.charge)+_c2, c2)
+        end
+        if haskey(A.blocks, sectorA) && haskey(B.blocks, sectorB)
+            blocks[sects[i]] = A.blocks[sectorA] * B.blocks[sectorB]
         else
             blocks[sects[i]] = zeros(T, sizes[i])
         end

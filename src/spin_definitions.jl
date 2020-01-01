@@ -1,30 +1,35 @@
 """
-    spinoperators(S)
+    spinoperators(s)
 
-For spin `S` returns the operators (`Sz`,`Sp`, `Sm`). `S` has to be
+For spin `s` returns the operators (`sz`,`sp`, `sm`). `s` has to be
 integer or half-integer
 """
-function spinoperators(S; symmetry::Symbol=:NONE)
-    d = Int(round(2*S + 1))
-    ms = [S-n+1 for n in 1:d]
-    amps = [sqrt((S+m)*(S-m+1)) for m in ms[1:d-1]]
+function spinoperators(s; symmetry::Symbol=:NONE)
+    d = Int(round(2*s + 1))
+    ms = [s-n+1 for n in 1:d]
+    amps = [sqrt((s+m)*(s-m+1)) for m in ms[1:d-1]]
 
     if symmetry == :NONE
-        Sz = diagm(0 => ms)
-        Sp = diagm(1 => amps)
-        Sm = diagm(-1 => amps)
-        return Sz, Sp, Sm
+        sz = diagm(0 => ms)
+        sp = diagm(1 => amps)
+        sm = diagm(-1 => amps)
+        return sz, sp, sm
     elseif symmetry == :U1
-        chrs = collect(0:d-1)
-        dims = ones(Int, d)
-        legs = (STLeg(+1, chrs, dims), STLeg(-1, chrs, dims))
-        Sz = SymMatrix(0, legs, [(c,c) for c in 0:d-1],
-                       [m*ones(1,1) for m in reverse(ms)])
-        Sp = SymMatrix(+1, legs, [(c+1, c) for c in 0:d-2],
-                       [m * ones(1,1) for m in amps])
-        Sm = SymMatrix(-1, legs, [(c, c+1) for c in 0:d-2],
-                       [m * ones(1,1) for m in amps])
-        return Sz, Sp, Sm
+        V = U1Space(c=>1 for c in 0:d-1)
+        sz_blocks = SortedDict{Sector{U1, 2}, Matrix{Float64}}()
+        sp_blocks = SortedDict{Sector{U1, 2}, Matrix{Float64}}()
+        sm_blocks = SortedDict{Sector{U1, 2}, Matrix{Float64}}()
+        for c in 0:d-1
+            sz_blocks[Sector{U1}(c, c)] = reverse(ms)[c+1] * ones(1,1)
+        end
+        for c in 0:d-2
+            sp_blocks[Sector{U1}(c+1, c)] = amps[c+1] * ones(1,1)
+            sm_blocks[Sector{U1}(c, c+1)] = amps[c+1] * ones(1,1)
+        end
+        sz = SymMatrix(zero(U1), (V,dual(V)), sz_blocks)
+        sp = SymMatrix(U1(+1), (V,dual(V)), sp_blocks)
+        sm = SymMatrix(U1(-1), (V,dual(V)), sm_blocks)
+        return sz, sp, sm
     else
         error("Unkown symmetry: $symmetry")
     end
@@ -87,13 +92,13 @@ function nbodyopexpansion(n::Int,
     ols = ['Z', 'P', 'M', 'I']
 
     T = eltype(H)
-    symops = [spinoperators(1/2, symmetry=:U1)..., eye(T, [0,1], [1,1])]
+    symops = [spinoperators(1/2, symmetry=:U1)..., eye(T, U1Space(0=>1, 1=>1))]
 
     amps = Vector{T}()
     if symmetry == :NONE
         terms = Vector{NTuple{n, Matrix{T}}}()
     elseif symmetry == :U1
-        terms = Vector{NTuple{n, SymMatrix{T}}}()
+        terms = Vector{NTuple{n, SymMatrix{U1,T}}}()
     end
     ⊗ = kron
     for is in Iterators.product([1:4 for i=1:n]...)

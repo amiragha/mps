@@ -21,6 +21,6 @@ const U1 = U1Charge
 convert(::Type{U1Charge}, s::Int) = U1Charge(s)
 
 function Base.show(io::IO, c::AbstractCharge)
-    show(c.charge)
+    print(io, c.charge)
     nothing
 end

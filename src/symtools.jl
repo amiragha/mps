@@ -1,6 +1,4 @@
-function svd(A::AbstractSymTensor)
-    rank(A) == 2 ||
-        error("svdsym only defined for matrix like objects rank is $(rank(A))")
+function svd(A::AbstractSymMatrix)
     T = eltype(A)
     S = vtype(A)
 
@@ -8,19 +6,27 @@ function svd(A::AbstractSymTensor)
     s_blocks = SortedDict{Sector{S, 2}, Diagonal{T}}()
     v_blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
 
-    mid = SortedDict{S, Int}()
+    midl = SortedDict{S, Int}()
+    midr = SortedDict{S, Int}()
     for (sect,blk) in A.blocks
         c1, c2 = sect
         fact = svd(blk, full=false)
-        u_blocks[Sector(c1, -c1)] = fact.U
-        s_blocks[Sector(c1,  c2)] = Diagonal(fact.S)
-        v_blocks[Sector(-c2, c2)] = fact.Vt
-        mid[c2] = length(fact.S)
+        u_blocks[Sector(c1, c1)] = fact.U
+        s_blocks[Sector(c1, c2)] = Diagonal(fact.S)
+        v_blocks[Sector(c2, c2)] = fact.Vt
+        midl[c1] = length(fact.S)
+        midr[c2] = length(fact.S)
     end
 
-    Vr = VectorSpace{S}(mid)
-    Vl = mapcharges(x->x+A.charge, dual(Vr))
+    Vl = VectorSpace{S}(midl, A.space[1].isdual)
+    Vr = VectorSpace{S}(midr, A.space[2].isdual)
 
+    # println(A.space[1])
+    # println(dual(Vl))
+    # println(Vl)
+    # println(Vr)
+    # println(dual(Vr))
+    # println(A.space[2])
     u  = SymMatrix{S,T}(zero(S), (A.space[1], dual(Vl)), u_blocks)
     s  = SymDiagonal{S,Float64}(A.charge, (Vl, Vr), s_blocks)
     v = SymMatrix{S,T}(zero(S), (dual(Vr), A.space[2]), v_blocks)

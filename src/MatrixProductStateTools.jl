@@ -19,7 +19,7 @@ include("mpogen.jl")
 #include("imps.jl")
 include("symmps.jl")
 
-export MPState
+export MPState, U1MPState
 export MPOperator
 #export MatrixProductOperator
 #export MatrixProductState
@@ -31,16 +31,18 @@ export svdtrunc
 #export randmps
 
 export normalize!
-export canonicalize_at!, move_center!
+export center_at!
 
 export entanglemententropy
 export entanglementspectrum
-export measure_1point, measure_2point
-export measure_bond
-export half_measurement_index
-export measure_mpo
-export apply_2siteoperator!
-export apply_1siteoperator!
+export measure
+#export measure_1point, measure_2point
+#export measure_bond
+#export half_measurement_index
+#export measure_mpo
+#export apply_2siteoperator!
+#export apply_1siteoperator!
+export apply!
 export twosite_tensor
 export overlap
 export display_matrices

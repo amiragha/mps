@@ -1,22 +1,27 @@
 abstract type AbstractVectorSpace end
 struct VectorSpace{S} <: AbstractVectorSpace
     sectors :: SortedDict{S, Int}
-
-    function VectorSpace{S}(s) where {S}
+    isdual  :: Bool
+    function VectorSpace{S}(s, id) where {S}
         allunique([c for (c,d) in s]) ||
             error("duplicate charges! $s")
         sectors = SortedDict{S, Int}(s)
         for (c, d) in sectors
             d > 0 || error("space dimension can only be positive!")
         end
-        new{S}(sectors)
+        new{S}(sectors, id)
     end
+    VectorSpace{S}(s) where{S} = VectorSpace{S}(s, false)
 end
-VectorSpace{S}(pairs::Pair{S,Int}...) where {S} = VectorSpace{S}(pairs)
+VectorSpace{S}(pairs::Pair{S,Int}...) where {S} = VectorSpace{S}(pairs, false)
 
 @inline vtype(::VectorSpace{S}) where {S} = S
 
-@inline isequal(V1::VectorSpace, V2::VectorSpace) = isequal(V1.sectors, V2.sectors)
+@inline isdual(V::VectorSpace) = V.isdual
+@inline isdual(V1::T, V2::T) where {T<:VectorSpace} =
+    V1.sectors == V2.sectors && V1.isdual != V2.isdual
+@inline isequal(V1::VectorSpace, V2::VectorSpace) =
+    isequal(V1.sectors, V2.sectors) && V1.isdual == V2.isdual
 ==(V1::VectorSpace, V2::VectorSpace) = isequal(V1, V2)
 
 @inline hascharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
@@ -34,27 +39,24 @@ doesn't exist. Return total dimension if charge is not specified."
 @inline Base.iterate(V::VectorSpace, i) = iterate(V.sectors, i)
 
 "Return the dual of the vector space"
-@inline dual(V::VectorSpace) = VectorSpace{vtype(V)}(-c=>d for (c,d) in V.sectors)
+@inline dual(V::VectorSpace) = VectorSpace{vtype(V)}(V.sectors, !V.isdual)
 
-@inline isdual(V1::T, V2::T) where {T<:VectorSpace} =
-    charges(V1) == -reverse(charges(V2)) && dims(V1) == reverse(dims(V2))
-
-function layout(V::VectorSpace; rev::Bool=false)
+function layout(V::VectorSpace)
     S = vtype(V)
     dict = SortedDict{S, UnitRange{Int}}()
-    if rev
-        p = dim(V)
-        for (c, d) in V
-            dict[c] = p-d+1:p
-            p -= d
-        end
-    else
+    # if V.isdual
+    #     p = dim(V)
+    #     for (c, d) in V
+    #         dict[c] = p-d+1:p
+    #         p -= d
+    #     end
+    # else
         p = 0
         for (c,d) in V
             dict[c] = p+1:p+d
             p+=d
         end
-    end
+    #end
     dict
 end
 
@@ -63,6 +65,7 @@ U1Space(pairs::Pair{Int, Int}...) = U1Space(U1(c)=>d for (c,d) in pairs)
 
 "Find sector intersections between two VSpace"
 function intersect(V1::VectorSpace{S}, V2::VectorSpace{S}) where {S}
+    V1.isdual != V2.isdual || error("Not the same dual-type")
     sectors = SortedDict{S, Int}()
     for (c, d) in V1.sectors
         if d == get(V2, c, 0)
@@ -91,52 +94,65 @@ the associator isomorphism to change the fusion tree.
 
 """
 
-fuse(Vs::VectorSpace...) = fuse(Vs)
-
-function fuse(Vs::NTuple{N, VectorSpace{S}}) where {N, S}
+fuse(_dual::Bool, Vs::VectorSpace...) = fuse(_dual, Vs)
+#fuse(Vs::VectorSpace...) = fuse(Vs)
+#fuse(Vs::NTuple{VectorSpace{S}}) where{N,S} = fuse(false, Vs)
+function fuse(_dual::Bool, Vs::NTuple{N, VectorSpace{S}}) where {N, S}
     if N < 2
-        return Vs[1]
+        if _dual == Vs[1].isdual
+            return Vs[1]
+        else
+            return dual(mapcharges(x->inv(x), Vs[1]))
+        end
     elseif N > 2
         # lets for now generally always fuse from right to left!
-        return fuse(Vs[1:N-2]..., fuse(Vs[N-1:N]...))
+        return fuse(_dual, Vs[1:N-2]..., fuse(_dual, Vs[N-1:N]...))
     end
     # N == 2 case
     sectors = SortedDict{S, Int}()
     for (c2, d2) in Vs[2]
+        c2 = Vs[2].isdual ? inv(c2) : c2
         for (c1, d1) in Vs[1]
-            if haskey(sectors, c1+c2)
-                sectors[c1+c2] += d1*d2
+            c1 = Vs[1].isdual ? inv(c1) : c1
+            c = _dual ? inv(c1+c2) : c1+c2
+            if haskey(sectors, c)
+                sectors[c] += d1*d2
             else
-                sectors[c1+c2] = d1*d2
+                sectors[c] = d1*d2
             end
         end
     end
-    VectorSpace{S}(sectors)
+    VectorSpace{S}(sectors, _dual)
 end
 
 "map the charges of the VSpace by some strictly ascending function `f`"
 function mapcharges(f::Function, V::VectorSpace)
     mappedchrs = f.(charges(V))
-    issorted(mappedchrs) ||
-        error("function not strictly ascending!")
+    # issorted(mappedchrs) ||
+    #     error("function not strictly ascending!")
     allunique(mappedchrs) ||
         error("mapping charges creates duplicates! $(l.chrs) -> $mappedchrs")
-    VectorSpace{vtype(V)}(f(c)=>d for (c,d) in V.sectors)
+    VectorSpace{vtype(V)}(SortedDict(f(c)=>d for (c,d) in V.sectors), V.isdual)
 end
 
-isdummy(V::VectorSpace) = charges(V) == (0,) && V[0] == 1
-dummyleg() = VectorSpace(0 => 1)
+isdummy(V::VectorSpace) = charges(V) == (zero(S),) && V[zero(S)] == 1
+dummyleg() = VectorSpace{S}(0 => 1)
 
 Base.show(io::IO, ::Type{U1Space}) = print(io, "U1Space")
 
 function Base.show(io::IO, V::VectorSpace)
     show(io, typeof(V))
+    V.isdual && print(io, "†")
     print(io, "(")
     seperator = ""
     comma = ", "
     io2 = IOContext(io, :typeinfo => typeof(V))
     for c in charges(V)
-        print(io2, seperator, c, "=>", dim(V, c))
+        if V.isdual
+            print(io2, seperator, c, "'", "=>", dim(V, c))
+        else
+            print(io2, seperator, c, "=>", dim(V, c))
+        end
         seperator = comma
     end
     print(io, ")")

@@ -20,7 +20,7 @@ end
     lx = length(mps)
     Vl = space(A, 1)
     if lx > 0
-        bondspace(lx) == Vl || throw("SpaceMismatch()")
+        bondspace(mps, lx) == dual(Vl) || throw("SpaceMismatch()")
     else
         dim(Vl) == 1 || throw("SpaceMismatch()")
     end
@@ -29,6 +29,7 @@ end
     mps
 end
 
+const U1MPState{T} = MPState{U1, T}
 ####################
 ### CONSTRUCTORS ###
 ####################
@@ -101,41 +102,43 @@ function U1MPState(lx  ::Int,
 
     mps = MPState{U1, T}()
 
-    statematrix = SymVector(charge, ketstate)
+    A = SymVector(U1(charge), ketstate)
+    #println(A)
 
     ℓ = 1
-    ex_leg_ℓ = U1Space(1, [0], [1])
-    physleg = U1Space(1, [0, 1], [1, 1])
+    ex_leg_ℓ = U1Space(0=>1)
+    Vd = U1Space(0=>1, 1=>1)
     charge_range = min(charge, lx-ℓ):-1:max(0, charge-ℓ)
-    smleg_ℓ = U1Space(-1, -1*charge_range, [binomial(lx-ℓ, c) for c in charge_range])
-    legs = (U1Space(1, [0, 1], [1, 1]), smleg_ℓ)
+    smleg_ℓ = U1Space(c=>binomial(lx-ℓ, c) for c in charge_range)
 
-    statematrix = unfuseleg(statematrix, 1, legs)
-    U, S, Vt = svdsym(statematrix)
-    dims[ℓ+1] = fulldims(U.legs[2])
+    A = splitleg(A, 1, (Vd, smleg_ℓ))
+    #println(A)
+    u,s,v = svd(A)
 
-    push!(matrices, unfuseleg(U, 1, (ex_leg_ℓ, physleg)))
+    # println(u)
+    # println(s)
+    # println(v)
+    #println(u*s*v ≈ A)
+    push!(mps, splitleg(u, 1, (ex_leg_ℓ, Vd)))
 
     for ℓ = 2:lx-1
         #@show ℓ
-        physleg = U1Space(1, [0, 1], [1, 1])
-        ex_leg_ℓ = U1Space(+1, U.legs[2].chrs, U.legs[2].dims)
 
+        ex_leg_ℓ = space(s, 1)
         charge_range = min(charge, lx-ℓ):-1:max(0, charge-ℓ)
-        smleg_ℓ = U1Space(-1, -1*charge_range, [binomial(lx-ℓ, c) for c in charge_range])
-        legs = (U1Space(1, [0, 1], [1, 1]), smleg_ℓ)
-        statematrix = fuselegs(unfuseleg(S*Vt, 2, legs), 1, 1, 2)
-        U, S, Vt = svdsym(statematrix)
-        dims[ℓ+1] = fulldims(U.legs[2])
+        smleg_ℓ = U1Space(c=>binomial(lx-ℓ, c) for c in charge_range)
+        #println(s*v)
+        A = fuselegs(splitleg(s*v, 2, (Vd, smleg_ℓ)), 1, 2)
+        #println(A)
+        u,s,v = svd(A)
+        #println(u*s*v ≈ A)
 
-        push!(matrices, unfuseleg(U, 1, (ex_leg_ℓ, physleg)))
+        push!(mps, splitleg(u, 1, (ex_leg_ℓ, Vd)))
     end
 
-    dims[lx+1] = 1
-    legs = (U1Space(1,[0, 1],[1, 1]), U1Space(-1, [0], [1]))
-    push!(matrices, unfuseleg(S*Vt,2,legs))
+    push!(mps, splitleg(s*v, 2, (Vd, U1Space(0=>1))))
 
-    return MPState{Tv}(lx, d, dims, matrices, lx)
+    mps
 end
 
 ### conversions
@@ -159,7 +162,7 @@ end
 function normalize!(mps::MPState{T}) where {T}
     A = mps.matrices[mps.center]
     if mps.center > div(mps.lx, 2)
-        U,S,Vt = svdsym(fuselegs(A, +1, 1, 2))
+        U,S,Vt = svd(fuselegs(A, +1, 1, 2))
         ss = vcat(diag.(S.nzblks)...)
         n = norm(ss)
 
@@ -168,7 +171,7 @@ function normalize!(mps::MPState{T}) where {T}
 
         mps.matrices[mps.center] = unfuseleg(U * S * Vt, 1, A.legs[1:2])
     else
-        U,S,Vt = svdsym(fuselegs(A, -1, 2, 2))
+        U,S,Vt = svd(fuselegs(A, -1, 2, 2))
         ss = vcat(diag.(S.nzblks)...)
         n = norm(ss)
 
@@ -181,11 +184,10 @@ function normalize!(mps::MPState{T}) where {T}
 end
 
 @inline function _pushleft!(mps::MPState, l::Int)
-    @boundscheck 1 < l < length(mps) ||
+    @boundscheck 1 < l <= length(mps) ||
         throw("can't pushleft at $l of $(length(mps))")
-    space = space(mps.As[l])
     u,s,v = svd(fuselegs(mps.As[l], 2, 2))
-    mps.As[l] = splitleg(v, 2, space[2:3])
+    mps.As[l] = splitleg(v, 2, space(mps.As[l])[2:3])
     mps.As[l-1] = contract(mps.As[l-1], (1, 2, -1), u*s, (-1, 3))
     nothing
 end
@@ -193,9 +195,8 @@ end
 @inline function _pushright!(mps::MPState, l::Int)
     @boundscheck 0 < l < length(mps) ||
         throw("can't pushright at $l of $(length(mps))")
-    space = space(mps.As[l])
     u,s,v = svd(fuselegs(mps.As[l], 1, 2))
-    mps.As[l] = splitleg(u, space[1:2])
+    mps.As[l] = splitleg(u, 1, space(mps.As[l])[1:2])
     mps.As[l+1] = contract(s*v, (1,-1), mps.As[l+1], (-1,2,3))
     nothing
 end
@@ -242,6 +243,10 @@ everywhere. The `ops` can be single site operators (matrices) or MPOs as in
 ```
 measure(mps, mpo)
 ```
+
+It returns a dictionary of position of measurements as keys and
+results as values.
+
 """
 function measure end
 
@@ -254,7 +259,7 @@ function measure(mps::MPState{S,T}, op::SymMatrix{S,T}, l::Int) where {S,T}
     A = mps.As[site]
     v = contract(A, (-1, -2, -3),
                  contract(dual(A), (1, -1, 3), op, (-1, 2)), (-1, -2, -3))
-    v
+    Dict{Int, T}(l=>v)
 end
 
 function measure(mps::MPState{S,T}, op::SymMatrix{S,T}) where {S,T}
@@ -263,7 +268,7 @@ function measure(mps::MPState{S,T}, op::SymMatrix{S,T}) where {S,T}
     @assert space(op, 2) == Vd
 
     lx = length(mps)
-    result = Vector{T}()
+    values = Dict{Int, T}
     center_at!(mps, 1)
     L = SymTensor(ones, zero(S), (U1Space(0=>1), U1Space(0=>1)))
 
@@ -272,11 +277,11 @@ function measure(mps::MPState{S,T}, op::SymMatrix{S,T}) where {S,T}
         v = contract(contract(contract(L, (-1, 1), dual(A), (-1, 2, 3)),
                               (1, -1, 3), op, (-1, 2)),
                      (-1,-2,-3), A, (-1,-2,-3))
-        push!(result, v)
+        values[x] = v
         L = contract(contract(L, (-1, 1), dual(A), (-1, 2, 3)),
                      (-1, -2, 1), A, (-1,-2, 2))
     end
-    result
+    values
 end
 
 function measure(mps::MPState{S,T},
@@ -291,10 +296,10 @@ function measure(mps::MPState{S,T},
     @assert space(op1, 2) == Vd1
     Vd2 = space(op2, 1)
     @assert space(op2, 2) == Vd2
-
     (op1.charge + op2.charge != zero(S)) &&
         error("operator charges don't add up to zero! $(op1.charge), $(op2.charge)")
 
+    values = Dict{NTuple{2, Int}, T}
     center_at!(mps, site1)
     A = mps.As[x1]
 
@@ -309,23 +314,22 @@ function measure(mps::MPState{S,T},
     v = contract(contract(contract(L, (-1, 1), dual(A), (-1, 2, 3)),
                           (1, -1, 3), op2, (-1, 2)),
                  (-1,-2,-3), A, (-1,-2,-3))
-    v
+    values[(x1, x2)] = v
 end
 
 function measure(mps::MPState{S,T},
                  op1::SymMatrix{S,T},
                  op2::SymMatrix{S,T}) where {S,T}
-    lx = length(mps)
-    @assert (0 < x1 < x2) && (x2 <= lx)
 
+    lx = length(mps)
     Vd1 = space(op1, 1)
-    @assert space(op1, 2) == Vd1
+    @assert space(op1, 2) == dual(Vd1)
     Vd2 = space(op2, 1)
-    @assert space(op2, 2) == Vd2
+    @assert space(op2, 2) == dual(Vd2)
     (op1.charge + op2.charge != zero(S)) &&
         error("operator charges don't add up to zero! $(op1.charge), $(op2.charge)")
 
-    result = T[]
+    values = Dict{NTuple{2,Int}, T}()
     for x1=1:lx-1
         center_at!(mps, x1)
         A = mps.As[x1]
@@ -336,7 +340,7 @@ function measure(mps::MPState{S,T},
             v = contract(contract(contract(L, (-1, 1), dual(A), (-1, 2, 3)),
                                   (1, -1, 3), op2, (-1, 2)),
                          (-1,-2,-3), A, (-1,-2,-3))
-            push!(result, v)
+            values[(x1, x)] = v
             L = contract(contract(L, (-1, 1), dual(A), (-1, 2, 3)),
                          (-1, -2, 1), A, (-1,-2, 2))
         end
@@ -344,9 +348,9 @@ function measure(mps::MPState{S,T},
         v = contract(contract(contract(L, (-1, 1), dual(A), (-1, 2, 3)),
                               (1, -1, 3), op2, (-1, 2)),
                      (-1,-2,-3), A, (-1,-2,-3))
-        push!(result,v)
+        values[x1, lx] = v
     end
-    result
+    values
 end
 
 function measure(mps::MPState{S,T1},
@@ -361,7 +365,7 @@ end
 function measure(mps::MPState{S,T},
                  mpo::MPOperator{S,T}) where{S,T}
     @assert mps.d == mpo.d && mps.lx == mpo.lx
-
+    values = Dict{Int, T}()
     dummy = VectorSpace{S}(0=>1)
     L = fill(one(T), zero(S), (dummy, dummy, dummy))
 
@@ -373,7 +377,8 @@ function measure(mps::MPState{S,T},
                               (1, -1, -2, 4), W, (-2, 3, 2,-1)),
                      (1,2,-1,-2), dual(A), (-2,-1,3))
     end
-    contract(L, (-1,-2,-3), fill(one(T), (dummy,dummy,dummy)), (-1,-2,-3))
+    values[1] = contract(L, (-1,-2,-3), fill(one(T), (dummy,dummy,dummy)), (-1,-2,-3))
+    values
 end
 
 """

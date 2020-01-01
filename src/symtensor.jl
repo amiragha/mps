@@ -12,7 +12,7 @@ matrix
 mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
     charge   :: S
     space    :: NTuple{N, VectorSpace{S}}
-    blocks     :: SortedDict{Sector{S, N}, Array{T, N}}
+    blocks   :: SortedDict{Sector{S, N}, Array{T, N}}
 
     function SymTensor(charge :: S,
                        space  :: NTuple{N, VectorSpace{S}},
@@ -20,7 +20,7 @@ mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
         for (s,d) in blocks
-            s == sects[i] || throw("SectorMismatch(), $s, $sects[i]")
+            s == sects[i] || throw("$blocks SectorMismatch(), $s vs $(sects[i])")
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
@@ -57,8 +57,8 @@ mutable struct SymDiagonal{S, T<:Number} <: AbstractSymMatrix{S, T}
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
-        dims(first(space)) == dims(last(space)) ||
-            throw("SymDiagonal has to be square")
+        # dims(first(space)) == dims(last(space)) ||
+        #     throw("SymDiagonal has to be square $space")
         new{S,T}(charge, space, blocks)
     end
 end
@@ -66,8 +66,8 @@ end
 SymDiagonal{S, T}(c,s,b) where{S,T} = SymDiagonal(c,s,b)
 const U1Diagonal{T} = SymDiagonal{Int, T}
 
-function SymVector(charge::S, v::Vector{T}) where{S, T}
-    V = VectorSpace{S}(charge => length(v))
+function SymVector(charge::S, v::Vector{T}, isdual::Bool=false) where {S<:AbstractCharge, T}
+    V = VectorSpace{S}([charge => length(v)], isdual)
     SymVector{S, T}(charge, (V,), SortedDict(Sector(charge) => v))
 end
 
@@ -77,6 +77,7 @@ function convert(::Type{SymTensor{S, T1, N}},
 end
 
 @inline space(A::AbstractSymTensor) = A.space
+@inline space(A::AbstractSymTensor, l::Int) = A.space[l]
 @inline rank(::AbstractSymTensor{S, T, N}) where {S, T, N} = N
 @inline charge(A::AbstractSymTensor) = A.charge
 @inline sectors(A::AbstractSymTensor) = collect(keys(A.blocks))
@@ -166,34 +167,30 @@ fill_linearindex(space::NTuple{N, VectorSpace{S}}) where{S,N} =
     fill_linearindex(zero(S), space)
 
 ##TODO: Mix this with the usual UnitScaling
-function eye(::Type{T}, V::VectorSpace{S}) where {S, T}
-    space = (V, dual(V))
-    SymMatrix(zero(S), space,
-              SortedDict([Sector(c,-c)=>Matrix{T}(I,d,d) for (c,d) in V]))
-end
-
-eye(cs::Vector{Int}, ds::Vector{Int}) = eye(Float64, cs, ds)
+@inline eye(V::VectorSpace{S}) where{S} = eye(Float64, V)
+@inline eye(::Type{T}, V::VectorSpace{S}) where {S, T} =
+    SymMatrix(zero(S), (V, dual(V)),
+              SortedDict([Sector(c, c)=>Matrix{T}(I,d,d) for (c,d) in V]))
 
 """
-    tensordual(A)
+    dual(A)
 
-Change the direction (sign) of all legs of the tensor to make the dual
-of tensor. This operation negates the: tensor charge, leg signs,
-sectors as well! One can set whether or not it also conjugates the
-blocks with `conjugate` which is true by default.
+Make the dual of tensor. This operation negates the: tensor charge,
+leg signs, sectors as well! One can set whether or not it also
+conjugates the blocks with `conjugate` which is true by default.
 
 """
-# This function seems to be not respecting the (+1, -1) convention for
-# SymMatrix objects, should I change the convention then?
 function dual(A::AbstractSymTensor; conjugate::Bool=true)
     if !conjugate
         return typeof(A)(inv(A.charge),
                          dual.(A.space),
-                         typeof(A.blocks)(dual(s), d for (s,d) in A.blocks))
+                         A.blocks)
+                         #SortedDict([inv(s)=>b for (s,b) in A.blocks]))
     end
     typeof(A)(inv(A.charge),
               dual.(A.space),
-              typeof(A.blocks)(dual(s), conj(d) for (s,d) in A.blocks))
+              A.blocks)
+              #SortedDict([inv(s)=>conj(b) for (s,b) in A.blocks]))
 end
 
 function mapcharges(f::Function, A::AbstractSymTensor)
@@ -207,8 +204,7 @@ function mapcharges(f::NTuple{N, Function},
     space = Tuple(mapcharges(f[i], A.space[i]) for i in 1:N)
 
     sects = [Tuple(f[i](s[i]) for i in 1:N) for s in A.sects]
-    sgns = signs(legs)
-    charges = [sum(s) for s in sectors(A.blocks)]
+    charges = [sum(s, isdual.(space)) for s in sectors(A.blocks)]
     !all(charges .== charges[1]) &&
         error("mapcharges functions are inconsistent!")
     SymTensor(charges[1], space,
@@ -218,11 +214,10 @@ end
 conj(A::AbstractSymTensor) =
     typeof(A)(A.charge, A.space, conj(A.blocks))
 
-function array(A::AbstractSymTensor{S,T,N};
-               rev::NTuple{N,Bool}=Tuple(zeros(Bool, N))) where {S,T,N}
+function array(A::AbstractSymTensor{S,T,N}) where {S,T,N}
     arrep = zeros(eltype(A), dim.(space(A))...)
     for (s,b) in A.blocks
-        arrep[layout(A.space, s, rev=rev)...] = b
+        arrep[layout(A.space, s)...] = b
     end
     arrep
 end
@@ -235,14 +230,15 @@ end
 "construct an additional SymTensor similar to A, possibly with a
 different scalar type T."
 function similar(A::AbstractSymTensor, T::Type=eltype(A))
-    typeof(A)(A.charge, A.legs, typeof(A)((s, similar(d, T)) for (s,d) in A.blocks))
+    typeof(A)(A.charge, A.space,
+              SortedDict([s=>similar(d, T) for (s,d) in A.blocks]))
 end
 
 "copy the contents of A to a preallocated SymTensor B"
 function copyto!(B::T, A::T) where {T<:AbstractSymTensor}
     issimilar(B, A) && error("Can not copy to a  non-similar SymTensor!")
-    for i in eachindex(B.blocks.values)
-        copyto!(B.blocks.values[i], A.blocks.values[i])
+    for st in onlysemitokens(B.blocks)
+        copyto!(B.blocks[st], A.blocks[st])
     end
     B
 end
@@ -250,8 +246,8 @@ end
 "out of place scalar multiplication; multiply SymTensor A with scalar α
 and store the result in B"
 function mul!(B::T, A::T, α) where {T<:AbstractSymTensor}
-    for i in eachindex(B.blocks.values)
-        mul!(B.blocks.values[i], A.blocks.values[i], α)
+    for st in onlysemitokens(B.blocks)
+        mul!(B.blocks[st], A.blocks[st], α)
     end
     B
 end
@@ -259,8 +255,8 @@ end
 "in-place scalar multiplication of A with α; in particular with α =
 false, A is initialized with all zeros"
 function rmul!(A::T, α) where {T<:AbstractSymTensor}
-    for i in eachindex(A.blocks.values)
-        rmul!(A.blocks.values[i],  α)
+    for st in onlysemitokens(A.blocks)
+        rmul!(A.blocks[st],  α)
     end
     A
 end
@@ -270,8 +266,8 @@ function axpy!(α,
                A::AbstractSymTensor{S,T1,N},
                B::AbstractSymTensor{S,T2,N}) where {S,T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
-    for i in eachindex(A.blocks.values)
-        B.blocks.values[i] = α .* A.blocks.values[i] + B.blocks.values[i]
+    for st in onlysemitokens(B.blocks)
+        B.blocks[st] = α .* A.blocks[st] + B.blocks[st]
     end
     B
 end
@@ -282,8 +278,8 @@ function axpby!(α,
                 β,
                 B::AbstractSymTensor{S,T2,N}) where {S,T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("axpy! The two matrices are not simliar!")
-    for i in eachindex(A.blocks.values)
-        B.blocks.values[i] = α .* A.blocks.values[i] + β .* B.blocks.values[i]
+    for st in onlysemitokens(B.blocks)
+        B.blocks[st] = α .* A.blocks[st] + β .* B.blocks[st]
     end
     B
 end
@@ -295,7 +291,7 @@ the second one
 function dot(A::AbstractSymTensor{S,T1,N},
              B::AbstractSymTensor{S,T2,N}) where{S,T1<:Number, T2<:Number, N}
     issimilar(A, B) || error("The two SymTensors have to be similar to dot!")
-    sum([dot(A.blocks[i], B.blocks[i]) for i in onlysemitokens(A.blocks)])
+    sum([dot(A.blocks[st], B.blocks[st]) for st in onlysemitokens(A.blocks)])
 end
 
 " compute the 2-norm of a  AbstractSymTensor"

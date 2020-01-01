@@ -15,7 +15,7 @@ using DataStructures
 include("group.jl")
 include("vspace.jl")
 include("sector.jl")
-include("productspace.jl")
+#include("productspace.jl")
 include("symtensor.jl")
 include("symreleg.jl")
 include("contract.jl")
@@ -26,7 +26,7 @@ export isequal, ==
 export isapprox
 export issimilar
 export AbstractSymTensor, AbstractSymMatrix
-export VectorSpace, ProductSpace
+export VectorSpace#, ProductSpace
 export AbstractCharge
 export U1Space, U1, U1Charge
 export Sector
@@ -41,6 +41,7 @@ export _sectorisallowed
 
 export array
 export dim, dims
+export space
 #export alldims, accdims, getdim, fulldims, signs
 export rank, sectors, blocks
 export fuse
@@ -55,7 +56,7 @@ export trimleg!
 export contract
 
 export memoryrepr
-export dual
+export dual, isdual
 export mapcharges
 #export invlegs
 

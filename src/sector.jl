@@ -10,16 +10,22 @@ struct Sector{S<:AbstractCharge, N}
     Sector(cs::S...) where {S<:AbstractCharge} = new{S, length(cs)}(cs)
 end
 
-@inline Base.sum(s::Sector) = sum(s)
-@inline inv(s::Sector) = Sector(inv(c) for c in s)
+@inline Base.length(::Sector{S,N}) where {S,N} = N
+@inline function Base.sum(s::Sector{S, N}, dualinfo::NTuple{N, Bool}) where{S,N}
+    r = zero(S)
+    for i=1:N
+        r += dualinfo[i] ? inv(s[i]) : s[i]
+    end
+    r
+end
+@inline Base.inv(s::Sector{S}) where{S} = Sector{S}([inv(c) for c in s]...)
 Base.getindex(s::Sector, i) = getindex(s.charges, i)
 Base.iterate(s::Sector) = iterate(s.charges)
 Base.iterate(s::Sector, i) = iterate(s.charges, i)
 
 @inline layout(space::NTuple{N, VectorSpace{S}},
-               s::Sector{S, N};
-               rev::NTuple{N,Bool}=zeros(Bool,N)) where {S, N} =
-                   Tuple(layout(space[i], rev=rev[i])[s[i]] for i=1:N)
+               s::Sector{S, N}) where {S, N} =
+                   Tuple(layout(space[i])[s[i]] for i=1:N)
 
 """
 we always sort sectors based on charges The sorting is column
@@ -48,10 +54,11 @@ recursive function calling itself with Vs[1:N-1], etc. The output
 sector is sorted by construction.
 """
 function _allsectorsandsizes(charge::S, Vs::NTuple{N, VectorSpace{S}}) where{S, N}
-    if length(Vs) < 2
-        d = dim(Vs[1], charge)
+    if N < 2
+        _c = Vs[1].isdual ? inv(charge) : charge
+        d = dim(Vs[1], _c)
         if d > 0
-            return [Sector(charge)], [(d,)]
+            return [Sector(_c)], [(d,)]
         end
         return Sector{S, 1}[], NTuple{1, Int}[]
     end
@@ -59,7 +66,8 @@ function _allsectorsandsizes(charge::S, Vs::NTuple{N, VectorSpace{S}}) where{S, 
     sects = Sector{S, N}[]
     sizes = NTuple{N, Int}[]
     for (c,d) in Vs[N]
-        sect_head, size_head = _allsectorsandsizes(charge - c, Vs[1:N-1])
+        _c = Vs[N].isdual ? inv(c) : c
+        sect_head, size_head = _allsectorsandsizes(charge - _c, Vs[1:N-1])
         for i in eachindex(sect_head)
             push!(sects, Sector(sect_head[i].charges..., c))
             push!(sizes, (size_head[i]..., d))

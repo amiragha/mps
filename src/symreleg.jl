@@ -74,33 +74,46 @@ prevent this).
 """
 function fuselegs(A::AbstractSymTensor,
                   l::Int,
-                  n::Int=2)
+                  n::Int=2,
+                  _dual::Bool=false)
 
     N = rank(A)
     0 < l < N+2-n  ||
         error("fuselegs $l to $(l+n-1) for size $N")
 
     if n < 2
-        return A
+        if _dual == isdual(A.space[l])
+            return A
+        else
+            Vf = fuse(_dual, A.space[l])
+            space = Tuple([A.space[1:l-1]..., Vf, A.space[l+n:end]...])
+            SymTensor(A.charge, space,
+                      SortedDict([Sector(s[1:l-1]...,inv(s[l]), s[l+1:N]...)=>b for (s,b) in A.blocks]))
+        end
     end
 
     T = eltype(A)
 
+    dualinfo = isdual.(A.space[l:l+n-1])
     csects = sectors(A)
     S = vtype(A)
     fsects = Vector{Sector{S, N-n+1}}(undef, length(csects))
     for i in eachindex(csects)
         sector = csects[i]
+        fc = sum(Sector(sector[l:l+n-1]), dualinfo)
+        if _dual
+            fc = inv(fc)
+        end
         fsects[i] = Sector(sector[1:l-1]...,
-                           sum(sector[l:l+n-1]),
+                           fc,
                            sector[l+n:N]...)
     end
 
     sperm = sortperm(fsects)
     semits = collect(onlysemitokens(A.blocks))[sperm]
 
-    fspace = fuse(A.space[l:l+n-1])
-    space = Tuple([A.space[1:l-1]..., fspace, A.space[l+n:end]...])
+    Vf = fuse(_dual, A.space[l:l+n-1])
+    space = Tuple([A.space[1:l-1]..., Vf, A.space[l+n:end]...])
 
     sects, sizes = _allsectorsandsizes(A.charge, space)
 
@@ -133,8 +146,8 @@ end
 
 # defuses a leg into some given legs
 splitleg(A::AbstractSymTensor,  l::Int, space::U1Space...) = splitleg(A, l, space)
-function splitleg(A    :: AbstractSymTensor,
-                  l    :: Int,
+function splitleg(A     :: AbstractSymTensor,
+                  l     :: Int,
                   space :: NTuple{M, VectorSpace{S}}) where {M, S}
     T = eltype(A)
     N = rank(A)
@@ -152,6 +165,7 @@ function splitleg(A    :: AbstractSymTensor,
     ##procedure amounts to!
     ##We first sort the sectors based on the charge the leg to be
     ##unfused. Then for each charge find all sectors and sizes!
+
     sects = collect(keys(A.blocks))
     semits = collect(onlysemitokens(A.blocks))
     sectperm = sortperm(sects, by=x->x.charges[l])
@@ -161,7 +175,7 @@ function splitleg(A    :: AbstractSymTensor,
     pats, sizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
     for i in eachindex(csects)
         #charge = sign * csects[i][l]
-        charge = csects[i][l]
+        charge = isdual(A.space[l]) ? inv(csects[i][l]) : csects[i][l]
         if i == 1 || charge != oldcharge
             pats, sizes = _allsectorsandsizes(charge, space)
             oldcharge = charge
