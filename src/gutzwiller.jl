@@ -21,8 +21,8 @@ function zipandgutzwiller!(mps1::MPState{T},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    move_center!(mps1, 1)
-    move_center!(mps2, 1)
+    center_at!(mps1, 1)
+    center_at!(mps2, 1)
 
     dims = ones(Int64, lx+1)
     matrices = Array{T, 3}[]
@@ -77,15 +77,14 @@ end
 function _zipandgutzwiller_B14!(mps1::MPState{S,T},
                                 mps2::MPState{S,T};
                                 maxdim::Int64=200) where {S,T}
-    @assert mps1.d == mps2.d == 2
-    lx = mps1.lx
-    @assert mps2.lx == lx
+    #@assert mps1.d == mps2.d == 2
+    lx = length(mps1)
+    @assert length(mps2) == lx
 
-    move_center!(mps1, 1)
-    move_center!(mps2, 1)
+    center_at!(mps1, 1)
+    center_at!(mps2, 1)
 
-    dims = ones(Int64, lx+1)
-    matrices = SymTensor{Tv, 3}[]
+    mps = MPState{S,T}()
 
     ## NOTE: in order to make the gutzwiller projector respect the U1
     ## symmetry we need to do the follwoing. Assume that ↑↑
@@ -96,8 +95,8 @@ function _zipandgutzwiller_B14!(mps1::MPState{S,T},
               STLeg(-1, [0,1], [1,1])))
 
     E = fill(one(T), 0, (STLeg(+1, [0], [1]),
-                          STLeg(-1, [0], [1]),
-                          STLeg(-1, [0], [1])))
+                         STLeg(-1, [0], [1]),
+                         STLeg(-1, [0], [1])))
     for l=1:lx-1
         A = mps1.matrices[l]
         B = mps2.matrices[l]
@@ -135,75 +134,72 @@ end
 function _zipandgutzwiller_F23!(mps1::MPState{S,T},
                                 mps2::MPState{S,T};
                                 maxdim::Int64=200) where {S,T}
-    @assert mps1.d == mps2.d == 2
-    lx = mps1.lx
-    @assert mps2.lx == lx
+    #@assert mps1.d == mps2.d == 2
+    lx = length(mps1)
+    @assert length(mps2) == lx
 
-    move_center!(mps1, 1)
-    move_center!(mps2, 1)
+    center_at!(mps1, 1)
+    center_at!(mps2, 1)
 
-    matrices = SymTensor{T, 3}[]
+    mps = MPState{S,T}()
 
     ## NOTE: in order to make the gutzwiller projector respect the U1
     ## symmetry we need to do the follwoing. Assume the first mps
     ## corresponds to ↑ or 1 and second mps to ↓ or -1.
-    G = fill(one(Tv), 0,
-             (STLeg(+1, [-1,1], [1,1]),
-              STLeg(-1, [0,1], [1,1]),
-              STLeg(+1, [0,1], [1,1])))
+    Vd = VectorSpace{S}(0=>1, 1=>1)
+    G = fill(one(T), (dual(Vd), mapcharges(x->2*x-1, Vd), Vd))
 
-    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
-                          STLeg(-1, [0], [1]),
-                          STLeg(+1, [0], [1])))
+    Vdummy = VectorSpace{S}(0=>1)
+    E = fill(one(T), (Vdummy, dual(Vdummy), Vdummy))
+
     for l=1:lx-1
-        A = mps1.matrices[l]
-        B = invlegs(mps2.matrices[l])
+        A = mps1.As[l]
+        B = dual(mps2.As[l], conjugate=false)
 
-        fswap = fermionswapgate(A.legs[2], B.legs[1])
+        fswap = fermionswapgate(A.space[2], B.space[1])
         ##NOTE:
-        # contracting (E2, A1)
-        # First tensor has EA = E1 E3 A2 A3
+        # contracting (E3, A1)
+        # First tensor has EA = E1 E2 A2 A3
         # contracting with swap
         # second tensor has EAX = E1 A2 E3 A3
         # contracting (A2, G2)
         # Third tensor has EAG = E1 G1 G3 E3 A3
         # contracting (E3, B1) and (G3, B2)
         # Final tensor has E1 G1 A3 B3
-        C = contract(contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+        C = contract(contract(contract(contract(E, (1, 2, -1), A, (-1, 3, 4)),
                                        (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
-                              (1, -1, 4, 5), G, (2, -1, 3)),
-                     (1,2, -2, -1,3), B, (-1,-2, 4))
+                              (1, -1, 4, 5), G, (-1, 2, 3)),
+                     (1,2, -2, -1, 4), B, (-1,-2, 3))
 
-        u,s,v = svdtrunc(fuselegs(fuselegs(C, 1, 2), 2, 2), maxdim=maxdim)
+        u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
         normalize!(s)
 
         fnl = x->div(x+l-1, 2)
         fnd = x->div(x+1, 2)
         fnr = x->div(x+l, 2)
-        push!(matrices,
+        push!(mps,
               mapcharges((fnl,fnd,fnr),
-                         unfuseleg(u, 1, (E.legs[1], G.legs[1]))))
-        E = unfuseleg(s*v, 2, (A.legs[3], B.legs[3]))
+                         splitleg(u, 1, (E.space[1], G.space[2]))))
+        E = splitleg(s*v, 2, (B.space[3], A.space[3]))
     end
-    A = mps1.matrices[lx]
-    B = invlegs(mps2.matrices[lx])
-    fswap = fermionswapgate(A.legs[2], B.legs[1])
-    C = contract(contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
+    A = mps1.As[lx]
+    B =  dual(mps2.As[lx], conjugate=false)
+    fswap = fermionswapgate(A.space[2], B.space[1])
+    C = contract(contract(contract(contract(E, (1, 2, -1), A, (-1, 3, 4)),
                                    (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
-                          (1, -1, 4, 5), G, (2, -1, 3)),
-                 (1,2, -2, -1,3), B, (-1,-2, 4))
+                          (1, -1, 4, 5), G, (-1, 2, 3)),
+                 (1,2, -2, -1, 4), B, (-1,-2, 3))
 
-    u,s,v = svdtrunc(fuselegs(fuselegs(C, +1, 1, 2), -1, 2, 2), maxdim=maxdim)
+    u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
     normalize!(s)
-    C = unfuseleg(u*s*v, 1, (E.legs[1], G.legs[1]))
 
-
+    C = splitleg(u*s*v, 1, (E.space[1], G.space[2]))
     fnl = x->div(x+lx-1, 2)
     fnd = x->div(x+1, 2)
     fnr = x->div(x+lx, 2)
-    push!(matrices, mapcharges((fnl,fnd,fnr), C))
+    push!(mps, mapcharges((fnl,fnd,fnr), C))
 
-    return MPState{S,T}(lx, 2, dims, matrices, lx)
+    mps
 end
 
 function _tensorproductzip!(mps1::MPState{S,T},
@@ -214,8 +210,8 @@ function _tensorproductzip!(mps1::MPState{S,T},
     lx = mps1.lx
     @assert mps2.lx == lx
 
-    move_center!(mps1, 1)
-    move_center!(mps2, 1)
+    center_at!(mps1, 1)
+    center_at!(mps2, 1)
 
     dims = ones(Int64, lx+1)
     matrices = SymTensor{Tv, 3}[]
@@ -324,8 +320,8 @@ function gutzwillerexact(mps1::MPState{T},
 
     @assert mps2.center == center
 
-    move_center!(mps1, 1)
-    move_center!(mps2, 1)
+    center_at!(mps1, 1)
+    center_at!(mps2, 1)
 
     dims = ones(Int64, lx+1)
     matrices = SymTensor{Tv, 3}[]

@@ -152,6 +152,9 @@ end
 #########
 
 function normalize!(mps::MPState)
+    if mps.center < 1
+        center_at!(mps, 1)
+    end
     A = mps.As[mps.center]
     if mps.center > div(length(mps), 2)
         u,s,v = svd(fuselegs(A, 1, 2, false))
@@ -392,27 +395,26 @@ function apply!(mps         :: MPState{S,T},
         center_at!(mps, x+1)
     end
 
-    A1 = mps.As[l]
-    A2 = mps.As[l+1]
+    A1 = mps.As[x]
+    A2 = mps.As[x+1]
 
     RR = contract(A1, (1,2,-1), A2, (-1,3,4))
     R = contract(RR,
                  (1,-1,-2,4), op, (2,3,-1,-2))
 
-    #display(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2))
-    u,s,v = svdtrunc(fuselegs(fuselegs(R, -1, 3, 2), +1, 1, 2),
+    u,s,v = svdtrunc(SymMatrix(R, [1,2], [3,4]),
                      maxdim=maxdim, tol=1.e-14)
 
     svnormalize && normalize!(s)
 
-    space = space(R)
+    _space = space(R)
     if (pushto == :R)
-        mps.As[x] = splitleg(u, 1, space[1:2])
-        mps.As[x+1] = splitleg(s*v, 2, space[3:4])
+        mps.As[x] = splitleg(u, 1, _space[1:2])
+        mps.As[x+1] = splitleg(s*v, 2, _space[3:4])
         mps.center = x+1
     elseif (pushto == :L)
-        mps.As[x] = splitleg(u*s, 1, space[1:2])
-        mps.As[x+1] = splitleg(v, 2, space[3:4])
+        mps.As[x] = splitleg(u*s, 1, _space[1:2])
+        mps.As[x+1] = splitleg(v, 2, _space[3:4])
         mps.center = x
     else
         error("invalid push_to :", pushto)

@@ -26,9 +26,9 @@ struct GaussianMPS
 end
 
 """
-    corrmat2gmps(corr_matrix, threshold, verbose)
+    corrmat2gmps(corrmat, threshold, verbose)
 
-For a given two-point correlation matrix `corr_matrix` called lambda
+For a given two-point correlation matrix `corrmat` called lambda
 perform the approach explained in arxiv:1504.07701 and generate the
 local (nearest-neighbor) gates.
 
@@ -38,7 +38,7 @@ function corrmat2gmps(corrmat::Matrix{T},
                       threshold::Float64=1.e-8;
                       alternate::Bool=false) where {T}
     T <: Complex && error("correlation matrix is complex!")
-    lx = size(corr_matrix)[1]
+    lx = size(corrmat)[1]
 
     #initconf = Vector{Int}(lx)
     initconf = zeros(Int, lx)
@@ -48,7 +48,7 @@ function corrmat2gmps(corrmat::Matrix{T},
     expected_next_evalue = 1
     for site=1:lx
         block_end = site
-        evalue = corr_matrix[site, site]
+        evalue = corrmat[site, site]
         corr_block = [evalue]
         vals = corr_block
 
@@ -61,7 +61,7 @@ function corrmat2gmps(corrmat::Matrix{T},
         while (delta > threshold && block_end < lx)
             block_end += 1
 
-            corr_block = corr_matrix[site:block_end, site:block_end]
+            corr_block = corrmat[site:block_end, site:block_end]
             vals = eigvals(corr_block)
 
             if alternate
@@ -107,12 +107,12 @@ function corrmat2gmps(corrmat::Matrix{T},
 
             ugate_extended = Matrix{T}(I, lx, lx)
             ugate_extended[block_range, block_range] = ugate_block
-            corr_matrix= Symmetric(ugate_extended' * corr_matrix * ugate_extended)
-            # display(corr_matrix)
+            corrmat= Symmetric(ugate_extended' * corrmat * ugate_extended)
+            # display(corrmat)
         end
         initconf[site] = round(evalue)
         expected_next_evalue = (round(evalue) == 1) ? 0 : 1
     end
-    # display(corr_matrix)
+    # display(corrmat)
     GaussianMPS(lx, initconf, positions, θs)
 end

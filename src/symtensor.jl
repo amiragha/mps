@@ -68,7 +68,7 @@ const U1Diagonal{T} = SymDiagonal{Int, T}
 
 function SymVector(charge::S, v::Vector{T}, isdual::Bool=false) where {S<:AbstractCharge, T}
     V = VectorSpace{S}([charge => length(v)], isdual)
-    SymVector{S, T}(charge, (V,), SortedDict(Sector(charge) => v))
+    SymVector{S, T}(charge, (V,), SortedDict([Sector(charge) => v]))
 end
 
 function convert(::Type{SymTensor{S, T1, N}},
@@ -215,12 +215,12 @@ function mapcharges(f::NTuple{N, Function},
                     A::AbstractSymTensor{S,T,N}) where{S,T<:Number,N}
     space = Tuple(mapcharges(f[i], A.space[i]) for i in 1:N)
 
-    sects = [Tuple(f[i](s[i]) for i in 1:N) for s in A.sects]
-    charges = [sum(s, isdual.(space)) for s in sectors(A.blocks)]
-    !all(charges .== charges[1]) &&
+    sects = [Tuple(f[i](s[i]) for i in 1:N) for s in sectors(A)]
+    charges = [sum(s, isdual.(space)) for s in sectors(A)]
+    !all([charges[i] == charges[1] for i in eachindex(charges)]) &&
         error("mapcharges functions are inconsistent!")
     SymTensor(charges[1], space,
-              typeof(A.blocks)(mapcharge(f, s),d for (s,d) in A.blocks))
+              typeof(A.blocks)(Sector(Tuple(convert(S,f[i](s[i])) for i in 1:N))=>d for (s,d) in A.blocks))
 end
 
 conj(A::AbstractSymTensor) =

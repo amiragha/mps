@@ -21,7 +21,7 @@ function gmps2mps(gmps::GaussianMPS,
         _applygmpsgates!(mps, gmps, maxdim)
 
     elseif symmetry == :U1
-        mps = MPState{U1,Float64}(gmps.lx, 2, gmps.initconf)
+        mps = U1MPState(Float64, gmps.lx, 2, gmps.initconf)
         _applygmpsgates!(mps, gmps, maxdim)
     else
         error( "Symmetry $symmetry is not defined!")
@@ -57,25 +57,23 @@ function _applygmpsgates!(mps::MPState{U1,T},
                           gmps::GaussianMPS,
                           maxdim::Int) where{T}
 
-    Vd = U1Space(0=>1, 1=>2)
+    Vd = U1Space(0=>1, 1=>1)
     # u is the two-body U gate matrix
-    u = eye(Float64, Vd)
+    u = eye(Float64, fuse(false, Vd,Vd))
 
     #   twobodyugate = Matrix{ComplexF64}(I, 4, 4)
     ## NOTE: the gates are applies in reverse order
-    rlegs = (STLeg(+1, [0,1], [1,1]), STLeg(+1, [0,1], [1,1]))
-    clegs = (STLeg(-1, [0,1], [1,1]), STLeg(-1, [0,1], [1,1]))
 
     for n=length(gmps.xs):-1:1
         site = gmps.xs[n]
         θ = gmps.θs[n]
-        set_sector!(u, (1,1), rotationmat(θ))
+        u[Sector{U1}(1,1)] =  rotationmat(θ)
 
-        uten = unfuseleg(unfuseleg(u, 2, (dual(Vd), dual(Vd))), 1, (Vd,Vd))
+        uten = splitleg(splitleg(u, 2, (dual(Vd), dual(Vd))), 1, (Vd,Vd))
 
         ## TODO: choose a better order of site or site+1 and push_to!
         center_at!(mps, site)
-        apply!(mps, site, uten, maxdim=maxdim, pushto=:R, svnormalize=true)
+        apply!(mps, uten, site, maxdim=maxdim, pushto=:R, svnormalize=true)
     end
     nothing
 end

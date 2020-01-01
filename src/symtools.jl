@@ -55,12 +55,12 @@ function fermionswapgate(l1::VectorSpace{S}, l2::VectorSpace{S}) where{S}
         if c1 == c1X && c2 == c2X
             d2, d1 = sizes[index][1:2]
             s = isodd(c1) && isodd(c2) ? -1 : +1
-            blocks[sects] =  s * reshape(I(d1*d2), d2, d1, d2, d1)
+            blocks[sects[index]] =  s * reshape(I(d1*d2), d2, d1, d2, d1)
         else
-            blocks[sects] = zeros(sizes[index])
+            blocks[sects[index]] = zeros(sizes[index])
         end
     end
-    SymTensor(zero(s), space, blocks)
+    SymTensor(zero(S), space, blocks)
 end
 
 # function isrightisometry(A::SymTensor)
