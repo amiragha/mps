@@ -38,9 +38,9 @@ SymMatrix(c::S, s::NTuple{2,T}, d) where{S, T} = SymMatrix{S,T}(c,s,d)
 
 const SymVector{S, T} = SymTensor{S, T, 1}
 
-const U1Tensor{T, N} = SymTensor{Int, T, N}
-const U1Matrix{T} = SymMatrix{Int, T}
-const U1Vector{T} = SymVector{Int, T}
+const U1Tensor{T, N} = SymTensor{U1Charge, T, N}
+const U1Matrix{T} = SymMatrix{U1Charge, T}
+const U1Vector{T} = SymVector{U1Charge, T}
 
 mutable struct SymDiagonal{S, T<:Number} <: AbstractSymMatrix{S, T}
     charge :: S
