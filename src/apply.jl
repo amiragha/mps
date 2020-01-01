@@ -14,13 +14,13 @@ function _mpsupdateright(renv::Array{T, 3},
     R
 end
 
-function _mpsupdateright(renv::SymTensor{Tv, 3},
-                         mat::SymTensor{Tv, 3},
-                         hmpo::SymTensor{Tv, 4}) where {Tv<:Number}
+function _mpsupdateright(renv::SymTensor{S,T,3},
+                         mat::SymTensor{S,T,3},
+                         hmpo::SymTensor{S,T,4}) where {S,T}
 
     R = contract(contract(contract(renv, (-1,3,4), mat, (1,2,-1)),
                           (1, -1, -2, 4), hmpo, (3,2,-2,-1)),
-                 (1,-1,2,-2), invlegs(conj(mat)), (3,-1,-2))
+                 (1,-1,2,-2), dual(mat), (3,-1,-2))
     R
 end
 
@@ -46,13 +46,13 @@ function _mpsupdateleft(lenv::Array{T, 3},
     L
 end
 
-function _mpsupdateleft(lenv::SymTensor{Tv, 3},
-                        mat::SymTensor{Tv, 3},
-                        hmpo::SymTensor{Tv, 4}) where {Tv<:Number}
+function _mpsupdateleft(lenv::SymTensor{S,T, 3},
+                        mat::SymTensor{S,T, 3},
+                        hmpo::SymTensor{S,T, 4}) where {S,T}
 
     L = contract(contract(contract(lenv, (-1,3,4), mat, (-1,2,1)),
                           (1, -1, -2, 4), hmpo, (-2,2,3,-1)),
-                 (1,-1,2,-2), invlegs(conj(mat)), (-2,-1,3))
+                 (1,-1,2,-2), dual(mat), (-2,-1,3))
 
     L
 end
@@ -70,7 +70,7 @@ end
 function _applymps1site(v,
                         envL::Array{T,3},
                         envR::Array{T,3},
-                        hmpo::Array{T,4}) where {T<:Number}
+                        hmpo::Array{T,4}) where {T}
 
     @tensor v[l,o,r] := ((envL[l',ml,l] * v[l',o',r']) *
                          hmpo[ml,o,mr,o']) * envR[r',mr,r]
@@ -81,7 +81,7 @@ function _applymps2site(v,
                         envL::Array{T,3},
                         envR::Array{T,3},
                         hmpoL::Array{T,4},
-                        hmpoR::Array{T,4}) where {T<:Number}
+                        hmpoR::Array{T,4}) where {T}
 
     @tensor v[l,o1,o2,r] := (((envL[l',ml,l] * v[l',o1',o2',r']) *
                               hmpoL[ml,o1,mm,o1']) *
@@ -90,11 +90,11 @@ function _applymps2site(v,
     v
 end
 
-function _applymps2site(v::SymTensor{Tv,4},
-                        envL::SymTensor{Tv,3},
-                        envR::SymTensor{Tv,3},
-                        hmpoL::SymTensor{Tv,4},
-                        hmpoR::SymTensor{Tv,4}) where {Tv<:Number}
+function _applymps2site(v::SymTensor{S,T,4},
+                        envL::SymTensor{S,T,3},
+                        envR::SymTensor{S,T,3},
+                        hmpoL::SymTensor{S,T,4},
+                        hmpoR::SymTensor{S,T,4}) where {S,T}
 
     v = contract(contract(contract(contract(
         envL, (-1,2,1), v, (-1,3,4,5)),

@@ -1,15 +1,15 @@
 abstract type AbstractMPState end
-mutable struct MPState{S<:AbstractCharge, T<:Number} <: AbstractMPState
+mutable struct MPState{S<:AbstractCharge, T} <: AbstractMPState
     As     :: Vector{SymTensor{S,T,3}}
     center :: Int
 end
 
-@inline Base.eltype(mps::MPState) = eltype(mps.As[1])
+@inline Base.eltype(mps::MPState{S,T}) where {S,T} = T
 @inline Base.length(mps::MPState) = length(mps.As)
-@inline checkbounds(mps, l) = 0 < l <= L || throw(BoundsError(mps.vectors), l)
+#@inline checkbounds(mps, l) = 0 < l <= L || throw(BoundsError(mps.vectors), l)
 
 @inline bondspace(mps::MPState, l::Int) = space(mps.As[l], 3)
-@inline bonddim(mps::MPState, l::Int) = dim(mps.As[l], 3)
+@inline bonddim(mps::MPState, l::Int) = size(mps.As[l], 3)
 @inline bonddim(mps::MPState) =
     [dim(mps.As[1], 1); [bonddim(mps, l) for l in 1:length(mps)]]
 
@@ -43,6 +43,7 @@ function U1MPState(::Type{T},
                    noise::T=0.0) where {T}
 
     mps = MPState{U1, T}()
+    M = m.charge
 
     # Just find all the possible sectors for each tensor at each site
     # and fill them with one(1,1,1). This gives an MPS with a norm of
@@ -51,12 +52,14 @@ function U1MPState(::Type{T},
     Vd = U1Space(c=>1 for c in 0:d-1)
     Vl = U1Space(0=>1)
     for site in 1:lx
-        cmin = max(0, m-(d-1)*(lx-site))
-        cmax = min(m, (d-1)*site)
+        cmin = max(0, M-(d-1)*(lx-site))
+        cmax = min(M, (d-1)*site)
         rchrs = collect(cmin:cmax)
         Vr = U1Space(c=>1 for c in rchrs)
 
-        A = SymTensor(ones + noise * randn, zero(U1), (Vl, Vd, dual(Vr)))
+
+        A = SymTensor((x,y)->ones(x,y) .+ noise .* randn(x,y),
+                      zero(U1), (Vl, Vd, dual(Vr)))
         push!(mps, A)
         Vl = Vr
     end
@@ -112,30 +115,19 @@ function U1MPState(lx  ::Int,
     smleg_ℓ = U1Space(c=>binomial(lx-ℓ, c) for c in charge_range)
 
     A = splitleg(A, 1, (Vd, smleg_ℓ))
-    #println(A)
     u,s,v = svd(A)
 
-    # println(u)
-    # println(s)
-    # println(v)
-    #println(u*s*v ≈ A)
     push!(mps, splitleg(u, 1, (ex_leg_ℓ, Vd)))
 
     for ℓ = 2:lx-1
-        #@show ℓ
-
         ex_leg_ℓ = space(s, 1)
         charge_range = min(charge, lx-ℓ):-1:max(0, charge-ℓ)
         smleg_ℓ = U1Space(c=>binomial(lx-ℓ, c) for c in charge_range)
-        #println(s*v)
         A = fuselegs(splitleg(s*v, 2, (Vd, smleg_ℓ)), 1, 2)
-        #println(A)
         u,s,v = svd(A)
-        #println(u*s*v ≈ A)
 
         push!(mps, splitleg(u, 1, (ex_leg_ℓ, Vd)))
     end
-
     push!(mps, splitleg(s*v, 2, (Vd, U1Space(0=>1))))
 
     mps
@@ -159,28 +151,18 @@ end
 ### TOOLS
 #########
 
-function normalize!(mps::MPState{T}) where {T}
-    A = mps.matrices[mps.center]
-    if mps.center > div(mps.lx, 2)
-        U,S,Vt = svd(fuselegs(A, +1, 1, 2))
-        ss = vcat(diag.(S.nzblks)...)
-        n = norm(ss)
-
-        S_nzblks = S.nzblks ./ n
-        S = SymDiagonal(S.charge, S.legs, S.sects, S_nzblks)
-
-        mps.matrices[mps.center] = unfuseleg(U * S * Vt, 1, A.legs[1:2])
+function normalize!(mps::MPState)
+    A = mps.As[mps.center]
+    if mps.center > div(length(mps), 2)
+        u,s,v = svd(fuselegs(A, 1, 2, false))
+        normalize!(s)
+        mps.As[mps.center] = splitleg(u*s*v, 1, A.space[1:2])
     else
-        U,S,Vt = svd(fuselegs(A, -1, 2, 2))
-        ss = vcat(diag.(S.nzblks)...)
-        n = norm(ss)
-
-        S_nzblks = S.nzblks ./ n
-        S = SymDiagonal(S.charge, S.legs, S.sects, S_nzblks)
-
-        mps.matrices[mps.center] = unfuseleg(U * S * Vt, 2, A.legs[2:3])
+        u,s,v = svd(fuselegs(A, 2, 2, true))
+        normalize!(s)
+        mps.As[mps.center] = splitleg(u*s*v, 2, A.space[2:3])
     end
-    sort(ss./n, rev=true)
+    mps
 end
 
 @inline function _pushleft!(mps::MPState, l::Int)
@@ -219,10 +201,10 @@ function center_at!(mps::MPState, center::Int)
 end
 
 function schmidtvalues(mps::MPState)
-    lx = mps.lx
+    lx = length(mps)
     values = Vector{Vector{Float64}}(undef, lx-1)
     center_at!(mps, 1)
-    A = mps.matrices[1]
+    A = mps.As[1]
     for l = 1:lx-1
         u,s,v = svd(fuselegs(A, 1, 2))
         values[l] = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
@@ -232,7 +214,7 @@ function schmidtvalues(mps::MPState)
 end
 
 entanglementspectrum(mps::MPState) = -1 .* log.(schmidtvalues(mps))
-entanglemententropy(mps::MPState) = [entropy(x.^2) for x in schmidtvalues]
+entanglemententropy(mps::MPState) = [entropy(x.^2) for x in schmidtvalues(mps)]
 
 """
     measure(mps, ops...[, xs...])
@@ -364,12 +346,12 @@ end
 
 function measure(mps::MPState{S,T},
                  mpo::MPOperator{S,T}) where{S,T}
-    @assert mps.d == mpo.d && mps.lx == mpo.lx
+    @assert length(mpo) == length(mps)
     values = Dict{Int, T}()
     dummy = VectorSpace{S}(0=>1)
     L = fill(one(T), zero(S), (dummy, dummy, dummy))
 
-    for x=1:mps.lx
+    for x=1:length(mps)
         A = mps.As[x]
         W = mpo.Ws[x]
         L = contract(contract(contract(

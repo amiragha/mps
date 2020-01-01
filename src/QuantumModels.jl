@@ -3,6 +3,7 @@ module QuantumModels
 using LinearAlgebra
 using SparseArrays
 
+#using DataStructures
 using SymTensors
 
 import Base: eltype, *

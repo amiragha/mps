@@ -2,8 +2,34 @@ struct MPOperator{S, T}
     Ws :: Vector{SymTensor{S,T,4}}
 end
 
+@inline Base.eltype(mpo::MPOperator{S,T}) where {S,T} = T
+@inline Base.length(mpo::MPOperator) = length(mpo.Ws)
+#@inline checkbounds(mpo, l) = 0 < l <= L || throw(BoundsError(mpo.vectors), l)
+
+@inline bondspace(mpo::MPOperator, l::Int) = space(mpo.Ws[l], 3)
+@inline bonddim(mpo::MPOperator, l::Int) = size(mpo.Ws[l], 3)
+@inline bonddim(mpo::MPOperator) =
+    [dim(mpo.Ws[1], 1); [bonddim(mpo, l) for l in 1:length(mpo)]]
+
+@inline sitespace(mpo::MPOperator, l::Int) = space(mpo.Ws[l], 2)
+
+@inline function Base.push!(mpo::MPOperator{S},
+                            W::SymTensor{S}) where{S}
+    lx = length(mpo)
+
+    isdual(space(W, 2), space(W,4))
+    if lx > 0
+        isdual(bondspace(mpo, lx), space(W,1)) || throw("SpaceMismatch()")
+    else
+        size(W,1) == 1 || throw("SpaceMismatch()")
+    end
+    push!(mpo.Ws, W)
+    mpo
+end
+
 const U1MPO{T} = MPOperator{Int, T}
 
+MPOperator{S,T}() where{S,T} = MPOperator{S,T}(Vector{SymTensor{S,T,4}}())
 "function to explicitly make the xxz mpo (for test and example)"
 function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
 
@@ -13,9 +39,9 @@ function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
 
     space = (V, d, dual(V), dual(d))
 
-    Wbeg = fill(zero(T), 0, (V0, space[2:4]...))
-    W    = fill(zero(T), 0, space)
-    Wend = fill(zero(T), 0, (space[1:2]...,V0, space[4]))
+    Wbeg = fill(zero(T), U1(0), (V0, space[2:4]...))
+    W    = fill(zero(T), U1(0), space)
+    Wend = fill(zero(T), U1(0), (space[1:2]...,V0, space[4]))
 
     # making the generic MPO tensor
     mat0 = [
@@ -50,7 +76,7 @@ function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
     Wend[Sector{U1}(-1,1,0,0)] =  0.5*ones(T,1,1,1,1)
     Wend[Sector{U1}(1,0,0,1)] =  0.5*ones(T,1,1,1,1)
 
-    mpo = MPOperator{S,T}()
+    mpo = MPOperator{U1,T}()
     push!(mpo, Wbeg)
     for site=2:lx-1
         push!(mpo, W)

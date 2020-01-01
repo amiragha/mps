@@ -16,6 +16,9 @@
                   reshape(collect(15:26), 3,1,4)]
 
         A0 = SymTensor(zero(U1), space, SortedDict(zip(sects,nzblks)))
+        #A0 = SymTensor(zero(U1), space,
+        #SortedDict{Sector{U1,3}, Array{Int,3}}(zip(sects,nzblks)))
+
         A1 = fuselegs(A0, 1, 2)
         A2 = splitleg(A1, 1, space[1:2])
         @test A0 == A2
@@ -23,6 +26,16 @@
         A1 = fuselegs(A0, 2, 2, true)
         A2 = splitleg(A1, 2, space[2:3])
         @test A0 == A2
+    end
+
+    @testset "dual" begin
+        A = eye(U1Space(0=>1, 1=>2, 2=>1))
+        A[Sector{U1}(2, 2)] *= -1
+        A[Sector{U1}(1, 1)] *= 1/sqrt(2) .* [-1. 1; 1 1]
+
+        B = splitleg(A, 1, U1Space(0=>1, 1=>1), U1Space(0=>1, 1=>1))
+        B = splitleg(A, 1, U1Space(0=>1, 1=>1), U1Space(0=>1, 1=>1))
+        fuselegs(dual(B), 1, 2, false) == dual(A)
     end
 
     @testset "U1 unitary" begin
@@ -144,12 +157,12 @@ end
 
 @testset "factorization" begin
 
-    @testset "svd" begin
-        V1 = U1Space(0=>2, 1=>3, 2=>4)
-        V2 = U1Space(0=>4, -1=>2, -2=>2, -3=>3)
-        V3 = U1Space(0=>4, 1=>2, 2=>2, 3=>3)
-        V4 = U1Space(0=>3, -1=>5, -2=>2)
+    V1 = U1Space(0=>2, 1=>3, 2=>4)
+    V2 = U1Space(0=>4, -1=>2, -2=>2, -3=>3)
+    V3 = U1Space(0=>4, 1=>2, 2=>2, 3=>3)
+    V4 = U1Space(0=>3, -1=>5, -2=>2)
 
+    @testset "svd" begin
         A1 = rand(Float64, zero(U1), (V1,V2))
         A2 = rand(Float64, U1(1), (V1,V2))
         A3 = rand(Float64, U1(-1), (V1,V2))
@@ -169,5 +182,10 @@ end
         @test u*s*v ≈ B2
         u,s,v = svd(B3)
         @test u*s*v ≈ B3
+    end
+
+    @testset "svdtrunc" begin
+        A1 = SymTensor(rand, ComplexF64, zero(U1), (V1,V2))
+        @test svd(A1) ≈ svdtrunc(A1)
     end
 end

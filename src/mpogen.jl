@@ -153,7 +153,7 @@ function _generatempo_nosym(model::UnitCellQModel;
         nextterms = Vector{QInteraction}()
         ldim = rdim
     end
-    MatrixProductOperator(n_sites, d, dims, tensors)
+    MPOperator(n_sites, d, dims, tensors)
 end
 
 function _generatempo_sym(model::UnitCellQModel;
@@ -352,7 +352,7 @@ tensors[n] =  W
 pchrs = nextterms
 lleg = STLeg(+1, rleg.chrs, rleg.dims)
 end
-SymMatrixProductOperator(n_sites, d, dims, tensors)
+MPOperator(n_sites, d, dims, tensors)
 end
 
 function _generatempo_infinite(model::UnitCellQModel;
@@ -390,7 +390,7 @@ function _generatempo_infinite(model::UnitCellQModel;
         end
     end
     push!(dims, size(tensors[end], 3))
-    return SymMatrixProductOperator(n_sites * lx, mpo.d, dims, tensors)
+    return MPOperator(n_sites * lx, mpo.d, dims, tensors)
 end
 # function generateinfinitempo(model::UnitCellQModel)
 #     typeof(model.qtype) == SpinType ||
@@ -624,5 +624,5 @@ end
 # pchrs = nextterms
 # lleg = STLeg(+1, rleg.chrs, rleg.dims)
 # end
-# SymMatrixProductOperator(n_sites, d, dims, tensors)
+# MPOperator(n_sites, d, dims, tensors)
 # end

@@ -9,8 +9,9 @@ import Base: fill, fill!, rand, sum
 import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!, svd
 import Base.intersect
 
-using DataStructures
-#include("sorteddict.jl")
+#using DataStructures
+include("sorteddict.jl")
+export SortedDict, onlysemitokens
 
 include("group.jl")
 include("vspace.jl")
@@ -40,7 +41,7 @@ export _allsectorsandsizes
 export _sectorisallowed
 
 export array
-export dim, dims
+export dim, dims, charges
 export space
 #export alldims, accdims, getdim, fulldims, signs
 export rank, sectors, blocks

@@ -8,6 +8,8 @@ using LinearAlgebra
 using KrylovKit
 using TensorOperations
 
+#using DataStructures
+
 import Base: convert, size
 import LinearAlgebra: norm, normalize!
 
@@ -53,7 +55,7 @@ export mps2ketstate
 export ketstate2imps
 
 export xxz_mpo
-export xxz_symmpo
+export xxz_u1mpo
 export xxzlong_mpo
 export qitf_mpo
 

@@ -3,7 +3,7 @@ function svd(A::AbstractSymMatrix)
     S = vtype(A)
 
     u_blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
-    s_blocks = SortedDict{Sector{S, 2}, Diagonal{T}}()
+    s_blocks = SortedDict{Sector{S, 2}, Diagonal{Float64, Vector{Float64}}}()
     v_blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
 
     midl = SortedDict{S, Int}()

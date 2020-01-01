@@ -45,6 +45,13 @@ function permutelegs(A::AbstractSymTensor,
     typeof(A) <: SymDiagonal &&
         return typeof(A)(A.charge, A.space[perm], A.blocks)
 
+    # blocks = SortedDict([Sector(s[perm]) => permutedims(blk, perm)
+    #                      for (s,blk) in A.blocks])
+    # if !issorted(keys(blocks))
+    #     println(A.charge)
+    #     println(A.space)
+    #     println(perm)
+    # end
     typeof(A)(A.charge, A.space[perm],
               SortedDict([Sector(s[perm]) => permutedims(blk, perm)
                          for (s,blk) in A.blocks]))

@@ -114,65 +114,63 @@ end
 ######NOTE
 ###TODO: this needs to be tested!
 function svdtrunc(A::AbstractSymTensor;
-                  maxdim::Int=size(A, 2),
+                  maxdim::Int=maximum(size(A)),
                   tol::Float64=1.e-12)
-    rank(A) == 2 ||
-        error("svd only defined for matrix like objects N = ", rank(A))
     T = eltype(A)
+    S = vtype(A)
 
-    n_sects = length(A.sects)
-    sects_U  = Vector{Tuple{Int, Int}}(undef, n_sects)
-    sects_S  = Vector{Tuple{Int, Int}}(undef, n_sects)
-    sects_Vt = Vector{Tuple{Int, Int}}(undef, n_sects)
+    n_sects = length(A.blocks)
+    sects_u  = Vector{Sector{S, 2}}(undef, n_sects)
+    sects_s  = Vector{Sector{S, 2}}(undef, n_sects)
+    sects_v = Vector{Sector{S, 2}}(undef, n_sects)
 
-    blks_U  = Vector{Matrix{T}}(undef, n_sects)
-    blks_S  = Vector{Vector{Float64}}(undef, n_sects)
-    blks_Vt = Vector{Matrix{T}}(undef, n_sects)
+    blks_u  = Vector{Matrix{T}}(undef, n_sects)
+    blks_s  = Vector{Vector{Float64}}(undef, n_sects)
+    blks_v = Vector{Matrix{T}}(undef, n_sects)
 
-    for idx in eachindex(A.sects)
-        c1, c2 = A.sects[idx]
-        sects_U[idx]  = (c1, c1)
-        sects_S[idx]  = (c1, c2)
-        sects_Vt[idx] = (c2, c2)
+    semits = collect(onlysemitokens(A.blocks))
+    i=1
+    for (sect, blk) in A.blocks
+        c1, c2 = sect
+        sects_u[i] = Sector{S}(c1, c1)
+        sects_s[i] = Sector{S}(c1, c2)
+        sects_v[i] = Sector{S}(c2, c2)
 
-        fact = svd(A.nzblks[idx], full=false)
-        blks_U[idx] = fact.U
-        blks_S[idx] = fact.S
-        blks_Vt[idx] = fact.Vt
+        fact = svd(blk, full=false)
+        blks_u[i] = fact.U
+        blks_s[i] = fact.S
+        blks_v[i] = fact.Vt
+        i += 1
     end
 
-    ns = truncatedsizes(blks_S, maxdim=maxdim, tol=tol)
+    ns = truncatedsizes(blks_s, maxdim=maxdim, tol=tol)
     indices = findall(x->x>0, ns)
     #n_sects_new = sum(ns .> 0)
 
-    sects_U  = sects_U[indices]
-    sects_S  = sects_S[indices]
-    sects_Vt = sects_Vt[indices]
+    sects_u  = sects_u[indices]
+    sects_s  = sects_s[indices]
+    sects_v = sects_v[indices]
 
-    blks_U = [blks_U[index][:, 1:ns[index]] for index in indices]
-    blks_S = [blks_S[index][1:ns[index]] for index in indices]
-    blks_Vt = [blks_Vt[index][1:ns[index], :] for index in indices]
+    blks_u = [blks_u[index][:, 1:ns[index]] for index in indices]
+    blks_s = [blks_s[index][1:ns[index]] for index in indices]
+    blks_v = [blks_v[index][1:ns[index], :] for index in indices]
 
     middledims = ns[indices]
 
-    ls, rs = zip(sects_S...)
-    lchrs = reverse([ls...])
-    rchrs = reverse(-[rs...])
-    middledims = reverse(middledims)
+    n_sectors =length(middledims)
+    Vl = VectorSpace{S}([sects_s[i][1]=>middledims[i] for i=1:n_sectors],
+                        isdual(A.space[1]))
+    Vr = VectorSpace{S}([sects_s[i][2]=>middledims[i] for i=1:n_sectors],
+                        isdual(A.space[2]))
 
-    println(lchrs)
-    println(rchrs)
+    u  = SymMatrix{S,T}(zero(S), (A.space[1], dual(Vl)),
+                        SortedDict(zip(sects_u,blks_u)))
+    s  = SymDiagonal{S,Float64}(A.charge, (Vl, Vr),
+                                SortedDict([sects_s[i]=>Diagonal(blks_s[i]) for i in 1:n_sectors]))
+    v = SymMatrix{S,T}(zero(S), (dual(Vr), A.space[2]),
+                       SortedDict(zip(sects_v,blks_v)))
 
-    Uleg2  = STLeg(-1, lchrs, middledims)
-    Sleg1  = STLeg(+1, lchrs, middledims)
-    Sleg2  = STLeg(-1, rchrs, middledims)
-    Vtleg1 = STLeg(+1, rchrs, middledims)
-
-    U  = SymMatrix{T}(0, (A.legs[1], Uleg2), sects_U, blks_U)
-    S  = SymDiagonal{Float64}(A.charge, (Sleg1, Sleg2), sects_S, [Diagonal(blk) for blk in blks_S])
-    Vt = SymMatrix{T}(0, (Vtleg1, A.legs[2]), sects_Vt, blks_Vt)
-
-    U, S, Vt
+    u, s, v
 end
 
 """

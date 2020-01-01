@@ -18,6 +18,7 @@ const U1 = U1Charge
 @inline Base.zero(::Type{U1Charge}) = U1Charge(0)
 @inline Base.isless(c1::U1Charge, c2::U1Charge) = isless(c1.charge, c2.charge)
 @inline Base.isequal(c1::U1Charge, c2::U1Charge) = isequal(c1.charge, c2.charge)
+@inline Base.isequal(c1::U1Charge, c2::Int) = isequal(c1.charge, c2)
 convert(::Type{U1Charge}, s::Int) = U1Charge(s)
 
 function Base.show(io::IO, c::AbstractCharge)

@@ -20,7 +20,7 @@ mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
         for (s,d) in blocks
-            s == sects[i] || throw("$blocks SectorMismatch(), $s vs $(sects[i])")
+            s == sects[i] || throw("$(keys(blocks)) SectorMismatch(), $s vs $(sects[i])")
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
@@ -45,15 +45,15 @@ const U1Vector{T} = SymVector{Int, T}
 mutable struct SymDiagonal{S, T<:Number} <: AbstractSymMatrix{S, T}
     charge :: S
     space  :: NTuple{2, VectorSpace{S}}
-    blocks   :: SortedDict{Sector{S, 2}, Diagonal{T}}
+    blocks   :: SortedDict{Sector{S, 2}, Diagonal{T,Vector{T}}}
 
     function SymDiagonal(charge :: S,
                          space  :: NTuple{2, VectorSpace{S}},
-                         blocks   :: SortedDict{Sector{S,2}, Diagonal{T}}) where{S,T}
+                         blocks   :: SortedDict{Sector{S,2}, Diagonal{T,Vector{T}}}) where{S,T}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
         for (s,d) in blocks
-            s == sects[i] || throw("SectorMismatch()")
+            s == sects[i] || throw("$blocks SectorMismatch(), $s vs $(sects[i])")
             size(d) == sizes[i] || throw(SizeMismatch())
             i += 1
         end
@@ -78,7 +78,7 @@ end
 
 @inline space(A::AbstractSymTensor) = A.space
 @inline space(A::AbstractSymTensor, l::Int) = A.space[l]
-@inline rank(::AbstractSymTensor{S, T, N}) where {S, T, N} = N
+@inline LinearAlgebra.rank(::AbstractSymTensor{S, T, N}) where {S, T, N} = N
 @inline charge(A::AbstractSymTensor) = A.charge
 @inline sectors(A::AbstractSymTensor) = collect(keys(A.blocks))
 @inline blocks(A::AbstractSymTensor) = A.blocks
@@ -124,6 +124,16 @@ function Base.setindex!(A::AbstractSymTensor{S,T,N},
     A
 end
 
+SymTensor(f::Function, charge::S, space::NTuple{N,VectorSpace{S}}) where {S,N} =
+    SymTensor(f, Float64, charge, space)
+
+function SymTensor(f::Function, ::Type{T}, charge::S,
+                   space::NTuple{N,VectorSpace{S}}) where {S,T,N}
+    sects, sizes = _allsectorsandsizes(charge, space)
+    blocks = SortedDict([sects[i] => f(T,sizes[i]) for i in eachindex(sects)])
+    SymTensor(charge, space, blocks)
+end
+
 function rand(::Type{T}, charge::S, space::NTuple{N, VectorSpace{S}};
               seed::Int=1911) where {S,T,N}
     sects, sizes = _allsectorsandsizes(charge, space)
@@ -139,6 +149,8 @@ rand(charge::Int, space::NTuple{N, VectorSpace{S}}) where {S,N} =
 rand(space::NTuple{N, VectorSpace{S}}) where {S,N} =
     rand(Float64, zero(0), space)
 
+fill(x::T, space::NTuple{N, VectorSpace{S}}) where {S,T,N} =
+    fill(x, zero(S), space)
 function fill(x::T, charge::S, space::NTuple{N, VectorSpace{S}}) where {S,T,N}
     sects, sizes = _allsectorsandsizes(charge, space)
     blocks = SortedDict([sects[i] => fill(x, sizes[i]) for i in eachindex(sects)])
@@ -146,8 +158,8 @@ function fill(x::T, charge::S, space::NTuple{N, VectorSpace{S}}) where {S,T,N}
 end
 
 function fill!(A::SymTensor{S,T,N}, x::T) where {S,T,N}
-    for i in eachindex(A.nzblks)
-        fill!(A.nzblks[i], x)
+    for b in values(A.blocks)
+        fill!(b, x)
     end
     A
 end
@@ -185,12 +197,12 @@ function dual(A::AbstractSymTensor; conjugate::Bool=true)
         return typeof(A)(inv(A.charge),
                          dual.(A.space),
                          A.blocks)
-                         #SortedDict([inv(s)=>b for (s,b) in A.blocks]))
+        #SortedDict([inv(s)=>b for (s,b) in A.blocks]))
     end
     typeof(A)(inv(A.charge),
               dual.(A.space),
               A.blocks)
-              #SortedDict([inv(s)=>conj(b) for (s,b) in A.blocks]))
+    #SortedDict([inv(s)=>conj(b) for (s,b) in A.blocks]))
 end
 
 function mapcharges(f::Function, A::AbstractSymTensor)
@@ -223,7 +235,8 @@ function array(A::AbstractSymTensor{S,T,N}) where {S,T,N}
 end
 
 @inline *(A::AbstractSymTensor, a::T) where {T<:Number} =
-    typeof(A)(A.charge, A.space, *(A.blocks, a))
+    typeof(A)(A.charge, A.space,
+              SortedDict([s=>a.*b for (s,b) in A.blocks]))
 
 @inline *(a::T, A::AbstractSymTensor) where {T<:Number} = *(A, a)
 
@@ -246,6 +259,19 @@ end
 "out of place scalar multiplication; multiply SymTensor A with scalar α
 and store the result in B"
 function mul!(B::T, A::T, α) where {T<:AbstractSymTensor}
+    issimilar(A, B) || error("oops")
+    semitsA = collect(onlysemitokens(A.blocks))
+    semitsB = collect(onlysemitokens(B.blocks))
+    for i in 1:length(semitsA)
+        if length(A.blocks[semitsA[i]]) != length(B.blocks[semitsB[i]])
+            println()
+            println(A.blocks)
+            println(B.blocks)
+            println(A.blocks[semitsA[i]])
+            println(B.blocks[semitsB[i]])
+            println()
+        end
+    end
     for st in onlysemitokens(B.blocks)
         mul!(B.blocks[st], A.blocks[st], α)
     end
