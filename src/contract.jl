@@ -111,13 +111,13 @@ function SymMatrix(A::AbstractSymTensor,
 
     rowdualinfo = isdual.(A.space[rowidxs])
     coldualinfo = isdual.(A.space[colidxs])
-    csects = sectors(A)
-    sperm1 = sortperm(csects, by=x->reverse(x[idxperm]))
+    csects = [Sector(x[idxperm]) for x in sectors(A)]
+    sperm1 = sortperm(csects)
     fsects = Vector{Sector{S, 2}}(undef, length(csects))
     for i in eachindex(csects)
         sector = csects[sperm1][i]
-        c1 = sum(Sector(sector[rowidxs]), rowdualinfo)
-        c2 = inv(sum(Sector(sector[colidxs]), coldualinfo))
+        c1 = sum(Sector(sector[1:n]), rowdualinfo)
+        c2 = inv(sum(Sector(sector[n+1:N]), coldualinfo))
         fsects[i] = Sector(c1, c2)
     end
     sperm2 = sortperm(fsects)

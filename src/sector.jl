@@ -35,6 +35,19 @@ major. That means the leftmost (first) VSpace changes charge faster
 @inline Base.isless(s1::Sector{S, N}, s2::Sector{S, N}) where {N, S} =
     reverse(s1.charges) < reverse(s2.charges)
 
+# @inline function Base.isless(s1::Sector{S, N},
+#                              s2::Sector{S, N}) where {N, S}
+#     for n in N:-1:1
+#         @inbounds a, b = s1[n], s2[n]
+#         if a < b
+#             return true
+#         elseif a > b
+#             return false
+#         end
+#     end
+#     false
+# end
+
 function _check_sectordatadict(charge, space, data)
     sects, sizes = _allsectorsandsizes(charge, space)
     i = 1
