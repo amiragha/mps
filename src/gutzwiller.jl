@@ -202,6 +202,9 @@ function _zipandgutzwiller_F23!(mps1::MPState{Y},
     fnr = x->div(x+lx, 2)
     push!(mps, mapcharges((fnl,fnd,fnr), C))
 
+    # could the below alone be the issue?!
+    # is this correct (need explanation and stuff)
+    mps.center = lx
     mps
 end
 
@@ -260,11 +263,11 @@ function _tensorproductzip!(mps1::MPState{Y},
                  (1, 2, -1, 5), B, (-1, 3, 4))
 
     push!(mps, fuselegs(fuselegs(C, 2, 2), 3, 2))
-
+    mps.center = lx
     mps
 end
 
-function _applygutzwiller!(mps)
+function _applygutzwiller!(mps::MPState{Y}) where{Y}
     T = eltype(mps)
     G = fill(one(T), 0,
              (STLeg(+1, [-1,1], [1,1]),
