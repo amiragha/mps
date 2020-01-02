@@ -31,6 +31,7 @@ export VectorSpace#, ProductSpace
 export AbstractCharge
 export Trivial
 export U1Space, U1, U1Charge
+export Z2Charge
 export Sector
 export SymTensor, SymMatrix, SymDiagonal, SymVector
 export eye

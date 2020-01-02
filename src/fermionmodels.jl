@@ -20,6 +20,7 @@ function t1t2model(lx::Int,
 
     UnitCellQModel(fermion,
                    QLattice(triangularunitcell, lx, boundary),
+                   Z2Charge,
                    terms)
 end
 
@@ -58,5 +59,6 @@ function triangularhopping(ls::Tuple{Int, Int},
 
     UnitCellQModel(fermion,
                    QLattice(triangularunitcell, (ly, lx), boundary),
+                   Z2Charge,
                    terms)
 end
