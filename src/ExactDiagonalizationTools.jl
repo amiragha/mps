@@ -4,7 +4,7 @@ using QuantumModels
 
 using LinearAlgebra
 using SparseArrays
-using DataStructures
+#using DataStructures
 using SymTensors
 using Random
 using QuadGK
