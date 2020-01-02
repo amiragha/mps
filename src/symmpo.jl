@@ -1,25 +1,29 @@
-struct MPOperator{S, T}
-    Ws :: Vector{SymTensor{S,T,4}}
+struct MPOperator{Y<:Tensor{T,4} where T}
+    Ws :: Vector{Y}
 end
 
-@inline Base.eltype(mpo::MPOperator{S,T}) where {S,T} = T
+@inline tensortype(::MPOperator{Y}) where {Y} = Y
+@inline Base.eltype(::MPOperator{Y}) where {Y} = eltype(Y)
 @inline Base.length(mpo::MPOperator) = length(mpo.Ws)
 #@inline checkbounds(mpo, l) = 0 < l <= L || throw(BoundsError(mpo.vectors), l)
 
-@inline bondspace(mpo::MPOperator, l::Int) = space(mpo.Ws[l], 3)
+@inline bondspace(mpo::MPOperator, l::Int) = dual(space(mpo.Ws[l], 3))
 @inline bonddim(mpo::MPOperator, l::Int) = size(mpo.Ws[l], 3)
 @inline bonddim(mpo::MPOperator) =
     [dim(mpo.Ws[1], 1); [bonddim(mpo, l) for l in 1:length(mpo)]]
 
+@inline leftspace(mpo::MPOperator) = space(mpo.Ws[1], 1)
+@inline rightspace(mpo::MPOperator) = bondspace(mpo, length(mpo))
+
 @inline sitespace(mpo::MPOperator, l::Int) = space(mpo.Ws[l], 2)
 
-@inline function Base.push!(mpo::MPOperator{S},
-                            W::SymTensor{S}) where{S}
+@inline function Base.push!(mpo::MPOperator{Y},
+                            W::Y) where{Y}
     lx = length(mpo)
 
-    isdual(space(W, 2), space(W,4))
+    isdual(space(W, 2), space(W, 4))
     if lx > 0
-        isdual(bondspace(mpo, lx), space(W,1)) || throw("SpaceMismatch()")
+        isequal(bondspace(mpo, lx), space(W,1)) || throw("SpaceMismatch()")
     else
         size(W,1) == 1 || throw("SpaceMismatch()")
     end
@@ -27,9 +31,10 @@ end
     mpo
 end
 
-const U1MPO{T} = MPOperator{Int, T}
+const U1MPO{T} = MPOperator{SymTensor{U1,T,4}}
+const MPO{T} = MPOperator{Array{T,4}}
 
-MPOperator{S,T}() where{S,T} = MPOperator{S,T}(Vector{SymTensor{S,T,4}}())
+MPOperator{Y}() where{Y} = MPOperator{Y}(Vector{Y}())
 "function to explicitly make the xxz mpo (for test and example)"
 function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
 
@@ -76,7 +81,7 @@ function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
     Wend[Sector{U1}(-1,1,0,0)] =  0.5*ones(T,1,1,1,1)
     Wend[Sector{U1}(1,0,0,1)] =  0.5*ones(T,1,1,1,1)
 
-    mpo = MPOperator{U1,T}()
+    mpo = U1MPO{T}()
     push!(mpo, Wbeg)
     for site=2:lx-1
         push!(mpo, W)
@@ -88,9 +93,9 @@ end
 ### conversions
 ###############
 
-MPOperator{T}(mpo::MPOperator{T}) where {T<:Number} = mpo
-function MPOperator{S,T}(mpo::MPOperator) where {S,T}
-    MPOperator{S,T}([SymTensor{S, T, 4}(W) for W in mpo])
+MPOperator{Y}(mpo::MPOperator{Y}) where {Y} = mpo
+function MPOperator{Y}(mpo::MPOperator) where {Y}
+    MPOperator{Y}([Y(W) for W in mpo])
 end
 
 # function MatrixProductOperator(mpo::MPOperator{T}) where {T<:Number}

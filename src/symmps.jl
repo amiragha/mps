@@ -3,15 +3,19 @@ mutable struct MPState{Y<:Tensor{T,3} where T}
     center :: Int
 end
 
+@inline center(mps::MPState) = mps.center
 @inline tensortype(::MPState{Y}) where {Y} = Y
 @inline Base.eltype(::MPState{Y}) where {Y} = eltype(Y)
 @inline Base.length(mps::MPState) = length(mps.As)
 #@inline checkbounds(mps, l) = 0 < l <= L || throw(BoundsError(mps.vectors), l)
 
-@inline bondspace(mps::MPState, l::Int) = space(mps.As[l], 3)
+@inline bondspace(mps::MPState, l::Int) = dual(space(mps.As[l], 3))
 @inline bonddim(mps::MPState, l::Int) = size(mps.As[l], 3)
 @inline bonddim(mps::MPState) =
     [dim(mps.As[1], 1); [bonddim(mps, l) for l in 1:length(mps)]]
+
+@inline leftspace(mps::MPState) = space(mps.As[1], 1)
+@inline rightspace(mps::MPState) = bondspace(mps, length(mps))
 
 @inline sitespace(mps::MPState, l::Int) = space(mps.As[l], 2)
 
@@ -19,7 +23,7 @@ end
     lx = length(mps)
     Vl = space(A, 1)
     if lx > 0
-        bondspace(mps, lx) == dual(Vl) || throw("SpaceMismatch()")
+        bondspace(mps, lx) == Vl || throw("SpaceMismatch()")
     else
         dim(Vl) == 1 || throw("SpaceMismatch()")
     end
@@ -342,7 +346,7 @@ function measure(mps::MPState{SymTensor{S,T1,3}},
 end
 
 function measure(mps::MPState{SymTensor{S,T,3}},
-                 mpo::MPOperator{S,T}) where{S,T}
+                 mpo::MPOperator{SymTensor{S,T,4}}) where{S,T}
     @assert length(mpo) == length(mps)
     values = Dict{Int, T}()
     dummy = VectorSpace{S}(0=>1)

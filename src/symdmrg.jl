@@ -1,59 +1,62 @@
-function initialenv(mps::MPState{S, T},
-                    mpo::MPOperator{S, T};
-                    isometry::Symbol=:R) where {S, T}
+"""
+    initialenv(mps, mpo)
+
+construct and initialize the environment for a dmrg algorithm that is
+about to start at positon `at` (defaulted to `1`)! The environment is
+made from `mps` and `mpo` by the _mpsupdateright function.
+
+"""
+function initialenv(mps::MPState{Ys},
+                    mpo::MPOperator{Yo};
+                    at::Int=1) where {Ys, Yo}
+    vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
+        error("MPS, MPO not the same type!")
+    center(mps) == at || error("MPS center has to be $at")
+
     lx = length(mps)
-    env = Vector{SymTensor{S,T,3}}(undef, lx+2)
+    env = Vector{Ys}(undef, lx+2)
 
-    lchr = charges(mps.As[1].space[1])[1]
-    rchr = charges(mps.As[lx].space[3])[1]
+    lVa = leftspace(mps)
+    rVa = rightspace(mps)
+    lVw = leftspace(mpo)
+    rVw = rightspace(mpo)
 
-    ##NOTE: assuming mpo has charge 0 at both ends!
-    lVa = VectorSpace{S}(lchr => 1)
-    rVa = VectorSpace{S}(rchr => 1)
-    Vw = VectorSpace{S}(0 => 1)
+    T = eltype(Ys)
+    env[1] = fill(one(T), (dual(lVa), dual(lVw), lVa))
+    env[lx+2] = fill(one(T), (rVa, rVw, dual(rVa)))
 
-    env[1] = fill(one(T), zero(S), (dual(lVa), dual(Vw), lVa))
-    env[lx+2] = fill(one(T), zero(S), (rVa, Vw, dual(rVa)))
+    for l = lx:-1:at
+        env[l+1] = _mpsupdateright(env[l+2], mps.As[l], mpo.Ws[l])
+    end
 
-    if isometry == :R
-        for l = lx:-1:1
-            mps.center == 1 || error("MPS center has to be 1")
-            # println(env[l+2].space)
-            # println(mps.As[l].space)
-            # println(mpo.Ws[l].space)
-            env[l+1] = _mpsupdateright(env[l+2], mps.As[l], mpo.Ws[l])
-        end
-    elseif isometry == :L
-        for l = 1:lx
-            mps.center == lx || error("MPS center has to be $lx")
-            env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
-        end
-    else
-        error("Invalid isometry value $isometry")
+    for l = 1:at-1
+        env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
     end
     return env
 end
 
-function initialenv(mps::MPState{S,T1},
-                    mpo::MPOperator{S,T2};
-                    isometry::Symbol=:R) where {S,T1,T2}
-    T = promote_type(T1, T2)
-    initialenv(convert(MPState{S,T}, mps),
-               convert(MPOperator{S,T}, mpo),
-               isometry=isometry)
-end
+# function _initialenv(mps::MPState{Y1},
+#                      mpo::MPOperator{Y2};
+#                      at::Int=1) where {Y1, Y2}
+#     Y = promote_type(Y1, Y2)
+#     initialenv(convert(MPState{Y}, mps),
+#                convert(MPOperator{Y}, mpo),
+#                at=at)
+# end
 
 
-function dmrg2sitesweep!(mps::MPState{S, T},
-                         mpo::MPOperator{S, T},
-                         env::Vector{SymTensor{S,T,3}};
+function dmrg2sitesweep!(mps::MPState{Ys},
+                         mpo::MPOperator{Yo},
+                         env::Vector{Ys};
                          maxdim::Int=200,
                          tol::Float64=1.e-9,
                          lanczostol::Float64=1.e-7,
                          krylovdim::Int=5,
                          krylovmaxiter::Int=8,
-                         verbose::Bool=false) where {S,T<:Number}
+                         verbose::Bool=false) where {Ys, Yo}
 
+    vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
+        error("MPS, MPO not the same type!")
     lx = length(mps)
     mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
 

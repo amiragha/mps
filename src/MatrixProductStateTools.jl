@@ -14,6 +14,7 @@ import Base: convert, size
 import LinearAlgebra: norm, normalize!
 
 const Tensor{T, N} = Union{SymTensor{S, T, N}, Array{T,N}} where{S}
+#const Tensor{T} = Union{SymTensor{S, T}, Array{T}} where{S}
 
 include("mpsutils.jl")
 #include("mpo.jl")
@@ -35,8 +36,9 @@ export svdtrunc
 #export randmps
 
 export normalize!
-export center_at!
+export center, center_at!
 
+export leftspace, rightspace
 export entanglemententropy
 export entanglementspectrum
 export measure
@@ -49,8 +51,8 @@ export measure
 export apply!
 export twosite_tensor
 export overlap
-export display_matrices
-export mps_dims_are_consistent
+#export display_matrices
+#export mps_dims_are_consistent
 
 export mps2ketstate
 
