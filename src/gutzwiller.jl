@@ -164,7 +164,7 @@ function _zipandgutzwiller_F23!(mps1::MPState{Y},
         # contracting (E3, A1)
         # First tensor has EA = E1 E2 A2 A3
         # contracting with swap
-        # second tensor has EAX = E1 A2 E3 A3
+        # second tensor has EAX = E1 XA2 E3 A3
         # contracting (A2, G2)
         # Third tensor has EAG = E1 G1 G3 E3 A3
         # contracting (E3, B1) and (G3, B2)
@@ -209,54 +209,59 @@ function _tensorproductzip!(mps1::MPState{Y},
                             mps2::MPState{Y};
                             maxdim::Int64=200,
                             verbose::Bool=true) where {Y}
-    @assert mps1.d == mps2.d == 2
-    lx = mps1.lx
-    @assert mps2.lx == lx
+
+    #@assert mps1.d == mps2.d == 2
+    lx = length(mps1)
+    @assert length(mps2) == lx
 
     center_at!(mps1, 1)
     center_at!(mps2, 1)
 
-    dims = ones(Int64, lx+1)
-    matrices = SymTensor{Tv, 3}[]
+    mps = MPState{Y}()
 
-    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
-                          STLeg(-1, [0], [1]),
-                          STLeg(+1, [0], [1])))
+    ## NOTE: in order to make the gutzwiller projector respect the U1
+    ## symmetry we need to do the follwoing. Assume the first mps
+    ## corresponds to ↑ or 1 and second mps to ↓ or -1.
+    T = eltype(Y)
+    S = vtype(Y)
+
+    Vdummy = VectorSpace{S}(0=>1)
+    E = fill(one(T), (Vdummy, dual(Vdummy), Vdummy))
+
     for l=1:lx-1
-        A = mps1.matrices[l]
-        B = invlegs(mps2.matrices[l])
+        A = mps1.As[l]
+        B = dual(mps2.As[l], conjugate=false)
 
-        fswap = fermionswapgate(A.legs[2], B.legs[1])
+        fswap = fermionswapgate(A.space[2], B.space[1])
         ##NOTE:
-        # contracting (E2, A1)
-        # First tensor has EA = E1 E3 A2 A3
+        # contracting (E3, A1)
+        # First tensor has EA = E1 E2 A2 A3
         # contracting with swap
-        # second tensor has EAX = E1 XA2 A3 EX3
-        # contracting (EX3, B1)
-        # Final tensor has E1 XA2 B2 A3 B3
-        C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
-                              (1, -1, -2, 3), fswap, (-1, 2, 4, -2)),
-                     (1,2, 4,-1), B, (-1, 3, 5))
+        # second tensor has EAX = E1 XA2 E2 A3
+        # contracting (EX2, B1)
+        # Final tensor has E1 XA2 B2 B3 A3
+        C = contract(contract(contract(E, (1, 2, -1), A, (-1, 3, 4)),
+                              (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                     (1, 2, -1, 5), B, (-1, 3, 4))
 
-        u,s,v = svdtrunc(fuselegs(fuselegs(C, +1, 1, 3), -1, 2, 2),
-                         maxdim=maxdim)
+        u,s,v = svdtrunc(SymMatrix(C, [1,2,3], [4,5]), maxdim=maxdim)
         normalize!(s)
 
-        push!(matrices,
-              unfuseleg(u, 1, (E.legs[1], fuse(+1, (A.legs[2], B.legs[2])))))
+        push!(mps, fuselegs(
+            splitleg(u, 1, (E.space[1], A.space[2], B.space[2])), 2, 2))
 
-        E = unfuseleg(s*v, 2, (A.legs[3], B.legs[3]))
+        E = splitleg(s*v, 2, (B.space[3], A.space[3]))
     end
     A = mps1.As[lx]
-    B = invlegs(mps2.As[lx])
-    fswap = fermionswapgate(A.legs[2], B.legs[1])
-    C = contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
-                          (1, -1, -2, 3), fswap, (-1, 2, 4, -2)),
-                 (1,2, 4,-1), B, (-1, 3, 5))
+    B = dual(mps2.As[lx], conjugate=false)
+    fswap = fermionswapgate(A.space[2], B.space[1])
+    C = contract(contract(contract(E, (1, 2, -1), A, (-1, 3, 4)),
+                          (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                 (1, 2, -1, 5), B, (-1, 3, 4))
 
-    push!(matrices, fuselegs(fuselegs(C, 2, 2), 3, 2))
+    push!(mps, fuselegs(fuselegs(C, 2, 2), 3, 2))
 
-    return MPState{Y}(lx, 4, dims, matrices, lx)
+    mps
 end
 
 function _applygutzwiller!(mps)
