@@ -1,4 +1,4 @@
-function svd(A::AbstractSymMatrix)
+function _svd_(A::AbstractSymMatrix)
     T = eltype(A)
     S = vtype(A)
 
@@ -33,7 +33,10 @@ function svd(A::AbstractSymMatrix)
 
     u, s, v
 end
-
+function _svd_(A::AbstractArray)
+    u,s,v = svd(A, full=false)
+    u, Diagonal(s), v
+end
 
 """
     fermionswapgate(l1, l2)

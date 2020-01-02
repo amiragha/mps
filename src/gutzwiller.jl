@@ -10,10 +10,10 @@ or :F23 for fermionic.
 
 """
 
-function zipandgutzwiller!(mps1::MPState{T},
-                           mps2::MPState{T};
+function zipandgutzwiller!(mps1::MPState{Y},
+                           mps2::MPState{Y};
                            mode::Symbol=:B14,
-                           maxdim::Int64=200) where {T}
+                           maxdim::Int64=200) where {Y<:Array}
     if mode != :B14
         error("only Bosinic ↑↑ and ↓↓ is possible for no-symmetry MPSs!")
     end
@@ -60,10 +60,10 @@ function zipandgutzwiller!(mps1::MPState{T},
     return MPState{T}(lx, 2, dims, matrices, lx)
 end
 
-function zipandgutzwiller!(mps1::MPState{S,T},
-                           mps2::MPState{S,T};
+function zipandgutzwiller!(mps1::MPState{Y},
+                           mps2::MPState{Y};
                            mode::Symbol=:F23,
-                           maxdim::Int64=200) where {S,T}
+                           maxdim::Int64=200) where {Y<:SymTensor}
     if mode==:B14
         return _zipandgutzwiller_B14!(mps1, mps2, maxdim=maxdim)
     elseif mode==:F23
@@ -74,9 +74,9 @@ function zipandgutzwiller!(mps1::MPState{S,T},
 end
 
 #bosonic version
-function _zipandgutzwiller_B14!(mps1::MPState{S,T},
-                                mps2::MPState{S,T};
-                                maxdim::Int64=200) where {S,T}
+function _zipandgutzwiller_B14!(mps1::MPState{Y},
+                                mps2::MPState{Y};
+                                maxdim::Int64=200) where {Y}
     #@assert mps1.d == mps2.d == 2
     lx = length(mps1)
     @assert length(mps2) == lx
@@ -84,7 +84,7 @@ function _zipandgutzwiller_B14!(mps1::MPState{S,T},
     center_at!(mps1, 1)
     center_at!(mps2, 1)
 
-    mps = MPState{S,T}()
+    mps = MPState{Y}()
 
     ## NOTE: in order to make the gutzwiller projector respect the U1
     ## symmetry we need to do the follwoing. Assume that ↑↑
@@ -128,12 +128,12 @@ function _zipandgutzwiller_B14!(mps1::MPState{S,T},
 
     push!(matrices, mapcharges(x->div(x,2), fuselegs(C, 3, 2)))
 
-    return MPState{S,T}(lx, 2, dims, matrices, lx)
+    return MPState{Y}(lx, 2, dims, matrices, lx)
 end
 
-function _zipandgutzwiller_F23!(mps1::MPState{S,T},
-                                mps2::MPState{S,T};
-                                maxdim::Int64=200) where {S,T}
+function _zipandgutzwiller_F23!(mps1::MPState{Y},
+                                mps2::MPState{Y};
+                                maxdim::Int64=200) where {Y}
     #@assert mps1.d == mps2.d == 2
     lx = length(mps1)
     @assert length(mps2) == lx
@@ -141,11 +141,14 @@ function _zipandgutzwiller_F23!(mps1::MPState{S,T},
     center_at!(mps1, 1)
     center_at!(mps2, 1)
 
-    mps = MPState{S,T}()
+    mps = MPState{Y}()
 
     ## NOTE: in order to make the gutzwiller projector respect the U1
     ## symmetry we need to do the follwoing. Assume the first mps
     ## corresponds to ↑ or 1 and second mps to ↓ or -1.
+    T = eltype(Y)
+    S = vtype(Y)
+
     Vd = VectorSpace{S}(0=>1, 1=>1)
     G = fill(one(T), (dual(Vd), mapcharges(x->2*x-1, Vd), Vd))
 
@@ -202,10 +205,10 @@ function _zipandgutzwiller_F23!(mps1::MPState{S,T},
     mps
 end
 
-function _tensorproductzip!(mps1::MPState{S,T},
-                            mps2::MPState{S,T};
+function _tensorproductzip!(mps1::MPState{Y},
+                            mps2::MPState{Y};
                             maxdim::Int64=200,
-                            verbose::Bool=true) where {S,T}
+                            verbose::Bool=true) where {Y}
     @assert mps1.d == mps2.d == 2
     lx = mps1.lx
     @assert mps2.lx == lx
@@ -253,7 +256,7 @@ function _tensorproductzip!(mps1::MPState{S,T},
 
     push!(matrices, fuselegs(fuselegs(C, 2, 2), 3, 2))
 
-    return MPState{S,T}(lx, 4, dims, matrices, lx)
+    return MPState{Y}(lx, 4, dims, matrices, lx)
 end
 
 function _applygutzwiller!(mps)
@@ -290,7 +293,7 @@ function _applygutzwiller!(mps)
     fnr = x->div(x+1, 2)
     matrices[1] =  mapcharges((fnl,fnd,fnr), C)
 
-    return MPState{S,T}(lx, 2, dims, matrices, 1)
+    return MPState{Y}(lx, 2, dims, matrices, 1)
 end
 
 """
@@ -307,10 +310,10 @@ generates the tensor product matrices first and then applies svd on
 them, the function to use is `zipandgutzwiller`
 
 """
-function gutzwillerexact(mps1::MPState{T},
-                         mps2::MPState{T};
+function gutzwillerexact(mps1::MPState{Y},
+                         mps2::MPState{Y};
                          mode::Symbol=:F23,
-                         maxdim::Int64=200) where {S,T}
+                         maxdim::Int64=200) where {Y}
     lx = mps1.length
     mps2.length == lx ||
         error("Two MPS should have the same number of sites!")
@@ -385,6 +388,6 @@ function gutzwillerexact(mps1::MPState{T},
     fnr = x->div(x+lx, 2)
     push!(matrices, mapcharges((fnl,fnd,fnr), C))
 
-    return MPState{S,T}(lx, 2, dims, matrices, lx)
+    return MPState{Y}(lx, 2, dims, matrices, lx)
 
 end

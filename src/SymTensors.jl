@@ -29,6 +29,7 @@ export issimilar
 export AbstractSymTensor, AbstractSymMatrix
 export VectorSpace#, ProductSpace
 export AbstractCharge
+export Trivial
 export U1Space, U1, U1Charge
 export Sector
 export SymTensor, SymMatrix, SymDiagonal, SymVector
@@ -65,7 +66,7 @@ export index_sector
 export get_sector!
 export set_sector!
 
-export svd
+export _svd_
 
 export eltype, similar, copyto!
 export mul!, rmul!, axpy!, axpby!, dot, norm

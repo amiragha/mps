@@ -11,8 +11,7 @@ combined should be 1:N+M-2n.
 function contract(A     :: AbstractSymTensor{S,T1,N},
                   idxA  :: NTuple{N, Int},
                   B     :: AbstractSymTensor{S,T2,M},
-                  idxB  :: NTuple{M, Int};
-                  debug :: Bool=false) where{S,T1,T2, N, M}
+                  idxB  :: NTuple{M, Int}) where{S,T1,T2, N, M}
 
     remsA, consA, tofinalsA = _contract_index_perm(idxA)
     remsB, consB, tofinalsB = _contract_index_perm(idxB)
@@ -28,7 +27,7 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
             _B = SymVector(B, consB, true)
             return _A * _B
         else
-            _B = SymMatrix(B, remsB, consB)
+            _B = SymMatrix(B, consB, remsB)
             return permutelegs(unfuseleg(_A*_B, 2, B.legs[remsB]),
                                invperm(tofinalsB))
         end
@@ -48,6 +47,20 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
     return permutelegs(SymTensor(_A * _B, A.space[remsA], B.space[remsB]),
                        #unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
                        invperm([tofinalsA; tofinalsB]))
+end
+
+function contract(A     :: AbstractArray{T1,N},
+                  idxA  :: NTuple{N, Int},
+                  B     :: AbstractArray{T2,M},
+                  idxB  :: NTuple{M, Int}) where{S,T1,T2, N, M}
+    remsA, consA, tofinalsA = _contract_index_perm(idxA)
+    remsB, consB, tofinalsB = _contract_index_perm(idxB)
+    permA = [remsA, consA]
+    permB = [consB, remsB]
+    _A = reshape(permutedims(A, permA), prod(size(A)[remsA]), prod(size(A)[consA]))
+    _B = reshape(permutedims(B, permB), prod(size(B)[consB]), prod(size(B)[remsB]))
+    permutedims(reshape(_A*_B, size(A)[remsA]..., size(B)[remsB]),
+                invperm([rofinalsA; tofinalsB]))
 end
 
 # auxillary function to find indexes for contract

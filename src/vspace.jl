@@ -1,4 +1,7 @@
 abstract type AbstractVectorSpace end
+struct TrivialVectorSpace <:AbstractVectorSpace
+    n :: Int
+end
 struct VectorSpace{S} <: AbstractVectorSpace
     sectors :: SortedDict{S, Int}
     isdual  :: Bool

@@ -1,10 +1,10 @@
-abstract type AbstractMPState end
-mutable struct MPState{S<:AbstractCharge, T} <: AbstractMPState
-    As     :: Vector{SymTensor{S,T,3}}
+mutable struct MPState{Y<:Tensor{T,3} where T}
+    As     :: Vector{Y}
     center :: Int
 end
 
-@inline Base.eltype(mps::MPState{S,T}) where {S,T} = T
+@inline tensortype(::MPState{Y}) where {Y} = Y
+@inline Base.eltype(::MPState{Y}) where {Y} = eltype(Y)
 @inline Base.length(mps::MPState) = length(mps.As)
 #@inline checkbounds(mps, l) = 0 < l <= L || throw(BoundsError(mps.vectors), l)
 
@@ -15,8 +15,7 @@ end
 
 @inline sitespace(mps::MPState, l::Int) = space(mps.As[l], 2)
 
-@inline function Base.push!(mps::MPState{S},
-                            A::SymTensor{S}) where{S}
+@inline function Base.push!(mps::MPState{Y}, A::Y) where{Y}
     lx = length(mps)
     Vl = space(A, 1)
     if lx > 0
@@ -29,35 +28,32 @@ end
     mps
 end
 
-const U1MPState{T} = MPState{U1, T}
+const U1MPS{T} = MPState{SymTensor{U1,T,3}}
+const MPS{T} = MPState{Array{T, 3}}
+
 ####################
 ### CONSTRUCTORS ###
 ####################
-MPState{S,T}() where{S,T} = MPState{S,T}(Vector{SymTensor{S,T,3}}(), 0)
+MPState{Y}() where{Y} = MPState{Y}(Vector{Y}(), 0)
 
 # equal probability constructor
-function U1MPState(::Type{T},
-                   lx::Int,
-                   d::Int,
-                   m::U1Charge;
-                   noise::T=0.0) where {T}
+function U1MPS(::Type{T},
+               lx::Int,
+               d::Int,
+               m::U1Charge;
+               noise::T=0.0) where {T}
 
-    mps = MPState{U1, T}()
+    mps = U1MPS{T}()
     M = m.charge
 
-    # Just find all the possible sectors for each tensor at each site
-    # and fill them with one(1,1,1). This gives an MPS with a norm of
-    # binomial(lx,m).
-    ##TODO: there sure is a better way to the following!
+    # Just find all the possible sectors for each site and put one(T)
+    # This gives an MPS with a norm of binomial(lx,m) if no noise.
     Vd = U1Space(c=>1 for c in 0:d-1)
     Vl = U1Space(0=>1)
     for site in 1:lx
         cmin = max(0, M-(d-1)*(lx-site))
         cmax = min(M, (d-1)*site)
-        rchrs = collect(cmin:cmax)
-        Vr = U1Space(c=>1 for c in rchrs)
-
-
+        Vr = U1Space(c=>1 for c in cmin:cmax)
         A = SymTensor((x,y)->ones(x,y) .+ noise .* randn(x,y),
                       zero(U1), (Vl, Vd, dual(Vr)))
         push!(mps, A)
@@ -68,46 +64,40 @@ function U1MPState(::Type{T},
 end
 
 # constructor with intial configuration vector
-function U1MPState(::Type{T},
-                   lx::Int,
-                   d::Int,
-                   initconf::Vector{Int}) where {T}
+function U1MPS(::Type{T},
+               lx::Int,
+               d::Int,
+               initconf::Vector{Int}) where {T}
 
     @assert all((0 .<= initconf) .& (initconf .< 2))
-    mps = MPState{U1, T}()
+    mps = U1MPS{T}()
     Vd = U1Space(c=>1 for c in 0:d-1)
     lchr = 0
     for site=1:lx
         Vl = U1Space(lchr=>1)
         if initconf[site] == 0
             Vr = U1Space(lchr=>1)
-            A = fill(one(T), zero(U1), (Vl, Vd, dual(Vr)))
-            push!(mps, A)
         else
             Vr = U1Space(lchr+1=>1)
-            A = fill(one(T), zero(U1), (Vl, Vd, dual(Vr)))
-            push!(mps, A)
             lchr += 1
         end
+        push!(mps, fill(one(T), (Vl, Vd, dual(Vr))))
     end
     center_at!(mps, 1)
     mps
 end
 
 #constructor from a ketstate given in Ising basis
-function U1MPState(lx  ::Int,
-                   d   ::Int,
-                   ketstate::Vector{T};
-                   svtruncation::Bool=false) where {T}
+function U1MPS(lx  ::Int,
+               d   ::Int,
+               ketstate::Vector{T};
+               svtruncation::Bool=false) where {T}
 
     @assert length(ketstate) == binomial(lx, div(lx,2))
     charge = div(lx,2)
-
-    mps = MPState{U1, T}()
-
     A = SymVector(U1(charge), ketstate)
-    #println(A)
 
+    mps = U1MPS{T}()
     ℓ = 1
     ex_leg_ℓ = U1Space(0=>1)
     Vd = U1Space(0=>1, 1=>1)
@@ -115,7 +105,7 @@ function U1MPState(lx  ::Int,
     smleg_ℓ = U1Space(c=>binomial(lx-ℓ, c) for c in charge_range)
 
     A = splitleg(A, 1, (Vd, smleg_ℓ))
-    u,s,v = svd(A)
+    u,s,v = _svd_(A)
 
     push!(mps, splitleg(u, 1, (ex_leg_ℓ, Vd)))
 
@@ -124,28 +114,24 @@ function U1MPState(lx  ::Int,
         charge_range = min(charge, lx-ℓ):-1:max(0, charge-ℓ)
         smleg_ℓ = U1Space(c=>binomial(lx-ℓ, c) for c in charge_range)
         A = fuselegs(splitleg(s*v, 2, (Vd, smleg_ℓ)), 1, 2)
-        u,s,v = svd(A)
+        u,s,v = _svd_(A)
 
         push!(mps, splitleg(u, 1, (ex_leg_ℓ, Vd)))
     end
     push!(mps, splitleg(s*v, 2, (Vd, U1Space(0=>1))))
-
     mps
 end
 
 ### conversions
 ###############
 
-MPState{T}(mps::MPState{T}) where {T<:Number} = mps
-function MPState{T}(mps::MPState) where {T<:Number}
-    MPState{T}(mps.lx, mps.d, mps.dims,
-               [SymTensor{T, 3}(mat) for mat in mps.matrices],
-               mps.center)
+MPState{Y}(mps::MPState{Y}) where {Y} = mps
+function MPState{Y}(mps::MPState) where {Y}
+    MPState{Y}(mps.As, mps.center)
 end
 
-function MatrixProductState(mps::MPState{T}) where {T<:Number}
-    MatrixProductState{T}(mps.lx, mps.d, mps.dims,
-                          [array(mat) for mat in mps.matrices], mps.center)
+function MPState{Y1}(mps::MPState{Y2}) where {Y1,Y2}
+    MPState{Y1}([convert(Y1, mps.As[i]) for i in eachindex(mps.As)], mps.center)
 end
 
 ### TOOLS
@@ -157,11 +143,11 @@ function normalize!(mps::MPState)
     end
     A = mps.As[mps.center]
     if mps.center > div(length(mps), 2)
-        u,s,v = svd(fuselegs(A, 1, 2, false))
+        u,s,v = _svd_(fuselegs(A, 1, 2, false))
         normalize!(s)
         mps.As[mps.center] = splitleg(u*s*v, 1, A.space[1:2])
     else
-        u,s,v = svd(fuselegs(A, 2, 2, true))
+        u,s,v = _svd_(fuselegs(A, 2, 2, true))
         normalize!(s)
         mps.As[mps.center] = splitleg(u*s*v, 2, A.space[2:3])
     end
@@ -171,7 +157,7 @@ end
 @inline function _pushleft!(mps::MPState, l::Int)
     @boundscheck 1 < l <= length(mps) ||
         throw("can't pushleft at $l of $(length(mps))")
-    u,s,v = svd(fuselegs(mps.As[l], 2, 2))
+    u,s,v = _svd_(fuselegs(mps.As[l], 2, 2))
     mps.As[l] = splitleg(v, 2, space(mps.As[l])[2:3])
     mps.As[l-1] = contract(mps.As[l-1], (1, 2, -1), u*s, (-1, 3))
     nothing
@@ -180,7 +166,7 @@ end
 @inline function _pushright!(mps::MPState, l::Int)
     @boundscheck 0 < l < length(mps) ||
         throw("can't pushright at $l of $(length(mps))")
-    u,s,v = svd(fuselegs(mps.As[l], 1, 2))
+    u,s,v = _svd_(fuselegs(mps.As[l], 1, 2))
     mps.As[l] = splitleg(u, 1, space(mps.As[l])[1:2])
     mps.As[l+1] = contract(s*v, (1,-1), mps.As[l+1], (-1,2,3))
     nothing
@@ -209,8 +195,14 @@ function schmidtvalues(mps::MPState)
     center_at!(mps, 1)
     A = mps.As[1]
     for l = 1:lx-1
-        u,s,v = svd(fuselegs(A, 1, 2))
-        values[l] = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+        u,s,v = _svd_(fuselegs(A, 1, 2))
+        if typeof(s) <: Diagonal
+            values[l] = diag(s)
+        elseif typeof(s) <: SymDiagonal
+            values[l] = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+        else
+            throw("unknown type for singular values!")
+        end
         A = contract(s*v, (1, -1), mps.As[l+1], (-1,2,3))
     end
     values
@@ -235,7 +227,8 @@ results as values.
 """
 function measure end
 
-function measure(mps::MPState{S,T}, op::SymMatrix{S,T}, l::Int) where {S,T}
+function measure(mps::MPState{SymTensor{S,T,3}},
+                 op::SymMatrix{S,T}, l::Int) where {S,T}
     lx = length(mps)
     @assert (l <= lx) && (l > 0)
     @assert sitespace(mps, l) == space(op, 2) == dual(space(op, 1))
@@ -247,7 +240,8 @@ function measure(mps::MPState{S,T}, op::SymMatrix{S,T}, l::Int) where {S,T}
     Dict{Int, T}(l=>v)
 end
 
-function measure(mps::MPState{S,T}, op::SymMatrix{S,T}) where {S,T}
+function measure(mps::MPState{SymTensor{S,T,3}},
+                 op::SymMatrix{S,T}) where {S,T}
 
     Vd = space(op, 1)
     @assert space(op, 2) == Vd
@@ -269,7 +263,7 @@ function measure(mps::MPState{S,T}, op::SymMatrix{S,T}) where {S,T}
     values
 end
 
-function measure(mps::MPState{S,T},
+function measure(mps::MPState{SymTensor{S,T,3}},
                  op1::SymMatrix{S,T},
                  op2::SymMatrix{S,T},
                  x1::Int,
@@ -302,7 +296,7 @@ function measure(mps::MPState{S,T},
     values[(x1, x2)] = v
 end
 
-function measure(mps::MPState{S,T},
+function measure(mps::MPState{SymTensor{S,T,3}},
                  op1::SymMatrix{S,T},
                  op2::SymMatrix{S,T}) where {S,T}
 
@@ -338,16 +332,16 @@ function measure(mps::MPState{S,T},
     values
 end
 
-function measure(mps::MPState{S,T1},
+function measure(mps::MPState{SymTensor{S,T1,3}},
                  op1::SymMatrix{S,T2},
                  op2::SymMatrix{S,T3}) where {S,T1,T2,T3}
     T = promote_type(T1,T2,T3)
-    measure(convert(MPState{S,T}, mps),
+    measure(convert(MPState{SymTensor{S,T,3}}, mps),
             convert(SymMatrix{S,T}, op1),
             convert(SymMatrix{S,T}, op2))
 end
 
-function measure(mps::MPState{S,T},
+function measure(mps::MPState{SymTensor{S,T,3}},
                  mpo::MPOperator{S,T}) where{S,T}
     @assert length(mpo) == length(mps)
     values = Dict{Int, T}()
@@ -380,7 +374,7 @@ push to either left `:L` or right `:R` (default) matrices using the
 argument `pushto`.
 
 """
-function apply!(mps         :: MPState{S,T},
+function apply!(mps         :: MPState{SymTensor{S,T,3}},
                 op          :: SymTensor{S,T,4},
                 x           :: Int;
                 maxdim      :: Int=bonddim(mps, l+1),
@@ -422,7 +416,7 @@ function apply!(mps         :: MPState{S,T},
     mps
 end
 
-function apply!(mps         :: MPState{S,T1},
+function apply!(mps         :: MPState{SymTensor{S,T1,3}},
                 op          :: SymTensor{S,T2,4},
                 x           :: Int;
                 maxdim      :: Int=bonddim(mps, l+1),
@@ -430,7 +424,7 @@ function apply!(mps         :: MPState{S,T1},
                 svnormalize :: Bool=false) where {S,T1,T2}
 
     T = promote_type(T1, T2)
-    apply!(convert(MPState{S,T}, mps),
+    apply!(convert(MPState{SymTensor{S,T,3}}, mps),
            convert(SymTensor{S,T,4}, op),
            x, maxdim=maxdim, pushto=pushto, svnormalize=svnormalize)
 end
@@ -445,8 +439,8 @@ MPSs, so it returned value is the overlap of the two states multiplied
 by the norm of each.
 
 """
-function overlap(mps1::MPState{S,T},
-                 mps2::MPState{S,T}) where {S,T}
+function overlap(mps1::MPState{Y},
+                 mps2::MPState{Y}) where {Y}
 
     lx = length(mps1)
     @assert length(mps2) == lx
@@ -468,9 +462,9 @@ function overlap(mps1::MPState{S,T},
     v
 end
 
-function overlap(mps1::MPState{S,T1}, mps2::MPState{S,T2}) where {S,T1,T2}
-    T = promote_type(T1, T2)
-    overlap(convert(MPSteat{S,T}, mps1), convert(MPSteat{S,T}, mps2))
+function overlap(mps1::MPState{Y1}, mps2::MPState{Y2}) where {Y1,Y2}
+    Y = promote_type(Y1, Y2)
+    overlap(convert(MPState{Y}, mps1), convert(MPSteat{Y}, mps2))
 end
 
 """

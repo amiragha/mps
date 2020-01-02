@@ -13,6 +13,8 @@ using TensorOperations
 import Base: convert, size
 import LinearAlgebra: norm, normalize!
 
+const Tensor{T, N} = Union{SymTensor{S, T, N}, Array{T,N}} where{S}
+
 include("mpsutils.jl")
 #include("mpo.jl")
 include("symmpo.jl")
@@ -21,8 +23,8 @@ include("mpogen.jl")
 #include("imps.jl")
 include("symmps.jl")
 
-export MPState, U1MPState
-export MPOperator
+export MPState, U1MPS, MPS
+export MPOperator, U1MPO, MPO
 #export MatrixProductOperator
 #export MatrixProductState
 #export SymMatrixProductState

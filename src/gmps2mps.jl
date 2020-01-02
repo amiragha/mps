@@ -13,23 +13,23 @@ made and then the gates are applied in reverse order.
 """
 function gmps2mps(gmps::GaussianMPS,
                   maxdim::Int64;
-                  symmetry::Symbol=:NONE)
+                  symmetry::Type{<:AbstractCharge}=Trivial)
 
     ##TODO: why are these defined complex here?!
-    if symmetry == :NONE
-        mps = MPState{Float64}(gmps.lx, 2, gmps.initconf)
+    if symmetry == Trivial
+        mps = MPS{Float64}(gmps.lx, 2, gmps.initconf)
         _applygmpsgates!(mps, gmps, maxdim)
 
-    elseif symmetry == :U1
-        mps = U1MPState(Float64, gmps.lx, 2, gmps.initconf)
+    elseif symmetry == U1
+        mps = U1MPS(Float64, gmps.lx, 2, gmps.initconf)
         _applygmpsgates!(mps, gmps, maxdim)
     else
-        error( "Symmetry $symmetry is not defined!")
+        throw(ArgumentError("Unkown symmetry : $symmetry"))
     end
     mps
 end
 
-function _applygmpsgates!(mps::MPState{T},
+function _applygmpsgates!(mps::MPState{Array{T,3}},
                           gmps::GaussianMPS,
                           maxdim::Int) where {T}
     twobodyugate = Matrix{T}(I, 4, 4)
@@ -53,11 +53,11 @@ function _applygmpsgates!(mps::MPState{T},
     nothing
 end
 
-function _applygmpsgates!(mps::MPState{U1,T},
+function _applygmpsgates!(mps::MPState{SymTensor{S,T,3}},
                           gmps::GaussianMPS,
-                          maxdim::Int) where{T}
+                          maxdim::Int) where {S,T}
 
-    Vd = U1Space(0=>1, 1=>1)
+    Vd = VectorSpace{S}(0=>1, 1=>1)
     # u is the two-body U gate matrix
     u = eye(Float64, fuse(false, Vd,Vd))
 
@@ -67,7 +67,7 @@ function _applygmpsgates!(mps::MPState{U1,T},
     for n=length(gmps.xs):-1:1
         site = gmps.xs[n]
         θ = gmps.θs[n]
-        u[Sector{U1}(1,1)] =  rotationmat(θ)
+        u[Sector{S}(1,1)] =  rotationmat(θ)
 
         uten = splitleg(splitleg(u, 2, (dual(Vd), dual(Vd))), 1, (Vd,Vd))
 

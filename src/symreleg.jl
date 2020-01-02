@@ -56,6 +56,10 @@ function permutelegs(A::AbstractSymTensor,
               SortedDict([Sector(s[perm]) => permutedims(blk, perm)
                          for (s,blk) in A.blocks]))
 end
+function permutelegs(A::AbstractArray,
+                     perm::Vector{Int})
+    permutedims(A, perm)
+end
 
 """
         fuselegs(A, l, n)
@@ -146,6 +150,13 @@ function fuselegs(A::AbstractSymTensor,
     end
     SymTensor(A.charge, space, blocks)
 end
+function fuselegs(A::AbstractArray,
+                  l::Int,
+                  n::Int=2,
+                  _dual::Bool=false)
+    sz = size(A)
+    reshape(A, sz[1:l-1]..., prod(sz[l:l+n-1]), sz[l+n:end]...)
+end
 
 function delinsert(tuple::NTuple{N, T}, items::NTuple{M, T}, index::Int) where{T, N, M}
     (tuple[1:index]..., items..., tuple[index+1:N])
@@ -207,97 +218,9 @@ function splitleg(A     :: AbstractSymTensor,
     SymTensor(A.charge, new_space, blocks)
 end
 
-# """
-#     fuse_set(sect, parts)
-
-# fuse the values in the `sect` using the binary operation `op` by to
-# the partitions given by `parts`
-
-# """
-# function fuse_set(op,
-#                   sect::NTuple{N, Tc},
-#                   partsizes::Vector{Int}) where {N, Tc<:Number}
-#     ###TODO: I should be able to code this nicer, probably using some
-#     ###functional stuff like map, fold, etc
-#     result = Tc[]
-#     p = 0
-#     for n in partsizes
-#         push!(result, foldl(op, sect[p+1:p+n]))
-#         p += n
-#     end
-#     Tuple(result)
-# end
-
-
-# # defuses a leg into some given legs
-# function unfuseleg(A    :: AbstractSymTensor{T, N},
-#                    l    :: Int,
-#                    legs :: NTuple{M, U1Space}) where {T<:Number, N, M}
-#     0 < l <= N || error("integer l not in range $l, $N")
-#     #println(A.legs)
-#     #println(legs)
-#     if length(legs) == 1
-#         if legs[1].sign == A.legs[l].sign
-#             A.legs[l] == legs[1] || error("Not the same legs", A.legs[l], legs[1])
-#             return A
-#         else
-#             Aleg = negate(A.legs[l])
-#             Aleg == legs[1] || (error("Not the same legs", Aleg, legs[1]))
-#             return negateleg(A, l)
-#         end
-#     end
-
-#     sects = NTuple{N+M-1, Int}[]
-#     nzblks = Array{T, N+M-1}[]
-
-#     sign = A.legs[l].sign
-#     csects = A.sects
-#     fchrdict = Dict{Int, Tuple{Vector{NTuple{M,Int}}, Vector{NTuple{M,Int}}}}()
-#     for i in eachindex(csects)
-#         charge = sign * csects[i][l]
-#         if haskey(fchrdict, charge)
-#             pats, patdims = fchrdict[charge]
-#         else
-#             pats, patdims = _allsectorsandsizes(charge, legs)
-#             #println(charge, pats, patdims)
-#             ## NOTE: sorting is not longer required because
-#             ## allsectorsandsizes return sorted pats
-#             # patperms = sortperm(pats)
-#             # pats, patdims = pats[patperms], patdims[patperms]
-#             #println(pats, patdims)
-#             fchrdict[charge] = (pats, patdims)
-#         end
-#         old_nzblock =  A.nzblks[i]
-#         s = size(old_nzblock)
-#         pivot = 0
-#         for patidx in eachindex(pats)
-#             sl = prod(patdims[patidx])
-#             push!(sects, (csects[i][1:l-1]..., pats[patidx]..., csects[i][l+1:N]...))
-#             push!(nzblks, reshape(old_nzblock[[1:s[n] for n=1:l-1]...,pivot+1:pivot+sl,[1:s[n] for n=l+1:N]...],
-#                                   s[1:l-1]...,patdims[patidx]...,s[l+1:N]...))
-#             pivot += sl
-#         end
-#     end
-
-#     # now check to see if the new legs can fuse into the original leg
-#     ###TODO: there should be an options to remove this step for
-#     ###efficientcy when it is not needed!
-#     for charge in keys(fchrdict)
-#         cidx = findall(A.legs[l].chrs .== sign * charge)[1]
-#         A.legs[l].dims[cidx] == sum([prod(patdims) for patdims in fchrdict[charge][2]]) ||
-#             error("For defuse, dimensions don't match for charge " , sign*charge)
-#         #, " ", A.legs[l].dims[cidx], " == ", fchrdict[charge]
-
-#     end
-
-#     #println(fchrdict)
-#     new_legs = (A.legs[1:l-1]...,legs...,A.legs[l+1:end]...)
-#     #println(A.sects)
-#     #println(sects)
-
-#     ## NOTE: It is necessary to sort the sectors here, because while
-#     ## the patterns were sorted whitin each fused charge, they are not
-#     ## sorted when are the charges are concerned
-#     sectperm = sortperm(sects)
-#     SymTensor(A.charge, new_legs, sects[sectperm], nzblks[sectperm])
-# end
+function splitleg(A     :: AbstractArray,
+                  l     :: Int,
+                  space :: NTuple{M, TrivialVectorSpace}) where {M}
+    sz = size(A)
+    reshape(A, sz[1:l-1], dim.(space)..., sz[l+1:end])
+end

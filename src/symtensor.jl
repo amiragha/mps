@@ -204,6 +204,7 @@ function dual(A::AbstractSymTensor; conjugate::Bool=true)
               A.blocks)
     #SortedDict([inv(s)=>conj(b) for (s,b) in A.blocks]))
 end
+dual(A::AbstractArray) = conj(A)
 
 function mapcharges(f::Function, A::AbstractSymTensor)
     SymTensor(f(A.charge),

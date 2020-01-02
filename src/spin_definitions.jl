@@ -4,17 +4,18 @@
 For spin `s` returns the operators (`sz`,`sp`, `sm`). `s` has to be
 integer or half-integer
 """
-function spinoperators(s; symmetry::Symbol=:NONE)
+function spinoperators(s;
+                       symmetry::Type{<:AbstractCharge}=Trivial)
     d = Int(round(2*s + 1))
     ms = [s-n+1 for n in 1:d]
     amps = [sqrt((s+m)*(s-m+1)) for m in ms[1:d-1]]
 
-    if symmetry == :NONE
+    if symmetry == Trivial
         sz = diagm(0 => ms)
         sp = diagm(1 => amps)
         sm = diagm(-1 => amps)
         return sz, sp, sm
-    elseif symmetry == :U1
+    elseif symmetry == U1
         V = U1Space(c=>1 for c in 0:d-1)
         sz_blocks = SortedDict{Sector{U1, 2}, Matrix{Float64}}()
         sp_blocks = SortedDict{Sector{U1, 2}, Matrix{Float64}}()
@@ -31,7 +32,7 @@ function spinoperators(s; symmetry::Symbol=:NONE)
         sm = SymMatrix(U1(-1), (V,dual(V)), sm_blocks)
         return sz, sp, sm
     else
-        error("Unkown symmetry: $symmetry")
+        throw(ArgumentError("Unkown symmetry : $symmetry"))
     end
 end
 
