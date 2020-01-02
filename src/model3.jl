@@ -116,20 +116,25 @@ function fermionoperators(f::Fermion)
 end
 abstract type AbstractQInteraction{T, N} end
 
+struct QAmpTerm{O, N, T}
+    amp :: T
+    ops :: NTuple{N, O}
+end
+
 abstract type AbstractQModelInteraction{D, N, T} end
 struct QModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     amp     :: T
     ucidxs  :: NTuple{N, Int}
     offsets :: NTuple{N, NTuple{D, Int}}
-    terms   :: Vector{NTuple{N, Matrix{T}}}
+    terms   :: Vector{QAmpTerm{Symbol,N,T}}
 end
 
-struct SymQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
-    amp     :: T
-    ucidxs  :: NTuple{N, Int}
-    offsets :: NTuple{N, NTuple{D, Int}}
-    terms   :: Vector{NTuple{N, SymMatrix{T}}}
-end
+# struct SymQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
+#     amp     :: T
+#     ucidxs  :: NTuple{N, Int}
+#     offsets :: NTuple{N, NTuple{D, Int}}
+#     terms   :: Vector{NTuple{N, SymMatrix{T}}}
+# end
 
 struct FermionQModelInteraction{D, N, T} <: AbstractQModelInteraction{D, N, T}
     amp     :: T
@@ -175,9 +180,10 @@ removehead(A::QTerm{OP, N}) where {OP, N} =
 
 abstract type AbstractQModel{Q, D} end
 struct UnitCellQModel{Q<:AbstractQType, D, J<:AbstractQModelInteraction} <: AbstractQModel{Q, D}
-    qtype   :: Q
-    lattice :: QLattice{D}
-    inters  :: Vector{J}
+    qtype    :: Q
+    lattice  :: QLattice{D}
+    symmetry :: Type{<:AbstractCharge}
+    inters   :: Vector{J}
 end
 
 @inline dimension(::AbstractQModel{Q, D}) where {Q, D} = D

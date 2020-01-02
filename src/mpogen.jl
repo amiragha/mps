@@ -1,21 +1,16 @@
 function generatempo(model::UnitCellQModel;
                      symmetry::Symbol=:AUTO,
                      verbose::Bool=false)
-    if symmetry == :AUTO
-        if eltype(model.inters) <: QModelInteraction
-            return _generatempo_nosym(model, verbose=verbose)
+    if model.symmetry == Trivial
+        return _generatempo_nosym(model, verbose=verbose)
 
-        elseif eltype(model.inters) <: SymQModelInteraction
-            return _generatempo_sym(model, verbose=verbose)
+    elseif model.symmetry == U1
+        return _generatempo_sym(model, verbose=verbose)
 
-        elseif eltype(model.inters) <: FermionQModelInteraction
-            error("JW not yet implemented! Do it manually and input the spin model for the mpo!")
-
-        else
-            error("Dont' recognize $(eltype(model.inters)) for MPO generation!")
-        end
+    elseif eltype(model.inters) <: FermionQModelInteraction
+        error("JW not yet implemented! Do it manually and input the spin model for the mpo!")
     else
-        error("symmetry not recognized!")
+        error("Dont' recognize $(eltype(model.inters)) for MPO generation!")
     end
 end
 
@@ -164,15 +159,22 @@ function _generatempo_sym(model::UnitCellQModel;
     model.lattice.bcs[D] == :OBC ||
         @warn "MPO generated periodic in X direction! discouraged!"
 
-    typeof(model.inters[1]) <: SymQModelInteraction ||
-        error("Only symmetric (U1) is allowed!")
+    # typeof(model.inters[1]) <: SymQModelInteraction ||
+    #     error("Only symmetric (U1) is allowed!")
 
     d = model.qtype.d
     d == 2 || error("only works for spin 1/2 for now!")
     n_sites = prod(model.lattice.sizes)
     T = eltype(model.inters[1])
 
-    allterms = Vector{QTerm{SymMatrix{T}}}()
+    sz,sp,sm = spinoperators(1/2, symmetry=U1)
+    dict = Dict{Symbol, SymMatrix{U1, T}}()
+    dict[:Z] = sz
+    dict[:P] = sp
+    dict[:M] = sm
+    dict[:I] = eye(T, U1Space(0=>1, 1=>1))
+
+    allterms = Vector{QTerm{SymMatrix{U1,T}}}()
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
         for interaction in model.inters
             ns = interaction.ucidxs
@@ -189,9 +191,10 @@ function _generatempo_sym(model::UnitCellQModel;
             end
             if isinside
                 perm = sortperm(indexes)
-                for ops in interaction.terms
+                for qaterm in interaction.terms
+                    ops = [dict[qaterm.ops[i]] for i in eachindex(qaterm.ops)]
                     permutedops = ops[perm]
-                    termops = (permutedops[1:end-1]..., interaction.amp * permutedops[end])
+                    termops = (permutedops[1:end-1]..., qaterm.amp * interaction.amp * permutedops[end])
                     push!(allterms, QTerm(Tuple(indexes[perm]), termops))
                 end
             end
@@ -199,19 +202,17 @@ function _generatempo_sym(model::UnitCellQModel;
     end
     sort!(allterms, by=x->x.sites[1])
 
-    dims = ones(Int, n_sites+1)
     pointer=1
-    tensors = Vector{SymTensor{Float64, 4}}(undef, n_sites)
-    chrs = [0]
-    lleg = STLeg(+1, chrs, [1])
-    o1leg = STLeg(+1, [0,1], [1,1])
-    o2leg = STLeg(-1, [0,1], [1,1])
-    symI = eye(T, collect(0:d-1), ones(Int, d))
-    pchrs = Dict{Int, Vector{QTerm}}()
+    mpo = MPOperator{SymTensor{U1, T, 4}}()
+    chrs = [zero(U1)]
+    Vw = U1Space(0=>1)
+    Vo = U1Space(0=>1, 1=>1)
+    symI = eye(T, Vo)
+    pchrs = Dict{U1Charge, Vector{QTerm}}()
     for n in 1:n_sites
         # find the new charge for each previous-term that still
         # continues to the next site
-        nextchrs = Int[0]
+        nextchrs = U1[zero(U1)]
         for (pchr, pterms) in pchrs
             for pterm in pterms
                 if pterm.sites[1] > n
@@ -237,7 +238,7 @@ function _generatempo_sym(model::UnitCellQModel;
         end
 
         sort!(nextchrs)
-        chrs = Int[]
+        chrs = U1[]
         chrdims = Int[]
         push!(chrs, nextchrs[1])
         push!(chrdims, 1)
@@ -253,43 +254,38 @@ function _generatempo_sym(model::UnitCellQModel;
         nextterms = Dict(chr => Vector{QTerm}() for chr in chrs)
         # make the new leg
         if n < n_sites
-            idx = searchsortedfirst(chrs, 0)
+            idx = searchsortedfirst(chrs, U1(0))
             chrdims[idx] += 1
-            rleg = STLeg(-1, chrs, chrdims)
+            Vr = dual(U1Space([chrs[i]=>chrdims[i] for i in eachindex(chrs)]))
         else
-            chrs == [0] || error("$chrs")
+            chrs == [U1(0)] || error("$chrs")
             chrdims == [1] || error("$chrdims")
-            rleg = STLeg(-1, [0], [1])
+            Vr = dual(Vw)
         end
 
-        dims[n+1] = fulldims(rleg)
+        W = fill(zero(T), U1(0), (Vw, Vo, Vr, dual(Vo)))
 
-
-        W = fill(zero(T), 0, (lleg, o1leg, rleg, o2leg))
-
-        index0000 = index_sector(W, (0,0,0,0))
-        index0101 = index_sector(W, (0,1,0,1))
-        l00, r00 = size(W.nzblks[index0000])[[1,3]]
+        l00, r00 = size(W.blocks[Sector{U1}(0,0,0,0)])[[1,3]]
         # better logic is needed for this!
         if n > 1
-            W.nzblks[index0000][1,1,1,1] = one(T)
-            W.nzblks[index0101][1,1,1,1] = one(T)
+            W.blocks[Sector{U1}(0,0,0,0)][1,1,1,1] = one(T)
+            W.blocks[Sector{U1}(0,1,0,1)][1,1,1,1] = one(T)
         end
         if n < n_sites
-            W.nzblks[index0000][l00,1,r00,1] = one(T)
-            W.nzblks[index0101][l00,1,r00,1] = one(T)
+            W.blocks[Sector{U1}(0,0,0,0)][l00,1,r00,1] = one(T)
+            W.blocks[Sector{U1}(0,1,0,1)][l00,1,r00,1] = one(T)
         end
 
         for lterm in lterms
             op = lterm.ops[1]
             op.charge == 0 || error()
-            W.nzblks[index0000][l00, 1, 1, 1] += get_sector(op, (0,0))
-            W.nzblks[index0101][l00, 1, 1, 1] += get_sector(op, (1,1))
+            W.blocks[Sector{U1}(0,0,0,0)][l00, 1, 1, 1] += op[Sector{U1}(0,0)]
+            W.blocks[Sector{U1}(0,1,0,1)][l00, 1, 1, 1] += op[Sector{U1}(1,1)]
         end
 
-        rows = Dict(c=>1 for c in lleg.chrs)
+        rows = Dict(c=>1 for c in charges(Vw))
         rows[0] = 2
-        cols = Dict(c=>1 for c in chrs)
+        cols = Dict(U1(c)=>1 for c in chrs)
         cols[0] = 2
 
         for (pchr, pterms) in pchrs
@@ -298,22 +294,22 @@ function _generatempo_sym(model::UnitCellQModel;
                     op = pterm.ops[1]
                     if support(pterm) == 1
                         # pchr goes to zero
-                        row ,col = rows[pchr], cols[0]
-                        for i in 1:length(op.sects)
-                            c1, c2 = op.sects[i]
-                            idx = index_sector(W, (pchr, c1, 0, c2))
-                            size(op.nzblks[i]) == (1, 1) || error()
-                            W.nzblks[idx][row, 1, 1, 1] = op.nzblks[i][1,1]
+                        row ,col = rows[pchr], cols[U1(0)]
+                        for (s,blk) in op.blocks
+                            c1, c2 = s.charges
+                            sect = Sector{U1}(pchr, c1, 0, c2)
+                            size(blk) == (1, 1) || error()
+                            W.blocks[sect][row, 1, 1, 1] = blk[1,1]
                         end
                         rows[pchr] += 1
                     else
                         #pchr goes to pchr+op.charge
                         row ,col = rows[pchr], cols[pchr+op.charge]
-                        for i in 1:length(op.sects)
-                            c1, c2 = op.sects[i]
-                            idx = index_sector(W, (pchr, c1, pchr+op.charge, c2))
-                            size(op.nzblks[i]) == (1, 1) || error()
-                            W.nzblks[idx][row, 1, col, 1] = op.nzblks[i][1,1]
+                        for (s,blk) in op.blocks
+                            c1, c2 = s.charges
+                            sect = Sector{U1}(pchr, c1, pchr+op.charge, c2)
+                            size(blk) == (1, 1) || error()
+                            W.blocks[sect][row, 1, col, 1] = blk[1,1]
                         end
                         rows[pchr] += 1
                         cols[pchr+op.charge] += 1
@@ -322,11 +318,11 @@ function _generatempo_sym(model::UnitCellQModel;
                 else
                     # pchr goes to pchr
                     row, col = rows[pchr], cols[pchr]
-                    for i in 1:length(symI.sects)
-                        c1, c2 = symI.sects[i]
-                        idx = index_sector(W, (pchr, c1, pchr, c2))
-                        size(symI.nzblks[i]) == (1, 1) || error()
-                        W.nzblks[idx][row, 1, col, 1] = symI.nzblks[i][1,1]
+                    for (s,blk) in symI.blocks
+                        c1, c2 = s.charges
+                        sect = Sector{U1}(pchr, c1, pchr, c2)
+                        size(blk) == (1, 1) || error()
+                        W.blocks[sect][row, 1, col, 1] = blk[1,1]
                     end
                     rows[pchr] += 1
                     cols[pchr] += 1
@@ -337,22 +333,23 @@ function _generatempo_sym(model::UnitCellQModel;
 
         for sterm in sterms
             op = sterm.ops[1]
-            row, col = rows[0], cols[op.charge]
-            for i in 1:length(op.sects)
-                c1, c2 = op.sects[i]
-                idx = index_sector(W, (0, c1, op.charge, c2))
-                size(op.nzblks[i]) == (1, 1) || error()
-                W.nzblks[idx][getdim(lleg, 0), 1, col, 1] = op.nzblks[i][1,1]
+            row = rows[U1(0)]
+            col = cols[op.charge]
+            for (s,blk) in op.blocks
+                c1, c2 = s.charges
+                sect = Sector{U1}(0, c1, op.charge, c2)
+                size(blk) == (1, 1) || error()
+                W.blocks[sect][dim(Vw, U1(0)), 1, col, 1] = blk[1,1]
             end
             cols[op.charge] += 1
             push!(nextterms[op.charge], removehead(sterm))
         end
 
-tensors[n] =  W
+push!(mpo, W)
 pchrs = nextterms
-lleg = STLeg(+1, rleg.chrs, rleg.dims)
+Vw = dual(Vr)
 end
-MPOperator(n_sites, d, dims, tensors)
+mpo
 end
 
 function _generatempo_infinite(model::UnitCellQModel;
@@ -541,22 +538,22 @@ end
 
 #         index0000 = index_sector(W, (0,0,0,0))
 #         index0101 = index_sector(W, (0,1,0,1))
-#         l00, r00 = size(W.nzblks[index0000])[[1,3]]
+#         l00, r00 = size(W.blocks[index0000])[[1,3]]
 #         # better logic is needed for this!
 #         if n > 1
-#             W.nzblks[index0000][1,1,1,1] = one(T)
-#             W.nzblks[index0101][1,1,1,1] = one(T)
+#             W.blocks[index0000][1,1,1,1] = one(T)
+#             W.blocks[index0101][1,1,1,1] = one(T)
 #         end
 #         if n < n_sites
-#             W.nzblks[index0000][l00,1,r00,1] = one(T)
-#             W.nzblks[index0101][l00,1,r00,1] = one(T)
+#             W.blocks[index0000][l00,1,r00,1] = one(T)
+#             W.blocks[index0101][l00,1,r00,1] = one(T)
 #         end
 
 #         for lterm in lterms
 #             op = lterm.ops[1]
 #             op.charge == 0 || error()
-#             W.nzblks[index0000][l00, 1, 1, 1] += get_sector(op, (0,0))
-#             W.nzblks[index0101][l00, 1, 1, 1] += get_sector(op, (1,1))
+#             W.blocks[index0000][l00, 1, 1, 1] += get_sector(op, (0,0))
+#             W.blocks[index0101][l00, 1, 1, 1] += get_sector(op, (1,1))
 #         end
 
 #         rows = Dict(c=>1 for c in lleg.chrs)
@@ -574,8 +571,8 @@ end
 #                         for i in 1:length(op.sects)
 #                             c1, c2 = op.sects[i]
 #                             idx = index_sector(W, (pchr, c1, 0, c2))
-#                             size(op.nzblks[i]) == (1, 1) || error()
-#                             W.nzblks[idx][row, 1, 1, 1] = op.nzblks[i][1,1]
+#                             size(op.blocks[i]) == (1, 1) || error()
+#                             W.blocks[idx][row, 1, 1, 1] = op.blocks[i][1,1]
 #                         end
 #                         rows[pchr] += 1
 #                     else
@@ -584,8 +581,8 @@ end
 #                         for i in 1:length(op.sects)
 #                             c1, c2 = op.sects[i]
 #                             idx = index_sector(W, (pchr, c1, pchr+op.charge, c2))
-#                             size(op.nzblks[i]) == (1, 1) || error()
-#                             W.nzblks[idx][row, 1, col, 1] = op.nzblks[i][1,1]
+#                             size(op.blocks[i]) == (1, 1) || error()
+#                             W.blocks[idx][row, 1, col, 1] = op.blocks[i][1,1]
 #                         end
 #                         rows[pchr] += 1
 #                         cols[pchr+op.charge] += 1
@@ -597,8 +594,8 @@ end
 #                     for i in 1:length(symI.sects)
 #                         c1, c2 = symI.sects[i]
 #                         idx = index_sector(W, (pchr, c1, pchr, c2))
-#                         size(symI.nzblks[i]) == (1, 1) || error()
-#                         W.nzblks[idx][row, 1, col, 1] = symI.nzblks[i][1,1]
+#                         size(symI.blocks[i]) == (1, 1) || error()
+#                         W.blocks[idx][row, 1, col, 1] = symI.blocks[i][1,1]
 #                     end
 #                     rows[pchr] += 1
 #                     cols[pchr] += 1
@@ -613,8 +610,8 @@ end
 #             for i in 1:length(op.sects)
 #                 c1, c2 = op.sects[i]
 #                 idx = index_sector(W, (0, c1, op.charge, c2))
-#                 size(op.nzblks[i]) == (1, 1) || error()
-#                 W.nzblks[idx][getdim(lleg, 0), 1, col, 1] = op.nzblks[i][1,1]
+#                 size(op.blocks[i]) == (1, 1) || error()
+#                 W.blocks[idx][getdim(lleg, 0), 1, col, 1] = op.blocks[i][1,1]
 #             end
 #             cols[op.charge] += 1
 #             push!(nextterms[op.charge], removehead(sterm))

@@ -5,7 +5,9 @@ abstract type AbstractCharge end
 struct Trivial <: AbstractCharge end
 abstract type AbstractNonTrivialCharge end
 
-
+struct Z2Charge <: AbstractCharge
+    charge :: Bool
+end
 "U1Charge for U(1) abelian group"
 struct U1Charge <: AbstractCharge
     charge :: Int
@@ -29,6 +31,7 @@ const U1 = U1Charge
 @inline Base.length(::U1Charge) = 1
 @inline Base.iterate(c::U1Charge) = (c, nothing)
 convert(::Type{U1Charge}, s::Int) = U1Charge(s)
+convert(::Type{Int}, c::U1Charge) = c.charge
 
 function Base.show(io::IO, c::AbstractCharge)
     print(io, c.charge)

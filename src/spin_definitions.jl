@@ -84,22 +84,24 @@ end
 # only for spin-half right now
 function nbodyopexpansion(n::Int,
                           H::AbstractMatrix;
-                          symmetry::Symbol=:NONE,
+                          mode::Symbol=:SYMBOL,
                           verbose::Bool=false)
     1 < n < 7 || error("too large!")
     size(H) == (2^n, 2^n) || error("operator size doesn't match n")
 
     ops = [spinoperators(1/2)..., I(2)]
     ols = ['Z', 'P', 'M', 'I']
-
+    symbols = [:Z, :P, :M, :I]
     T = eltype(H)
-    symops = [spinoperators(1/2, symmetry=:U1)..., eye(T, U1Space(0=>1, 1=>1))]
+    symops = [spinoperators(1/2, symmetry=U1)..., eye(T, U1Space(0=>1, 1=>1))]
 
     amps = Vector{T}()
-    if symmetry == :NONE
-        terms = Vector{NTuple{n, Matrix{T}}}()
-    elseif symmetry == :U1
-        terms = Vector{NTuple{n, SymMatrix{U1,T}}}()
+    if mode == :SYMBOL
+        terms = Vector{QAmpTerm{Symbol, n, T}}()
+    elseif mode == :Trival
+        terms = Vector{QAmpTerm{matrix{T}, n, T}}()
+    elseif mode == :U1
+        terms = Vector{QAmpTerm{SymTensor{U1,T,2}, n, T}}()
     end
     ⊗ = kron
     for is in Iterators.product([1:4 for i=1:n]...)
@@ -110,17 +112,16 @@ function nbodyopexpansion(n::Int,
             verbose && println([ols[i] for i in is]..., "  $amp")
             is == Tuple([4 for i=1:n]) &&
                 @warn "Operator has identity with amplitude $amp"
-            if symmetry == :NONE
+            if mode == :SYMBOL
+                term = [symbols[i] for i in is]
+            elseif mode == :Trivial
                 term = [Matrix{T}(ops[i]) for i in is]
-                term[n] = term[n] * amp
-                push!(terms, Tuple(term))
-            elseif symmetry == :U1
+            elseif mode == :U1
                 term = [symops[i] for i in is]
-                term[n] = term[n] * amp
-                push!(terms, Tuple(term))
             else
-                error("symmetry not yet implemented: $symmetry")
+                error("unrecognized mode : $mode")
             end
+            push!(terms, QAmpTerm(amp, Tuple(term)))
         end
     end
     terms

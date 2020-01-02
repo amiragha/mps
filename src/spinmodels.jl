@@ -11,33 +11,27 @@ sz, sp, sm = spinoperators(1/2)
 # example models
 function j1j2model(lx::Int, j1::Float64, j2::Float64;
                    boundary::Symbol=:OBC,
-                   symmetry::Symbol=:NONE)
+                   symmetry::Type{<:AbstractCharge}=Trivial)
 
     heis = nbodyopexpansion(2,
                             0.25 * (ringexchangeoperator(2) - I(4)),
-                            symmetry=symmetry)
+                            mode=:SYMBOL)
 
-    if symmetry == :NONE
-        qitype = QModelInteraction
-    elseif symmetry == :U1
-        qitype = SymQModelInteraction
-    else
-        error()
-    end
-    heis1 = qitype{1, 2, Float64}(
+    heis1 = QModelInteraction{1, 2, Float64}(
         j1,
         (1, 1),
         ((0,), (1,)), heis)
-    heis2 = qitype{1, 2, Float64}(
+    heis2 = QModelInteraction{1, 2, Float64}(
         j2,
         (1, 1),
         ((0,), (2,)), heis)
-    terms = qitype[]
+    terms = QModelInteraction[]
     j1 != 0 && push!(terms, heis1)
     j2 != 0 && push!(terms, heis2)
 
     UnitCellQModel(spinhalf,
                    QLattice(chainunitcell, lx, boundary),
+                   symmetry,
                    terms)
 end
 
@@ -51,59 +45,51 @@ function triangularspinmodel(ls::Tuple{Int, Int},
                              k2::Float64,
                              k3::Float64;
                              boundary::Tuple{Symbol,Symbol}=(:PBC, :OBC),
-                             symmetry::Symbol=:NONE)
+                             symmetry::Type{<:AbstractCharge}=Trivial)
 
     heis = nbodyopexpansion(2,
                             0.25 * (ringexchangeoperator(2) - I(4)),
-                            symmetry=symmetry)
+                            mode=:SYMBOL)
     ly, lx = ls
 
-    if symmetry == :NONE
-        qitype = QModelInteraction
-    elseif symmetry == :U1
-        qitype = SymQModelInteraction
-    else
-        error()
-    end
-
-    heis1 = qitype{2, 2, Float64}(
+    heis1 = QModelInteraction{2, 2, Float64}(
         j1,
         (1, 1),
         ((0, 0), (0, 1)), heis)
 
-    heis2 = qitype{2, 2, Float64}(
+    heis2 = QModelInteraction{2, 2, Float64}(
         j2,
         (1, 1),
         ((0, 0), (1, 0)), heis)
 
-    heis3 = qitype{2, 2, Float64}(
+    heis3 = QModelInteraction{2, 2, Float64}(
         j3,
         (1, 1),
         ((0, 0), (1, -1)), heis)
 
     R4 = nbodyopexpansion(4,
                           ringexchangeoperator(4) - 0.25 * I(16),
-                          symmetry=symmetry)
+                          mode=:SYMBOL)
 
-    ring1 = qitype{2, 4, Float64}(
+    ring1 = QModelInteraction{2, 4, Float64}(
         k1,
         (1, 1, 1, 1),
         ((0, 0), (0, 1), (1, 1), (1, 0)),
         R4)
 
-    ring2 = qitype{2, 4, Float64}(
+    ring2 = QModelInteraction{2, 4, Float64}(
         k2,
         (1, 1, 1, 1),
         ((0, 0), (0, 1), (1, 0), (1, -1)),
         R4)
 
-    ring3 = qitype{2, 4, Float64}(
+    ring3 = QModelInteraction{2, 4, Float64}(
         k3,
         (1, 1, 1, 1),
         ((0, 0), (1, 0), (0, 1), (-1, 1)),
         R4)
 
-    terms = qitype[]
+    terms = QModelInteraction[]
     j1 != 0 && push!(terms, heis1)
     j2 != 0 && push!(terms, heis2)
     j3 != 0 && push!(terms, heis3)
@@ -113,5 +99,6 @@ function triangularspinmodel(ls::Tuple{Int, Int},
 
     UnitCellQModel(spinhalf,
                    QLattice(triangularunitcell, (ly, lx), boundary),
+                   symmetry,
                    terms)
 end
