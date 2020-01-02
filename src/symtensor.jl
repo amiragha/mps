@@ -16,7 +16,7 @@ mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
 
     function SymTensor(charge :: S,
                        space  :: NTuple{N, VectorSpace{S}},
-                       blocks   :: SortedDict{Sector{S, N}, Array{T, N}}) where{S,T,N}
+                       blocks :: SortedDict{Sector{S, N}, Array{T, N}}) where{S,T,N}
         sects, sizes = _allsectorsandsizes(charge, space)
         i = 1
         for (s,d) in blocks
@@ -26,7 +26,7 @@ mutable struct SymTensor{S, T, N} <: AbstractSymTensor{S, T, N}
         end
         new{S,T,N}(charge, space, blocks)
     end
-    SymTensor{S,T,N}(c,s,d) where{S,T,N} = SymTensor(c,s,d)
+    SymTensor{S,T,N}(c,s,d::SortedDict{Sector{S, N}, Array{T, N}}) where{S,T,N} = new{S,T,N}(c,s,d)
 end
 
 # function SymTensor{S,T1,N}(A::SymTensor{S,T2,N}) where {S,T1, T2, N}
@@ -34,7 +34,9 @@ end
 # end
 
 const SymMatrix{S, T} = SymTensor{S, T, 2}
-SymMatrix(c::S, s::NTuple{2,T}, d) where{S, T} = SymMatrix{S,T}(c,s,d)
+SymMatrix(c::S,
+          s::NTuple{2, VectorSpace{S}},
+          d::SortedDict{Sector{S, 2}, Array{T, 2}}) where{S, T} = SymMatrix{S,T}(c,s,d)
 
 const SymVector{S, T} = SymTensor{S, T, 1}
 

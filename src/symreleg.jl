@@ -45,13 +45,6 @@ function permutelegs(A::AbstractSymTensor,
     typeof(A) <: SymDiagonal &&
         return typeof(A)(A.charge, A.space[perm], A.blocks)
 
-    # blocks = SortedDict([Sector(s[perm]) => permutedims(blk, perm)
-    #                      for (s,blk) in A.blocks])
-    # if !issorted(keys(blocks))
-    #     println(A.charge)
-    #     println(A.space)
-    #     println(perm)
-    # end
     typeof(A)(A.charge, A.space[perm],
               SortedDict([Sector(s[perm]) => permutedims(blk, perm)
                          for (s,blk) in A.blocks]))
@@ -148,7 +141,8 @@ function fuselegs(A::AbstractSymTensor,
         sector = sects[index]
         blocks[sector] = blk
     end
-    SymTensor(A.charge, space, blocks)
+    #SymTensor(A.charge, space, blocks)
+    SymTensor{S,T,N-n+1}(A.charge, space, blocks)
 end
 function fuselegs(A::AbstractArray,
                   l::Int,
@@ -215,7 +209,8 @@ function splitleg(A     :: AbstractSymTensor,
     #TODO: now check to see if the new legs can fuse into the original leg
     new_space = (A.space[1:l-1]...,space...,A.space[l+1:end]...)
 
-    SymTensor(A.charge, new_space, blocks)
+    #SymTensor(A.charge, new_space, blocks)
+    SymTensor{S,T,N+M-1}(A.charge, new_space, blocks)
 end
 
 function splitleg(A     :: AbstractArray,

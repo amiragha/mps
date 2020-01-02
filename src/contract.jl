@@ -156,7 +156,8 @@ function SymMatrix(A::AbstractSymTensor,
         sector = sects[index]
         blocks[sector] = blk
     end
-    SymMatrix(A.charge, space, blocks)
+    #SymMatrix(A.charge, space, blocks)
+    SymMatrix{S,T}(A.charge, space, blocks)
 end
 
 # function SymMatrix(A::AbstractSymTensor,
@@ -212,7 +213,8 @@ function SymTensor(A     :: SymMatrix,
 
     #TODO: now check to see if the new legs can fuse into the original leg
     space = (rlegs...,clegs...)
-    SymTensor(A.charge, space, blocks)
+    #SymTensor(A.charge, space, blocks)
+    SymTensor{S,T,N+M}(A.charge, space, blocks)
 end
 
 function *(A::SymVector, B::SymVector)
@@ -286,7 +288,8 @@ function *(A::AbstractSymMatrix,
             blocks[sects[i]] = zeros(T, sizes[i])
         end
     end
-    SymMatrix(charge, space, blocks)
+    #SymMatrix(charge, space, blocks)
+    SymMatrix{S,T}(charge, space, blocks)
 end
 
 ###TODO: This is the above function with a version of fuselegs (that fuses both of them at once!)
