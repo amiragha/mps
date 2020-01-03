@@ -130,13 +130,19 @@ function svdtrunc(A::AbstractSymTensor;
 
     semits = collect(onlysemitokens(A.blocks))
     i=1
+    fact = svd(zeros(T, 1,1), full=false)
     for (sect, blk) in A.blocks
         c1, c2 = sect
         sects_u[i] = Sector{S}(c1, c1)
         sects_s[i] = Sector{S}(c1, c2)
         sects_v[i] = Sector{S}(c2, c2)
 
-        fact = svd(blk, full=false)
+        try
+            fact = svd(blk, full=false)
+        catch e
+            @warn "error $e"
+            fact = svd(blk, full=false, alg=LinearAlgebra.QRIteration())
+        end
         blks_u[i] = fact.U
         blks_s[i] = fact.S
         blks_v[i] = fact.Vt

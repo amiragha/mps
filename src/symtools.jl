@@ -8,9 +8,15 @@ function _svd_(A::AbstractSymMatrix)
 
     midl = SortedDict{S, Int}()
     midr = SortedDict{S, Int}()
+    fact = svd(zeros(T,1,1), full=false)
     for (sect,blk) in A.blocks
         c1, c2 = sect
-        fact = svd(blk, full=false)
+        try
+            fact = svd(blk, full=false)
+        catch e
+            @warn "error $e"
+            fact = svd(blk, full=false, alg=LinearAlgebra.QRIteration())
+        end
         u_blocks[Sector(c1, c1)] = fact.U
         s_blocks[Sector(c1, c2)] = Diagonal(fact.S)
         v_blocks[Sector(c2, c2)] = fact.Vt
