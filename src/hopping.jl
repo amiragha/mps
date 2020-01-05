@@ -62,7 +62,7 @@ function generatebdg(model::UnitCellQModel)
         error("BdG Hamiltonian only for FermionType models!")
 
     ft, f = fermionoperators(model.qtype)
-    n_sites = prod(model.lattice.sizes)
+    n_sites = prod(model.lattice.sizes) * model.lattice.unitc.n
     H = zeros(eltype(model.inters[1]), n_sites, n_sites)
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
         for interaction in model.inters
@@ -87,10 +87,12 @@ function generatebdg(model::UnitCellQModel)
             # only two-fermionic terms
             if isinside && length(indexes) < 3
                 sign = +1
-                if model.lattice.bcs[2] == :APBC
-                    #println("$indexes, $crosses, $(interaction.amp)")
-                    if isodd(crosses[2][2] - crosses[1][2])
-                        sign = -1
+                for n = 1:dimension(model)
+                    if model.lattice.bcs[n] == :APBC
+                        #println("$indexes, $crosses, $(interaction.amp)")
+                        if isodd(crosses[2][n] - crosses[1][n])
+                            sign *= -1
+                        end
                     end
                 end
                 for term in interaction.terms

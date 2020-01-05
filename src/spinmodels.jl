@@ -2,6 +2,8 @@
 chainunitcell = UnitCell{1}(1, [0.], +1.)
 squareunitcell = UnitCell{2}(1, [(0, 0)], [(0, 1), (1, 0)])
 triangularunitcell = UnitCell{2}(1, [(0, 0)], [(1, 0), (0.5, sin(pi/3))])
+kagomestripunitcell = UnitCell{1}(3, [0., 0., 0.], +1.)
+
 
 # example types
 spinhalf = SpinType(2)

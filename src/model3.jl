@@ -187,6 +187,7 @@ struct UnitCellQModel{Q<:AbstractQType, D, J<:AbstractQModelInteraction} <: Abst
 end
 
 @inline dimension(::AbstractQModel{Q, D}) where {Q, D} = D
+@inline numofsites(m::UnitCellQModel) = prod(m.lattice.sizes)*m.lattice.unitc.n
 
 function changeboundary(model::UnitCellQModel, d::Int, boundary::Symbol)
     UnitCellQModel(model.qtype,

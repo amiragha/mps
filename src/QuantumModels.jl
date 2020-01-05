@@ -23,6 +23,7 @@ export FermionQModelInteraction
 export UnitCellQModel
 export QTerm
 
+export numofsites
 export dimension
 export changeboundary
 export changesize
@@ -43,6 +44,7 @@ export permutespins
 
 export chainunitcell
 export triangularunitcell
+export kagomestripunitcell
 
 # spin model examples
 export j1j2model
@@ -51,6 +53,7 @@ export triangularspinmodel
 # fermion model examples
 export t1t1model
 export triangularhopping
+export kagomestriphopping
 
 export tikzlattice
 end
