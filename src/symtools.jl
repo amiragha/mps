@@ -78,11 +78,16 @@ end
 # end
 
 function isrightisometry(A::SymMatrix)
-    eye(eltype(A), A.space[1]) ≈ SymMatrix(contract(A, (1, -1), dual(A), (2, -1)))
+    if eye(eltype(A), A.space[1]) ≈ contract(A, (1, -1), dual(A), (2, -1))
+        return true
+    else
+        println(contract(A, (1, -1), dual(A), (2, -1)))
+    end
+    false
 end
 
 function isleftisometry(A::SymMatrix)
-    eye(eltype(A), A.space[2]) ≈ SymMatrix(contract(dual(A), (-1, 1), A, (-1, 2)))
+    eye(eltype(A), dual(A.space[2])) ≈ contract(dual(A), (-1, 1), A, (-1, 2))
 end
 
 isunitary(A::SymMatrix) = isrightisometry(A) && isleftisometry(A)

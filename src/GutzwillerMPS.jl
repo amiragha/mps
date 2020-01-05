@@ -7,6 +7,9 @@ using TensorOperations
 
 include("gutzwiller.jl")
 
-export gutzwillerexact, zipandgutzwiller!
+export gutzwillerexact
+export zipandgutzwiller!
+export _tensorproductzip!
+export _applygutzwillerzip!
 
 end

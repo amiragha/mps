@@ -133,6 +133,7 @@ end
 
 function _zipandgutzwiller_F23!(mps1::MPState{Y},
                                 mps2::MPState{Y};
+                                truncation::Bool=true,
                                 maxdim::Int64=200) where {Y}
     #@assert mps1.d == mps2.d == 2
     lx = length(mps1)
@@ -155,6 +156,7 @@ function _zipandgutzwiller_F23!(mps1::MPState{Y},
     Vdummy = VectorSpace{S}(0=>1)
     E = fill(one(T), (Vdummy, dual(Vdummy), Vdummy))
 
+    u,s,v = _svd_(eye(T, Vdummy))
     for l=1:lx-1
         A = mps1.As[l]
         B = dual(mps2.As[l], conjugate=false)
@@ -174,7 +176,11 @@ function _zipandgutzwiller_F23!(mps1::MPState{Y},
                               (1, -1, 4, 5), G, (-1, 2, 3)),
                      (1,2, -2, -1, 4), B, (-1,-2, 3))
 
-        u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
+        if truncation
+            u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
+        else
+            u,s,v = _svd_(SymMatrix(C, [1,2], [3,4]))
+        end
         normalize!(s)
 
         fnl = x->div(x+l-1, 2)
@@ -193,7 +199,11 @@ function _zipandgutzwiller_F23!(mps1::MPState{Y},
                           (1, -1, 4, 5), G, (-1, 2, 3)),
                  (1,2, -2, -1, 4), B, (-1,-2, 3))
 
-    u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
+    if truncation
+        u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
+    else
+        u,s,v = _svd_(SymMatrix(C, [1,2], [3,4]))
+    end
     normalize!(s)
 
     C = splitleg(u*s*v, 1, (E.space[1], G.space[2]))
@@ -206,6 +216,12 @@ function _zipandgutzwiller_F23!(mps1::MPState{Y},
     # is this correct (need explanation and stuff)
     mps.center = lx
     mps
+end
+
+function gutzwillerexact(mps1::MPState{Y},
+                         mps2::MPState{Y};
+                         mode::Symbol=:F23) where {Y}
+    _zipandgutzwiller_F23(mps1, mps2, truncation=false)
 end
 
 function _tensorproductzip!(mps1::MPState{Y},
@@ -267,135 +283,31 @@ function _tensorproductzip!(mps1::MPState{Y},
     mps
 end
 
-function _applygutzwiller!(mps::MPState{Y}) where{Y}
+function _applygutzwillerzip!(mps::MPState{Y}) where{Y}
     T = eltype(mps)
-    G = fill(one(T), 0,
-             (STLeg(+1, [-1,1], [1,1]),
-              STLeg(-1, [-1,0,1], [1,2,1])))
+    G = Tensor(ones, zero(U1),
+               (U1Space([-1=>1, 1=>1]),
+                dual(U1Space([-1=>1, 0=>2, 1=>1]))
+                ))
 
-    C = contract(G, (2, -1), matrices[lx], (1, -1, 3))
-    U, S, Vt = svdtrunc(fuselegs(C, -1, 2, 2))
-    dims[lx] = size(S, 1)
-    fnl = x->div(x+lx-1, 2)
-    fnd = x->div(x+1, 2)
-    fnr = x->div(x+lx, 2)
-    matrices[lx] = mapcharges((fnl,fnd,fnr),
-                              unfuseleg(Vt, 2, (G.legs[1], C.legs[3])))
-    E = U*S
-    for l=lx-1:-1:2
-        C = contract(contract(G, (2, -1), matrices[l], (1, -1, 3)),
-                     (1,2,-1), E, (-1, 3))
-        U, S, Vt = svdtrunc(fuselegs(C, -1, 2, 2))
-        dims[l] = size(S, 1)
-        fnl = x->div(x+l-1, 2)
-        fnd = x->div(x+1, 2)
-        fnr = x->div(x+l, 2)
-        matrices[l] = mapcharges((fnl,fnd,fnr),
-                                 unfuseleg(Vt, 2, (G.legs[1], C.legs[3])))
-        E = U*S
-    end
-    C = contract(contract(G, (2, -1), matrices[1], (1, -1, 3)),
-                 (1,2,-1), E, (-1, 3))
-    fnl = x->div(x+1-1, 2)
-    fnd = x->div(x+1, 2)
-    fnr = x->div(x+1, 2)
-    matrices[1] =  mapcharges((fnl,fnd,fnr), C)
+    mpsgutz = MPState{Y}()
 
-    return MPState{Y}(lx, 2, dims, matrices, 1)
-end
-
-"""
-    gutzwillerexact(mps1, mps2, mode)
-
-given two MPS, with the same number of sites and 2 physical
-dimensions perform the exact gutzwiller projection of the two. The
-final result is an MPS with 2 physical dimension where the final
-matrices are the tensor product of the given ones according to the
-`mode`.
-
-This function is just for testing. It is very inefficient because it
-generates the tensor product matrices first and then applies svd on
-them, the function to use is `zipandgutzwiller`
-
-"""
-function gutzwillerexact(mps1::MPState{Y},
-                         mps2::MPState{Y};
-                         mode::Symbol=:F23,
-                         maxdim::Int64=200) where {Y}
-    lx = mps1.length
-    mps2.length == lx ||
-        error("Two MPS should have the same number of sites!")
-
-    @assert mps1.d == mps2.d == 2
-    center = mps1.center
-
-    @assert mps2.center == center
-
-    center_at!(mps1, 1)
-    center_at!(mps2, 1)
-
-    dims = ones(Int64, lx+1)
-    matrices = SymTensor{Tv, 3}[]
-
-    ## NOTE: in order to make the gutzwiller projector respect the U1
-    ## symmetry we need to do the follwoing. Assume the first mps
-    ## corresponds to ↑ or 1 and second mps to ↓ or -1.
-    G = fill(one(Tv), 0,
-             (STLeg(+1, [-1,1], [1,1]),
-              STLeg(-1, [0,1], [1,1]),
-              STLeg(+1, [0,1], [1,1])))
-
-    E = fill(one(Tv), 0, (STLeg(+1, [0], [1]),
-                          STLeg(-1, [0], [1]),
-                          STLeg(+1, [0], [1])))
+    center_at!(mps, 1)
+    C = contract(G, (2, -1), mps.As[1], (1, -1, 3))
     for l=1:lx-1
-        A = mps1.matrices[l]
-        B = invlegs(mps2.matrices[l])
+        u,s,v = svdtrunc(fuselegs(C, 1, 2))
 
-        fswap = fermionswapgate(A.legs[2], B.legs[1])
-        ##NOTE:
-        # contracting (E2, A1)
-        # First tensor has EA = E1 E3 A2 A3
-        # contracting with swap
-        # second tensor has EAX = E1 A2 E3 A3
-        # contracting (A2, G2)
-        # Third tensor has EAG = E1 G1 G3 E3 A3
-        # contracting (E3, B1) and (G3, B2)
-        # Final tensor has E1 G1 A3 B3
-        C = contract(contract(contract(A, (1, -1, 5), fswap, (2, 3, 4, -1)),
-                              (1, 2, -1, 5, 6), G, (3, -1, 4)),
-                     (1,2, 3,-2, -1,5), B, (-1,-2, 4))
-
-        fuselegs(fuselegs(C, 1, 2), 3, 2)
-        u,s,v = svdtrunc(fuselegs(fuselegs(C, 1, 2), 2, 2), maxdim=maxdim)
-        normalize!(s)
-
-        fnl = x->div(x+l-1, 2)
+        fnl = x->div(x+lx-1, 2)
         fnd = x->div(x+1, 2)
-        fnr = x->div(x+l, 2)
-        push!(matrices,
-              mapcharges((fnl,fnd,fnr),
-                         unfuseleg(u, 1, (E.legs[1], G.legs[1]))))
-        E = unfuseleg(s*v, 2, (A.legs[3], B.legs[3]))
+        fnr = x->div(x+lx, 2)
+        push!(mpsgutz, mapcharges((fnl,fnd,fnr),
+                                  splitleg(u, 1, (C.legs[1], G.legs[1]))))
+        E = s*v
+        C = contract(E, (1, -1),
+                     contract(G, (2, -1), mps.As[l+1], (1, -1, 3)),
+                     (-1,2,3))
     end
-    A = mps1.As[lx]
-    B = invlegs(mps2.As[lx])
-    fswap = fermionswapgate(A.legs[2], B.legs[1])
-    C = contract(contract(contract(contract(E, (1,-1, 2), A, (-1, 3, 4)),
-                                   (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
-                          (1, -1, 4, 5), G, (2, -1, 3)),
-                 (1,2, -2, -1,3), B, (-1,-2, 4))
+    push!(mpsgutz, C)
 
-    u,s,v = svdtrunc(fuselegs(fuselegs(C, 1, 2), 2, 2), maxdim=maxdim)
-    normalize!(S)
-    C = unfuseleg(u*s*v, 1, (E.legs[1], G.legs[1]))
-
-
-    fnl = x->div(x+lx-1, 2)
-    fnd = x->div(x+1, 2)
-    fnr = x->div(x+lx, 2)
-    push!(matrices, mapcharges((fnl,fnd,fnr), C))
-
-    return MPState{Y}(lx, 2, dims, matrices, lx)
-
+    mpsgutz
 end
