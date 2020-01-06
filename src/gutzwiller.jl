@@ -226,6 +226,7 @@ end
 
 function _tensorproductzip!(mps1::MPState{Y},
                             mps2::MPState{Y};
+                            truncation::Bool=true,
                             maxdim::Int64=200,
                             verbose::Bool=true) where {Y}
 
@@ -247,6 +248,7 @@ function _tensorproductzip!(mps1::MPState{Y},
     Vdummy = VectorSpace{S}(0=>1)
     E = fill(one(T), (Vdummy, dual(Vdummy), Vdummy))
 
+    u,s,v = _svd_(eye(T, Vdummy))
     for l=1:lx-1
         A = mps1.As[l]
         B = dual(mps2.As[l], conjugate=false)
@@ -263,7 +265,11 @@ function _tensorproductzip!(mps1::MPState{Y},
                               (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
                      (1, 2, -1, 5), B, (-1, 3, 4))
 
-        u,s,v = svdtrunc(SymMatrix(C, [1,2,3], [4,5]), maxdim=maxdim)
+        if truncation
+            u,s,v = svdtrunc(SymMatrix(C, [1,2,3], [4,5]), maxdim=maxdim)
+        else
+            u,s,v = _svd_(SymMatrix(C, [1,2,3], [4,5]))
+        end
         normalize!(s)
 
         push!(mps, fuselegs(
@@ -301,7 +307,7 @@ function _applygutzwillerzip!(mps::MPState{Y}) where{Y}
         fnd = x->div(x+1, 2)
         fnr = x->div(x+lx, 2)
         push!(mpsgutz, mapcharges((fnl,fnd,fnr),
-                                  splitleg(u, 1, (C.legs[1], G.legs[1]))))
+                                  splitleg(u, 1, (C.space[1], G.space[1]))))
         E = s*v
         C = contract(E, (1, -1),
                      contract(G, (2, -1), mps.As[l+1], (1, -1, 3)),
@@ -310,4 +316,138 @@ function _applygutzwillerzip!(mps::MPState{Y}) where{Y}
     push!(mpsgutz, C)
 
     mpsgutz
+end
+
+function _zipandgutzwiller_F23_analysis!(mps1::MPState{Y},
+                                         mps2::MPState{Y};
+                                         maxdim::Int64=200) where {Y}
+
+    lx = length(mps1)
+    @assert length(mps2) == lx
+
+    center_at!(mps1, 1)
+    center_at!(mps2, 1)
+
+    mps = MPState{Y}()
+    ## NOTE: in order to make the gutzwiller projector respect the U1
+    ## symmetry we need to do the follwoing. Assume the first mps
+    ## corresponds to ↑ or 1 and second mps to ↓ or -1.
+    T = eltype(Y)
+    S = vtype(Y)
+
+    Vd = VectorSpace{S}(0=>1, 1=>1)
+    G = fill(one(T), (dual(Vd), mapcharges(x->2*x-1, Vd), Vd))
+
+    Vdummy = VectorSpace{S}(0=>1)
+
+    ### Making the F tensors
+    Vend1 = rightspace(mps1)
+    Vend2 = rightspace(mps2)
+    Fs = Vector{SymTensor{S,T,3}}(undef, lx)
+    F = fill(one(T), (Vend1, dual(Vend2), fuse(true, dual(Vend1), Vend2)))
+    for l=lx:-1:2
+        A = mps1.As[l]
+        B = dual(mps2.As[l], conjugate=false)
+        fswap = fermionswapgate(A.space[2], B.space[1])
+        C = contract(contract(contract(contract(A, (1, 2, -1), F, (-1, 3, 4)),
+                                       (1, 2, -1, 5), B, (3, 4, -1)),
+                              (1, -2, -1, 4, 5), fswap, (2, 3, -1, -2)),
+                     (1, 2, -1, -2, 4), G, (-1, 3, -2))
+        u,s,v = _svd_(SymMatrix(C, [1,2], [3,4]))
+        #println(s)
+        normalize!(s)
+        F = splitleg(u*s, 1, (C.space[1], C.space[2]))
+        Fs[l] = F
+    end
+
+    E = fill(one(T), (Vdummy, Vdummy, dual(Vdummy)))
+    for l=1:lx-1
+        A = mps1.As[l]
+        B = dual(mps2.As[l], conjugate=false)
+
+        fswap = fermionswapgate(A.space[2], B.space[1])
+        ##NOTE:
+        # contracting (E3, A1)
+        # First tensor has EA = E1 E2 A2 A3
+        # contracting with swap
+        # second tensor has EAX = E1 XA2 E3 A3
+        # contracting (A2, G2)
+        # Third tensor has EAG = E1 G1 G3 E3 A3
+        # contracting (E3, B1) and (G3, B2)
+        # Final tensor has E1 G1 A3 B3
+        C = contract(contract(contract(contract(E, (1, 2, -1), A, (-1, 3, 4)),
+                                       (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                              (1, -1, 4, 5), G, (-1, 2, 3)),
+                     (1,2, -2, -1, 4), B, (-1,-2, 3))
+
+        Cmat = SymMatrix(C, [1,2], [3,4])
+        norm_cmat = norm(Cmat)
+        u,s,v = svdtrunc(Cmat, maxdim=maxdim)
+        println(s)
+        normalize!(s)
+        u,s,v = _svd_(Cmat)
+        println(s)
+        #amp2 = dot(u*s*v, Cmat)#contract(u*s*v, (-1,-2),
+        #dual(Cmat, conjugate=false), (-1, -2))
+
+        # if l==2
+        #     println(u)
+        #     println(s)
+        #     println(v)
+        #     println("...Cmat...")
+        #     println(Cmat)
+        #     println(u*s*v)
+        # end
+        # println(amp2/(norm_cmat*norm(u*s*v)))
+        #println(u*s*v ≈ SymMatrix(C, [1,2], [3,4]))
+        #println(s)
+        #normalize!(s)
+
+        # CC = contract(C, (1,2,-1,-2), Fs[l+1], (-2,-1, 3))
+        # _u,_s,_v = _svd_(SymMatrix(CC, [1, 2], [3]))
+        # #println(_u*_s*_v ≈ SymMatrix(CC, [1, 2], [3]))
+        # #normalize!(_s)
+
+        # #println( (u*s*v)*SymMatrix(Fs[l+1], [2,1], [3]) ≈ (_u*_s*_v))
+        # println(l)
+        # amp1 = contract(u*s*v*SymMatrix(Fs[l+1], [2,1], [3]), (-1,-2),
+        #                dual(u*s*v*SymMatrix(Fs[l+1], [2,1], [3]), conjugate=false), (-1, -2))
+        # #println(value)
+        # amp2 = contract(_u*_s*_v, (-1,-2),
+        #                  dual(_u*_s*_v, conjugate=false), (-1, -2))
+        # #println(value)
+        # #println(value)
+        # value = contract(u*s*v*SymMatrix(Fs[l+1], [2,1], [3]), (-1,-2),
+        #                  dual(_u*_s*_v, conjugate=false), (-1, -2))
+        # #println(value)
+        # println(value/sqrt(amp1*amp2))
+
+        fnl = x->div(x+l-1, 2)
+        fnd = x->div(x+1, 2)
+        fnr = x->div(x+l, 2)
+        push!(mps,
+              mapcharges((fnl,fnd,fnr),
+                         splitleg(u, 1, (E.space[1], G.space[2]))))
+        E = splitleg(s*v, 2, (B.space[3], A.space[3]))
+    end
+    A = mps1.As[lx]
+    B =  dual(mps2.As[lx], conjugate=false)
+    fswap = fermionswapgate(A.space[2], B.space[1])
+    C = contract(contract(contract(contract(E, (1, 2, -1), A, (-1, 3, 4)),
+                                   (1, -1, -2, 4), fswap, (-1, 2, 3, -2)),
+                          (1, -1, 4, 5), G, (-1, 2, 3)),
+                 (1,2,-2,-1,4), B, (-1,-2, 3))
+
+    u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
+
+    C = splitleg(u*s*v, 1, (E.space[1], G.space[2]))
+    fnl = x->div(x+lx-1, 2)
+    fnd = x->div(x+1, 2)
+    fnr = x->div(x+lx, 2)
+    push!(mps, mapcharges((fnl,fnd,fnr), C))
+
+    # could the below alone be the issue?!
+    # is this correct (need explanation and stuff)
+    mps.center = lx
+    mps
 end
