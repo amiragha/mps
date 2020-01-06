@@ -35,6 +35,7 @@ VectorSpace{S}(pairs::Pair{S,Int}...) where {S} = VectorSpace{S}(pairs, false)
 "Find the dimension of the the given `charge`. Returns 0 if charges
 doesn't exist. Return total dimension if charge is not specified."
 @inline dim(V::VectorSpace{S}, charge::S) where{S}= get(V.sectors, charge, 0)
+@inline dim(V::VectorSpace{S}, charge::Int) where{S}= get(V.sectors, convert(S, charge), 0)
 @inline dim(V::VectorSpace) = sum(dims(V))
 
 @inline Base.length(V::VectorSpace) = length(V.sectors)

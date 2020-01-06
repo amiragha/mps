@@ -1,38 +1,38 @@
 @testset "MPO" begin
 
     @testset "xxz" begin
-        smpo = xxz_symmpo(Float64, 4, 2, 1.0)
+        smpo = xxz_u1mpo(Float64, 4, 2, 1.0)
         mpo = xxz_mpo(Float64, 4, 2, 1.0);
 
-        h2sym = contract(smpo.tensors[1], (1,2,-1,5),
-                         smpo.tensors[4], (-1,3,4,6))
-        h2sym = fuselegs(fuselegs(h2sym,+1, 2, 2), -1, 4, 2)
+        h2sym = contract(smpo.Ws[1], (1,2,-1,5),
+                         smpo.Ws[4], (-1,3,4,6))
+        h2sym = fuselegs(fuselegs(h2sym, 2, 2), 4, 2, true)
         h2sym = removedummyleg(h2sym, 3)
         h2sym = removedummyleg(h2sym, 1)
 
         h4sym = contract(
             contract(
-                contract(smpo.tensors[1], (1,2,-1,5),
-                         smpo.tensors[2], (-1,3,4,6)), (1,2,3,-1,6,7),
-                smpo.tensors[3], (-1,4,5,8)), (1,2,3,4,-1,7,8,9),
-            smpo.tensors[4], (-1,5,6,10))
+                contract(smpo.Ws[1], (1,2,-1,5),
+                         smpo.Ws[2], (-1,3,4,6)), (1,2,3,-1,6,7),
+                smpo.Ws[3], (-1,4,5,8)), (1,2,3,4,-1,7,8,9),
+            smpo.Ws[4], (-1,5,6,10))
 
-        h4sym = fuselegs(fuselegs(h4sym, +1, 2, 4), -1, 4, 4)
+        h4sym = fuselegs(fuselegs(h4sym, 2, 4), 4, 4, true)
         h4sym = removedummyleg(h4sym, 3)
         h4sym = removedummyleg(h4sym, 1)
 
         @tensor h2[:] :=
-            mpo.tensors[1][-1,-2,1,-5] * mpo.tensors[4][1,-3,-4,-6]
+            mpo.Ws[1][-1,-2,1,-5] * mpo.Ws[4][1,-3,-4,-6]
         h2 = reshape(h2,4,4)
 
         @tensor h3[:] :=
-            mpo.tensors[1][-1,-2,1,-6] * mpo.tensors[2][1,-3,2,-7] *
-            mpo.tensors[4][2,-4,-5,-8]
+            mpo.Ws[1][-1,-2,1,-6] * mpo.Ws[2][1,-3,2,-7] *
+            mpo.Ws[4][2,-4,-5,-8]
         h3 = reshape(h3,8,8)
 
         @tensor h4[:] :=
-            mpo.tensors[1][-1,-2,1,-7] * mpo.tensors[2][1,-3,2,-8] *
-            mpo.tensors[3][2,-4,3,-9] * mpo.tensors[4][3,-5,-6,-10]
+            mpo.Ws[1][-1,-2,1,-7] * mpo.Ws[2][1,-3,2,-8] *
+            mpo.Ws[3][2,-4,3,-9] * mpo.Ws[4][3,-5,-6,-10]
         h4 = reshape(h4,16,16)
 
         H2 = Matrix(xxz_hamiltonian(2, 1.0))
@@ -62,17 +62,17 @@
 
         mpo = xxzlong_mpo(Float64,4,2,delta,r)
         @tensor h2[:] :=
-            mpo.tensors[1][-1,-2,1,-5] * mpo.tensors[4][1,-3,-4,-6]
+            mpo.Ws[1][-1,-2,1,-5] * mpo.Ws[4][1,-3,-4,-6]
         h2 = reshape(h2,4,4)
 
         @tensor h3[:] :=
-            mpo.tensors[1][-1,-2,1,-6] * mpo.tensors[2][1,-3,2,-7] *
-            mpo.tensors[4][2,-4,-5,-8]
+            mpo.Ws[1][-1,-2,1,-6] * mpo.Ws[2][1,-3,2,-7] *
+            mpo.Ws[4][2,-4,-5,-8]
         h3 = reshape(h3,8,8)
 
         @tensor h4[:] :=
-            mpo.tensors[1][-1,-2,1,-7] * mpo.tensors[2][1,-3,2,-8] *
-            mpo.tensors[3][2,-4,3,-9] * mpo.tensors[4][3,-5,-6,-10]
+            mpo.Ws[1][-1,-2,1,-7] * mpo.Ws[2][1,-3,2,-8] *
+            mpo.Ws[3][2,-4,3,-9] * mpo.Ws[4][3,-5,-6,-10]
         h4 = reshape(h4,16,16)
 
         H2 = xxz_longrange(2,delta,r)

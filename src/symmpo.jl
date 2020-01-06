@@ -10,7 +10,7 @@ end
 @inline bondspace(mpo::MPOperator, l::Int) = dual(space(mpo.Ws[l], 3))
 @inline bonddim(mpo::MPOperator, l::Int) = size(mpo.Ws[l], 3)
 @inline bonddim(mpo::MPOperator) =
-    [dim(mpo.Ws[1], 1); [bonddim(mpo, l) for l in 1:length(mpo)]]
+    [size(mpo.Ws[1], 1); [bonddim(mpo, l) for l in 1:length(mpo)]]
 
 @inline leftspace(mpo::MPOperator) = space(mpo.Ws[1], 1)
 @inline rightspace(mpo::MPOperator) = bondspace(mpo, length(mpo))
@@ -122,35 +122,34 @@ function mpo2hamiltonian(mpo::MPOperator)
 end
 
 function reducempo!(mpo::MPOperator)
-    # this definitely needs to be better
-    if size(mpo.tensors[1], 1) != 1
+    if dim(rightspace(mpo)) != 1
+        println(rightspace(mpo))
         return _reduceinfinitempo!(mpo)
     end
-    A = mpo.tensors[1]
-    for l=1:mpo.lx-1
-        U, S, Vt = svdtrunc(fuselegs(permutelegs(A,
-                                                 [1,2,4,3]),
-                                     +1, 1, 3))
-        mpo.dims[l+1] = size(S, 1)
-        mpo.tensors[l] = permutelegs(unfuseleg(U*S, 1,
-                                               A.legs[[1,2,4]]),
-                                     [1,2,4,3])
-        A = contract(Vt, (1, -1), mpo.tensors[l+1], (-1, 2, 3, 4))
+    lx = length(mpo)
+    W = mpo.Ws[1]
+    for l=1:lx-1
+        u,s,v = svdtrunc(fuselegs(permutelegs(W,
+                                              [1,2,4,3]),
+                                  1, 3))
+        mpo.Ws[l] = permutelegs(splitleg(u*s, 1,
+                                         W.space[[1,2,4]]),
+                                [1,2,4,3])
+        W = contract(v, (1, -1), mpo.Ws[l+1], (-1, 2, 3, 4))
     end
 
-    for l=mpo.lx:-1:2
-        U, S, Vt = svdtrunc(fuselegs(A, -1, 2, 3))
-        mpo.dims[l] = size(S, 1)
-        mpo.tensors[l] = unfuseleg(S*Vt, 2, A.legs[2:4])
+    for l=lx:-1:2
+        u,s,v = svdtrunc(fuselegs(W, 2, 3, true))
+        mpo.Ws[l] = splitleg(s*v, 2, W.space[2:4])
 
-        A = contract(mpo.tensors[l-1], (1,2,-1,4), U, (-1, 3))
+        W = contract(mpo.Ws[l-1], (1,2,-1,4), u, (-1, 3))
     end
-    mpo.tensors[1] = A
+    mpo.Ws[1] = W
     mpo
 end
 
 function _reduceinfinitempo!(mpo::MPOperator)
-    A = mpo.tensors[1]
+    A = mpo.Ws[1]
     for l=1:mpo.lx-1
         U, S, Vt = svdtrunc(fuselegs(permutelegs(A,
                                                  [1,2,4,3]),

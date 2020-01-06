@@ -260,7 +260,7 @@ function _generatempo_sym(model::UnitCellQModel;
         else
             chrs == [U1(0)] || error("$chrs")
             chrdims == [1] || error("$chrdims")
-            Vr = dual(Vw)
+            Vr = dual(U1Space(zero(U1)=>1))
         end
 
         W = fill(zero(T), U1(0), (Vw, Vo, Vr, dual(Vo)))

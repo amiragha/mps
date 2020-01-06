@@ -26,6 +26,9 @@ include("symmps.jl")
 
 export MPState, U1MPS, MPS
 export MPOperator, U1MPO, MPO
+
+export bonddim
+export bondspace
 #export MatrixProductOperator
 #export MatrixProductState
 #export SymMatrixProductState
