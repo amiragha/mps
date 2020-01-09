@@ -1,5 +1,6 @@
 function tikzlattice(model::UnitCellQModel,
-                     filename::String)
+                     filename::String,
+                     coordchange::Bool=false)
     isfile(filename) && error("file already exists: $filename")
     D = dimension(model)
     D == 2 || error("only 2D lattices can be drawn with tikz!")
@@ -21,11 +22,14 @@ function tikzlattice(model::UnitCellQModel,
 
   \\begin{document}
 
-  \\begin{tikzpicture}[
+  \\begin{tikzpicture}
+  """)
+        if coordchange
+            write(f, "[
         x={$a1},
         y={$a2},
-        ]
-  """)
+        ]\n")
+        end
 
         write(f, "  \\tikzset{\n")
 
@@ -36,7 +40,7 @@ function tikzlattice(model::UnitCellQModel,
         for i in eachindex(bonds)
             write(f, "    bond$i/.style={thin, double, $(bondcolors[i])!70!black},\n")
         end
-        for i in eachindex(lattice.unitc.n)
+        for i in 1:lattice.unitc.n
             write(f, "    ball$i/.style={inner color=blue, ball color=$(ballcolors[i])!20!black},\n")
         end
 

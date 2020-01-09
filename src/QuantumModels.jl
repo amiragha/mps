@@ -53,6 +53,7 @@ export triangularspinmodel
 # fermion model examples
 export t1t1model
 export triangularhopping
+export honeycombhopping
 export kagomestriphopping
 
 export tikzlattice

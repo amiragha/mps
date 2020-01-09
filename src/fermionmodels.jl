@@ -63,6 +63,46 @@ function triangularhopping(ls::Tuple{Int, Int},
                    terms)
 end
 
+function honeycombhopping(ls::Tuple{Int, Int},
+                          t1::T,
+                          t2::T,
+                          t3::T,
+                          mu1::Float64=0.0,
+                          mu2::Float64=0.0;
+                          boundary::Tuple{Symbol, Symbol}=(:PBC, :OBC)) where{T}
+
+    ly, lx = ls
+
+    fermion = Fermion{:f}()
+    ft, f = fermionoperators(fermion)
+
+    fhop = [(ft, f), (f, ft)]
+    hop1 = FermionQModelInteraction{2, 2, T}(
+        t1,
+        (1, 2),
+        ((0, 0), (0, 0)), fhop)
+
+    hop2 = FermionQModelInteraction{2, 2, T}(
+        t2,
+        (2, 1),
+        ((0, 0), (1, 0)), fhop)
+
+    hop3 = FermionQModelInteraction{2, 2, T}(
+        t3,
+        (2, 1),
+        ((0, 0), (1, -1)), fhop)
+
+    terms = FermionQModelInteraction[]
+    t1 != 0 && push!(terms, hop1)
+    t2 != 0 && push!(terms, hop2)
+    t3 != 0 && push!(terms, hop3)
+
+    UnitCellQModel(fermion,
+                   QLattice(honeycombunitcell, (ly, lx), boundary),
+                   Z2Charge,
+                   terms)
+end
+
 function kagomestriphopping(lx::Int,
                             tl::T,
                             tc::T,
