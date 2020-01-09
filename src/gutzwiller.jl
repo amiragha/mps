@@ -354,12 +354,13 @@ function _zipandgutzwiller_F23_analysis!(mps1::MPState{Y},
                               (1, -2, -1, 4, 5), fswap, (2, 3, -1, -2)),
                      (1, 2, -1, -2, 4), G, (-1, 3, -2))
         u,s,v = _svd_(SymMatrix(C, [1,2], [3,4]))
-        #println(s)
         normalize!(s)
         F = splitleg(u*s, 1, (C.space[1], C.space[2]))
         Fs[l] = F
     end
 
+    error_ortho = Vector{Float64}()
+    error_ets = Vector{Float64}()
     E = fill(one(T), (Vdummy, Vdummy, dual(Vdummy)))
     for l=1:lx-1
         A = mps1.As[l]
@@ -380,47 +381,26 @@ function _zipandgutzwiller_F23_analysis!(mps1::MPState{Y},
                               (1, -1, 4, 5), G, (-1, 2, 3)),
                      (1,2, -2, -1, 4), B, (-1,-2, 3))
 
-        Cmat = SymMatrix(C, [1,2], [3,4])
-        norm_cmat = norm(Cmat)
-        u,s,v = svdtrunc(Cmat, maxdim=maxdim)
-        println(s)
+
+        # actual zipgutz process
+        u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
         normalize!(s)
-        u,s,v = _svd_(Cmat)
-        println(s)
-        #amp2 = dot(u*s*v, Cmat)#contract(u*s*v, (-1,-2),
-        #dual(Cmat, conjugate=false), (-1, -2))
+        println(norm(SymMatrix(C, [1,2], [3,4])))
+        # The ortho center matrix
+        CFmat = SymMatrix(contract(C, (1,2,-1,-2), Fs[l+1], (-2,-1, 3)), [1, 2], [3])
+        println(norm(SymMatrix(Fs[l+1], [2,1], [3])))
+        norm_CFmat = norm(CFmat)
+        println(norm_CFmat)
+        println()
+        # othonormal truncation error
+        _u,_s,_v = svdtrunc(CFmat, maxdim=maxdim)
+        normalize!(_s)
+        push!(error_ortho, dot(_u*_s*_v, CFmat) / norm_CFmat)
 
-        # if l==2
-        #     println(u)
-        #     println(s)
-        #     println(v)
-        #     println("...Cmat...")
-        #     println(Cmat)
-        #     println(u*s*v)
-        # end
-        # println(amp2/(norm_cmat*norm(u*s*v)))
-        #println(u*s*v ≈ SymMatrix(C, [1,2], [3,4]))
-        #println(s)
-        #normalize!(s)
-
-        # CC = contract(C, (1,2,-1,-2), Fs[l+1], (-2,-1, 3))
-        # _u,_s,_v = _svd_(SymMatrix(CC, [1, 2], [3]))
-        # #println(_u*_s*_v ≈ SymMatrix(CC, [1, 2], [3]))
-        # #normalize!(_s)
-
-        # #println( (u*s*v)*SymMatrix(Fs[l+1], [2,1], [3]) ≈ (_u*_s*_v))
-        # println(l)
-        # amp1 = contract(u*s*v*SymMatrix(Fs[l+1], [2,1], [3]), (-1,-2),
-        #                dual(u*s*v*SymMatrix(Fs[l+1], [2,1], [3]), conjugate=false), (-1, -2))
-        # #println(value)
-        # amp2 = contract(_u*_s*_v, (-1,-2),
-        #                  dual(_u*_s*_v, conjugate=false), (-1, -2))
-        # #println(value)
-        # #println(value)
-        # value = contract(u*s*v*SymMatrix(Fs[l+1], [2,1], [3]), (-1,-2),
-        #                  dual(_u*_s*_v, conjugate=false), (-1, -2))
-        # #println(value)
-        # println(value/sqrt(amp1*amp2))
+        # zipgutz truncation error
+        CtrFmat = (u*s*v) * SymMatrix(Fs[l+1], [2,1], [3])
+        norm_CtrFmat = norm(CtrFmat)
+        push!(error_ets, dot(CtrFmat, CFmat) / (norm_CFmat*norm_CtrFmat))
 
         fnl = x->div(x+l-1, 2)
         fnd = x->div(x+1, 2)
@@ -439,6 +419,10 @@ function _zipandgutzwiller_F23_analysis!(mps1::MPState{Y},
                  (1,2,-2,-1,4), B, (-1,-2, 3))
 
     u,s,v = svdtrunc(SymMatrix(C, [1,2], [3,4]), maxdim=maxdim)
+    normalize!(s)
+
+    push!(error_ortho, 1.0)
+    push!(error_ets, 1.0)
 
     C = splitleg(u*s*v, 1, (E.space[1], G.space[2]))
     fnl = x->div(x+lx-1, 2)
@@ -446,8 +430,6 @@ function _zipandgutzwiller_F23_analysis!(mps1::MPState{Y},
     fnr = x->div(x+lx, 2)
     push!(mps, mapcharges((fnl,fnd,fnr), C))
 
-    # could the below alone be the issue?!
-    # is this correct (need explanation and stuff)
     mps.center = lx
-    mps
+    mps, error_ortho, error_ets
 end
