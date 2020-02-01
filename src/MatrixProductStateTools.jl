@@ -71,5 +71,6 @@ export generatempo
 export generatesymmpo
 export generateinfinitempo
 export reducempo!
+export entropy
 
 end

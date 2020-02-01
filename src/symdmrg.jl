@@ -73,10 +73,15 @@ function dmrg2sitesweep!(mps::MPState{Ys},
         v = vs[1]
         e = es[1]
         verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
-        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)\n")
+        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
         push!(energies, e)
         u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
-
+        normalize!(s)
+        if verbose
+            values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+            println("Entanglement S1 = $(entropy(values.^2))")
+            println()
+        end
         mps.As[l] = splitleg(u, 1, A.space[1:2])
 
         env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
@@ -96,11 +101,17 @@ function dmrg2sitesweep!(mps::MPState{Ys},
     v = vs[1]
     e = es[1]
     verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
-    verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)\n")
+    verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
     push!(energies, e)
 
     for l = lx-1:-1:2
         u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+        normalize!(s)
+        if verbose
+            values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+            println("Entanglement S1 = $(entropy(values.^2))")
+            println()
+        end
 
         mps.As[l+1] = splitleg(v, 2, AA.space[3:4])
         env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
@@ -117,11 +128,17 @@ function dmrg2sitesweep!(mps::MPState{Ys},
         v = vs[1]
         e = es[1]
         verbose && println("Sweep R2L: bond $(l-1), $l -> energy $e")
-        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)\n")
+        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
         push!(energies, e)
     end
     l = 1
     u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+    normalize!(s)
+    if verbose
+        values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+        println("Entanglement S1 = $(entropy(values.^2))")
+        println()
+    end
 
     mps.As[l+1] = splitleg(v, 2, AA.space[3:4])
     env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
