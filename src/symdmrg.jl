@@ -71,12 +71,18 @@ function dmrg2sitesweep!(mps::MPState{Ys},
                                 krylovdim=krylovdim,
                                 maxiter=krylovmaxiter)
         v = vs[1]
-        e = es[1]
-        verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
+        #e = es[1]
+        verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $(es[1])")
         verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
-        push!(energies, e)
+
         u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+        verbose && println("truncation error = $(1-norm(s))")
         normalize!(s)
+        AA = splitleg(splitleg(u*s*v, 2, AA.space[3:4]), 1, AA.space[1:2])
+        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                                   mpo.Ws[l], mpo.Ws[l+1]))
+        verbose && println("energy after truncation $e")
+        push!(energies, e)
         if verbose
             values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
             println("Entanglement S1 = $(entropy(values.^2))")
@@ -99,14 +105,22 @@ function dmrg2sitesweep!(mps::MPState{Ys},
                             maxiter=krylovmaxiter)
 
     v = vs[1]
-    e = es[1]
-    verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $e")
+    #e = es[1]
+    verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $(es[1])")
     verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
-    push!(energies, e)
+    # verbose && println("truncation error = 1")
+    # push!(energies, e)
 
     for l = lx-1:-1:2
         u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+        verbose && println("truncation error = $(1-norm(s))")
         normalize!(s)
+        AA = splitleg(splitleg(u*s*v, 2, AA.space[3:4]), 1, AA.space[1:2])
+        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                                   mpo.Ws[l], mpo.Ws[l+1]))
+        verbose && println("energy after truncation $e")
+        push!(energies, e)
+
         if verbose
             values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
             println("Entanglement S1 = $(entropy(values.^2))")
@@ -126,14 +140,21 @@ function dmrg2sitesweep!(mps::MPState{Ys},
                                 krylovdim=krylovdim,
                                 maxiter=krylovmaxiter)
         v = vs[1]
-        e = es[1]
-        verbose && println("Sweep R2L: bond $(l-1), $l -> energy $e")
+        #e = es[1]
+        verbose && println("Sweep R2L: bond $(l-1), $l -> energy $(es[1])")
         verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
         push!(energies, e)
     end
     l = 1
     u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+    verbose && println("truncation error = $(1-norm(s))")
     normalize!(s)
+    AA = splitleg(splitleg(u*s*v, 2, AA.space[3:4]), 1, AA.space[1:2])
+    e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                               mpo.Ws[l], mpo.Ws[l+1]))
+    verbose && println("energy after truncation $e")
+    push!(energies, e)
+
     if verbose
         values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
         println("Entanglement S1 = $(entropy(values.^2))")
@@ -141,10 +162,10 @@ function dmrg2sitesweep!(mps::MPState{Ys},
     end
 
     mps.As[l+1] = splitleg(v, 2, AA.space[3:4])
-    env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
+env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
-    mps.As[l] = splitleg(u*s, 1, AA.space[1:2])
-    return energies
+mps.As[l] = splitleg(u*s, 1, AA.space[1:2])
+return energies
 end
 
 # function dmrg2site!(mps::MPState{S,Tv},
