@@ -97,12 +97,15 @@ function nbodyopexpansion(n::Int,
 
     amps = Vector{T}()
     if mode == :SYMBOL
-        terms = Vector{QAmpTerm{Symbol, n, T}}()
-    elseif mode == :Trival
-        terms = Vector{QAmpTerm{matrix{T}, n, T}}()
+        MType = Symbol
+    elseif mode == :Trivial
+        MType = Matrix{T}
     elseif mode == :U1
-        terms = Vector{QAmpTerm{SymTensor{U1,T,2}, n, T}}()
+        MType = SymTensor{U1,T,2}
+    else
+        error("unrecognized mode!")
     end
+    terms = Vector{QAmpTerm{MType, n, T}}()
     ⊗ = kron
     for is in Iterators.product([1:4 for i=1:n]...)
         op = reduce(⊗, [ops[i] for i in is], init=I(1))

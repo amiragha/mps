@@ -134,6 +134,10 @@ function MPState{Y}(mps::MPState) where {Y}
     MPState{Y}(mps.As, mps.center)
 end
 
+function convert(::Type{MPState{Y1}}, mps::MPState{Y2}) where {Y1, Y2}
+    MPState{Y1}([convert(Y1, mps.As[i]) for i in eachindex(mps.As)], mps.center)
+end
+
 function MPState{Y1}(mps::MPState{Y2}) where {Y1,Y2}
     MPState{Y1}([convert(Y1, mps.As[i]) for i in eachindex(mps.As)], mps.center)
 end
@@ -237,8 +241,8 @@ function measure(mps::MPState{SymTensor{S,T,3}},
     @assert (l <= lx) && (l > 0)
     @assert sitespace(mps, l) == space(op, 2) == dual(space(op, 1))
 
-    center_at!(mps, site)
-    A = mps.As[site]
+    center_at!(mps, l)
+    A = mps.As[l]
     v = contract(A, (-1, -2, -3),
                  contract(dual(A), (1, -1, 3), op, (-1, 2)), (-1, -2, -3))
     Dict{Int, T}(l=>v)
@@ -251,7 +255,7 @@ function measure(mps::MPState{SymTensor{S,T,3}},
     @assert space(op, 2) == Vd
 
     lx = length(mps)
-    values = Dict{Int, T}
+    values = Dict{Int, T}()
     center_at!(mps, 1)
     L = SymTensor(ones, zero(S), (U1Space(0=>1), U1Space(0=>1)))
 
@@ -282,8 +286,8 @@ function measure(mps::MPState{SymTensor{S,T,3}},
     (op1.charge + op2.charge != zero(S)) &&
         error("operator charges don't add up to zero! $(op1.charge), $(op2.charge)")
 
-    values = Dict{NTuple{2, Int}, T}
-    center_at!(mps, site1)
+    values = Dict{NTuple{2, Int}, T}()
+    center_at!(mps, x1)
     A = mps.As[x1]
 
     L = contract(contract(dual(A), (1, -1, 3), op1, (-1, 2)),
@@ -381,7 +385,7 @@ argument `pushto`.
 function apply!(mps         :: MPState{SymTensor{S,T,3}},
                 op          :: SymTensor{S,T,4},
                 x           :: Int;
-                maxdim      :: Int=bonddim(mps, l+1),
+                maxdim      :: Int=bonddim(mps, x+1),
                 pushto      :: Symbol=:R,
                 svnormalize :: Bool=false) where {S,T}
 
@@ -423,7 +427,7 @@ end
 function apply!(mps         :: MPState{SymTensor{S,T1,3}},
                 op          :: SymTensor{S,T2,4},
                 x           :: Int;
-                maxdim      :: Int=bonddim(mps, l+1),
+                maxdim      :: Int=bonddim(mps, x+1),
                 pushto      :: Symbol=:R,
                 svnormalize :: Bool=false) where {S,T1,T2}
 
@@ -468,7 +472,7 @@ end
 
 function overlap(mps1::MPState{Y1}, mps2::MPState{Y2}) where {Y1,Y2}
     Y = promote_type(Y1, Y2)
-    overlap(convert(MPState{Y}, mps1), convert(MPSteat{Y}, mps2))
+    overlap(convert(MPState{Y}, mps1), convert(MPState{Y}, mps2))
 end
 
 """

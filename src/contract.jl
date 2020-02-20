@@ -28,7 +28,7 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
             return _A * _B
         else
             _B = SymMatrix(B, consB, remsB)
-            return permutelegs(unfuseleg(_A*_B, 2, B.legs[remsB]),
+            return permutelegs(splitleg(_A*_B, 2, B.legs[remsB]),
                                invperm(tofinalsB))
         end
     end
@@ -37,7 +37,7 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
 
     if length(remsB) == 0
         _B = SymVector(B, consB, true)
-        return permutelegs(unfuseleg(_A*_B, 1, A.legs[remsA]),
+        return permutelegs(splitleg(_A*_B, 1, A.legs[remsA]),
                            invperm(tofinalsA))
     end
 
@@ -55,12 +55,34 @@ function contract(A     :: AbstractArray{T1,N},
                   idxB  :: NTuple{M, Int}) where{S,T1,T2, N, M}
     remsA, consA, tofinalsA = _contract_index_perm(idxA)
     remsB, consB, tofinalsB = _contract_index_perm(idxB)
-    permA = [remsA, consA]
-    permB = [consB, remsB]
+    permA = [remsA; consA]
+    permB = [consB; remsB]
+
+    if length(remsA) == 0
+        _A = reshape(permutedims(A, permA), prod(size(A)[permA]))
+        if length(remsB) == 0
+            _B = reshape(permutedims(B, permB), prod(size(B)[permB]))
+            return sum(_A .* _B)
+        else
+            _B = reshape(permutedims(B, permB), prod(size(B)[consB]), prod(size(B)[remsB]))
+            return permutedims(reshape(transpose(_A)*_B, size(B)[remsB]...),
+                               invperm(tofinalsB))
+        end
+    end
+
     _A = reshape(permutedims(A, permA), prod(size(A)[remsA]), prod(size(A)[consA]))
+    if length(remsB) == 0
+        _B = reshape(permutedims(B, permB), prod(size(B)[permB]))
+        return permutedims(reshape(_A*_B, size(A)[remsA]...),
+                           invperm(tofinalsA))
+    end
     _B = reshape(permutedims(B, permB), prod(size(B)[consB]), prod(size(B)[remsB]))
-    permutedims(reshape(_A*_B, size(A)[remsA]..., size(B)[remsB]),
-                invperm([rofinalsA; tofinalsB]))
+    # println(size(A))
+    # println(permA)
+    # println(size(B))
+    # println(permB)
+    permutedims(reshape(_A*_B, size(A)[remsA]..., size(B)[remsB]...),
+                invperm([tofinalsA; tofinalsB]))
 end
 
 # auxillary function to find indexes for contract

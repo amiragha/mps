@@ -23,9 +23,15 @@ VectorSpace{S}(pairs::Pair{S,Int}...) where {S} = VectorSpace{S}(pairs, false)
 @inline isdual(V::VectorSpace) = V.isdual
 @inline isdual(V1::T, V2::T) where {T<:VectorSpace} =
     V1.sectors == V2.sectors && V1.isdual != V2.isdual
+@inline isdual(V1::TrivialVectorSpace, V2::TrivialVectorSpace) =
+    isequal(V1, V2)
+
 @inline isequal(V1::VectorSpace, V2::VectorSpace) =
     isequal(V1.sectors, V2.sectors) && V1.isdual == V2.isdual
-==(V1::VectorSpace, V2::VectorSpace) = isequal(V1, V2)
+@inline isequal(V1::TrivialVectorSpace, V2::TrivialVectorSpace) =
+    V1.n == V2.n
+
+==(V1::AbstractVectorSpace, V2::AbstractVectorSpace) = isequal(V1, V2)
 
 @inline hascharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
 @inline findcharge(V::VectorSpace{S}, charge::S) where{S}= haskey(V.sectors)
@@ -37,6 +43,7 @@ doesn't exist. Return total dimension if charge is not specified."
 @inline dim(V::VectorSpace{S}, charge::S) where{S}= get(V.sectors, charge, 0)
 @inline dim(V::VectorSpace{S}, charge::Int) where{S}= get(V.sectors, convert(S, charge), 0)
 @inline dim(V::VectorSpace) = sum(dims(V))
+@inline dim(V::TrivialVectorSpace) = V.n
 
 @inline Base.length(V::VectorSpace) = length(V.sectors)
 @inline Base.iterate(V::VectorSpace) = iterate(V.sectors)
@@ -44,6 +51,7 @@ doesn't exist. Return total dimension if charge is not specified."
 
 "Return the dual of the vector space"
 @inline dual(V::VectorSpace) = VectorSpace{vtype(V)}(V.sectors, !V.isdual)
+@inline dual(V::AbstractVectorSpace) = V # is this correct!
 
 function layout(V::VectorSpace)
     S = vtype(V)

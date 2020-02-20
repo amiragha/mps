@@ -39,9 +39,11 @@ function _svd_(A::AbstractSymMatrix)
 
     u, s, v
 end
+
 function _svd_(A::AbstractArray)
     u,s,v = svd(A, full=false)
-    u, Diagonal(s), v
+    # note that iterating the component produces U,S,V instead of U,S,Vt!
+    u, Diagonal(s), v'
 end
 
 """

@@ -217,5 +217,5 @@ function splitleg(A     :: AbstractArray,
                   l     :: Int,
                   space :: NTuple{M, TrivialVectorSpace}) where {M}
     sz = size(A)
-    reshape(A, sz[1:l-1], dim.(space)..., sz[l+1:end])
+    reshape(A, sz[1:l-1]..., dim.(space)..., sz[l+1:end]...)
 end

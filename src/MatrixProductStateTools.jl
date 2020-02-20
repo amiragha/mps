@@ -17,12 +17,12 @@ const Tensor{T, N} = Union{SymTensor{S, T, N}, Array{T,N}} where{S}
 #const Tensor{T} = Union{SymTensor{S, T}, Array{T}} where{S}
 
 include("mpsutils.jl")
-#include("mpo.jl")
 include("symmpo.jl")
+include("mpo.jl")
 include("mpogen.jl")
-#include("mps.jl")
 #include("imps.jl")
 include("symmps.jl")
+include("mps.jl")
 
 export MPState, U1MPS, MPS
 export MPOperator, U1MPO, MPO
