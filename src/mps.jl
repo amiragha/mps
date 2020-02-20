@@ -107,6 +107,37 @@ function MPS(lx::Int, d::Int,
     return mps
 end
 
+"""
+    mps2ketstate(mps)
+
+make a ketstate from a `mps` by multiplication the matrices
+corresponding to each Ising configuration. Note that this function is
+very expensive and is only meant for testing.
+
+"""
+function mps2ketstate(mps::MPS{T}) where {T<:Number}
+
+    lx = length(mps)
+    ds = [dim(sitespace(mps, l)) for l=1:lx]
+
+    ketstate = zeros(T, prod(ds))
+
+    for ketindex::Int = 0:prod(ds)-1
+        resolve::Int = ketindex
+        amplitude = T[1]
+        ## TODO: find a better way!
+        for i::Int64 = lx:-1:1
+            d = ds[i]
+            A = mps.As[i]
+            amplitude = reshape(A[:,(resolve % d) + 1,:],
+                                size(A, 1), size(A, 3)) * amplitude
+            resolve = div(resolve, d)
+        end
+        ketstate[ketindex+1] = amplitude[1]
+    end
+    ketstate
+end
+
 # function randmps(T::Type{<:RLorCX}, rng::AbstractRNG, lx::Int, d::Int, maxdim::Int)
 #     dims = Vector{Int}(undef, lx+1)
 #     dims[1] = 1
@@ -382,7 +413,7 @@ function measure(mps::MPS{T},
         for x=x1+1:lx-1
             A = mps.As[x]
             @tensor v = scalar((L[lu, ld] * A[lu,d',r] * conj(A)[ld,d,r]) * op2[d,d'])
-            values[(x1, x2)] = v
+            values[(x1, x)] = v
             @tensor L[ru,rd] := L[lu, ld] * A[lu,d,ru] * conj(A)[ld,d,rd]
         end
         A = mps.As[lx]
@@ -406,150 +437,6 @@ function measure(mps::MPS{T},
     end
     values[1] = L[1,1,1]
     values
-end
-
-# ## TODO: make these conversions more general -- learn more about the type system
-# function measure_1point(mps::MatrixProductState{ComplexF64},
-#                         op::Matrix{Float64})
-
-#     measure_1point(mps, convert(Matrix{ComplexF64}, op))
-# end
-
-# """
-#     measure_2point(mps, op1, op2, site1, site2)
-
-# two local single site operators `op1` and `op2` measurement at sites,
-# `site1` and `site2`.
-
-# """
-
-# """
-#     measure_2point(mps, op1, op2)
-
-# two local single site operators `op1` and `op2` measurement at all
-# possible choices of two sites where site1 is less than site2. The
-# output the is the vector of measuremets having the measurement on
-# site1, site2 at index given by the `half_measurement_index` auxilary
-# function.
-
-# """
-# function measure_2point(mps::MatrixProductState{T},
-#                         op1::Matrix{T}, op2::Matrix{T}) where {T<:RLorCX}
-#     d = mps.d
-#     lx = mps.lx
-#     @assert size(op1) == size(op2) == (d, d)
-
-#     result = T[]
-#     for site1=1:lx-1
-#         move_center!(mps, site1)
-#         mat = mps.matrices[site1]
-
-#         @tensor left[ru,rd] := mat[l,d',ru] * op1[d,d'] * conj(mat)[l,d,rd]
-#         for site=site1+1:lx-1
-#             mat = mps.matrices[site]
-#             @tensor v = scalar((left[lu, ld] * mat[lu,d',r] * conj(mat)[ld,d,r]) * op2[d,d'])
-#             push!(result, v)
-#             @tensor left[ru,rd] := left[lu, ld] * mat[lu,d,ru] * conj(mat)[ld,d,rd]
-#         end
-#         mat = mps.matrices[lx]
-#         @tensor v = scalar((left[lu, ld] * mat[lu,d',r] * conj(mat)[ld,d,r]) * op2[d,d'])
-#         push!(result, v)
-#     end
-#     result
-# end
-
-# ## TODO: make these conversions more general -- learn more about the type system
-# function measure_2point(mps::MatrixProductState{ComplexF64},
-#                         op1::Matrix{Float64},
-#                         op2::Matrix{Float64})
-#     measure_2point(mps, convert(Matrix{ComplexF64}, op1), convert(Matrix{ComplexF64}, op2))
-# end
-
-# """
-#     measure_mpo(mps, mpo)
-
-# The output is the result of measurement of a full MPO that is a
-# number.
-
-# """
-# function measure_mpo(
-#     mps::MatrixProductState{T},
-#     mpo::MatrixProductOperator{T}) where{T<:RLorCX}
-
-#     (mps.d == mpo.d && mps.lx == mpo.lx) ||
-#         error("MPS and MPO are non-compatible!")
-
-#     left = ones(T, 1, 1, 1)
-
-#     for site=1:mps.lx
-#         mat = mps.matrices[site]
-#         ten = mpo.tensors[site]
-#         @tensor left[ru,rm,rd] := (left[lu,lm,ld] * mat[lu,d',ru]) *
-#             ten[lm, d, rm, d'] * conj(mat)[ld,d,rd]
-#     end
-#     left[1,1,1]
-# end
-
-# function entanglementspectrum(mps::MatrixProductState)
-#     lx = mps.lx
-#     result = Vector{Vector{Float64}}(undef, lx-1)
-#     center = mps.center
-#     move_center!(mps, 1)
-#     A = mps.matrices[1]
-
-#     for l = 1:lx-1
-#         U, S, Vt = svd(reshape(A, size(A, 1)*size(A,2), size(A,3)))
-#         result[l] = S
-#         @tensor A[l,o,r] := (Diagonal(S)*Vt)[l,m] * mps.matrices[l+1][m,o,r]
-#     end
-
-#     move_center!(mps, center)
-#     result
-# end
-
-# """
-#     entanglemententropy(A)
-
-# Measure the entanglement entropy for an MPS at a given cut `l` or if
-# ommited at every bond of the MPS.
-
-# """
-# function entanglemententropy(mps::MatrixProductState;
-#                              alpha::Int=1)
-#    [entropy(spectrum.^2) for spectrum in entanglementspectrum(mps)]
-# end
-
-
-### USEFULL FUNCTIONS FOR TESTING
-"""
-    mps2ketstate(mps)
-
-make a ketstate from a `mps` by multiplication the matrices
-corresponding to each Ising configuration. Note that this function is
-very expensive and is only meant for testing.
-
-"""
-function mps2ketstate(mps::MPS{T}) where {T<:Number}
-
-    lx = length(mps)
-    ds = [dim(sitespace(mps, l)) for l=1:lx]
-
-    ketstate = zeros(T, prod(ds))
-
-    for ketindex::Int = 0:prod(ds)-1
-        resolve::Int = ketindex
-        amplitude = T[1]
-        ## TODO: find a better way!
-        for i::Int64 = lx:-1:1
-            d = ds[i]
-            A = mps.As[i]
-            amplitude = reshape(A[:,(resolve % d) + 1,:],
-                                size(A, 1), size(A, 3)) * amplitude
-            resolve = div(resolve, d)
-        end
-        ketstate[ketindex+1] = amplitude[1]
-    end
-    ketstate
 end
 
 function apply!(mps         :: MPS{T},
@@ -605,188 +492,16 @@ function apply!(mps         :: MPS{T1},
            x, maxdim=maxdim, pushto=pushto, svnormalize=svnormalize)
 end
 
-# """
-#     apply_2siteoperator!(mps, l, operator, maxdim, pushto)
+function apply!(mps      :: MPS{T},
+                op       :: Array{T, 2},
+                x        :: Int) where {T}
 
-# applies the `operator` which is `d x d x d x d` tensor to site `l` and
-# `l+1` of the `mps`. The order of indeces start from the bottom left
-# (resulting on site l) and are counterclockwise, so it is bottom left,
-# bottom right, top right, top left.
+    @boundscheck 0 < x < length(mps) || throw()
 
-# The `maxdim` operator chooses the max possible size of dimension of
-# the new mps at bond between `l` and `l+1`, The singular values are
-# push to either left `:L` or right `:R` (default) matrices using the
-# argument `pushto`.
+    center_at!(mps, x)
 
-# """
-# function apply_2siteoperator!(mps        :: MatrixProductState{T},
-#                               l          :: Int64,
-#                               operator   :: Array{T, 4};
-#                               maxdim     :: Int64=mps.dims[l+1],
-#                               pushto     :: Symbol=:R,
-#                               normalizeS :: Bool=false) where {T<:RLorCX}
-
-#     @assert mps_dims_are_consistent(mps)
-#     @assert 0 < l < mps.lx
-
-#     d = mps.d
-
-#     if mps.center < l
-#         move_center!(mps, l)
-#     elseif mps.center > l+1
-#         move_center!(mps, l+1)
-#     end
-
-#     one = mps.matrices[l]
-#     two = mps.matrices[l+1]
-
-#     dim_l = mps.dims[l]
-#     dim_m = mps.dims[l+1]
-#     dim_r = mps.dims[l+2]
-
-#     @tensor R[a,i,j,b] := operator[i,j,l,k] * (one[a,k,c] * two[c,l,b])
-
-#     fact = svd(reshape(R, dim_l*d, d*dim_r), full=false)
-
-#     S, n, ratio = truncate(fact.S, maxdim=maxdim)
-
-#     U = fact.U[:,1:n]
-#     Vt = fact.Vt[1:n,:]
-
-#     normalizeS && normalize!(S)
-#     mps.dims[l+1] = n
-
-#     if (pushto == :R)
-#         mps.matrices[l] = reshape(U, dim_l, d, n)
-#         mps.matrices[l+1] = reshape(Diagonal(S) * Vt, n, d, dim_r)
-#         mps.center = l+1
-#     elseif (pushto == :L)
-#         mps.matrices[l] = reshape(U * Diagonal(S), dim_l, d, n)
-#         mps.matrices[l+1] = reshape(Diagonal(S) * Vt, n, d, dim_r)
-#         mps.center = l
-#     else
-#         error("invalid push_to :", pushto)
-#     end
-#     nothing
-# end
-
-# function apply_2siteoperator!(mps        :: MatrixProductState{ComplexF64},
-#                               l          :: Int64,
-#                               op         :: Array{Float64, 4};
-#                               maxdim     :: Int64=mps.dims[l+1],
-#                               pushto     :: Symbol=:R,
-#                               normalizeS :: Bool=false)
-
-#     apply_2siteoperator!(mps, l, convert(Array{ComplexF64, 4}, op),
-#                          maxdim=maxdim, pushto=pushto, normalizeS=normalizeS)
-# end
-
-# function twosite_tensor(op1::Matrix{T}, op2::Matrix{T}) where {T<:RLorCX}
-#     a, b = size(op1)
-#     c, d = size(op2)
-#     @assert a == b && c == d
-#     permutedims(reshape(kron(op1, op2),a,c,a,c), [1,2,4,3])
-# end
-
-# """
-#     apply_1siteoperator!(mps, l, op)
-
-# applies the `op` which is `d x d` tensor to site `l` of the `mps`. The
-# order of indeces are bottom, top.
-
-# """
-# function apply_1siteoperator!(mps      ::MatrixProductState{T},
-#                               l        ::Int64,
-#                               op       ::Matrix{T}) where {T<:RLorCX}
-
-#     @assert 0 < l <= mps.lx
-
-#     d = mps.d
-#     move_center!(mps, l)
-#     A = mps.matrices[l]
-#     @tensor A[l,o,r] := A[l,o',r] * op[o,o']
-#     mps.matrices[l] = A
-
-#     nothing
-# end
-
-# ### Multi-MPS functions
-# #######################
-
-# """
-#     overlap(mps1, mps2)
-
-# calculates the overlap between two matrix product states `mps1` and
-# `mps2` that is to run the tensor contraction corresponding to
-# ``⟨ψ_2|ψ_1⟩``. Note that it is not divided by the norm of the two
-# MPSs, so it returned value is the overlap of the two states multiplied
-# by the norm of each.
-
-# """
-# function overlap(mps1::MatrixProductState{T},
-#                  mps2::MatrixProductState{T}) where {T<:RLorCX}
-
-#     @assert mps1.d == mps2.d && mps1.lx == mps2.lx
-
-#     left = ones(T, 1, 1)
-
-#     for site=1:mps1.lx
-#         mat1 = mps1.matrices[site]
-#         mat2 = mps2.matrices[site]
-#         @tensor left[ru,rd] := (left[lu,ld] * mat1[lu,d,ru]) * conj(mat2)[ld,d,rd]
-#     end
-#     left[1,1]
-# end
-
-# overlap(mps1::MatrixProductState{ComplexF64}, mps2::MatrixProductState{Float64}) =
-#     overlap(mps1, convert(MatrixProductState{ComplexF64}, mps2))
-# overlap(mps1::MatrixProductState{Float64}, mps2::MatrixProductState{ComplexF64}) =
-#     overlap(convert(MatrixProductState{ComplexF64}, mps1), mps2)
-
-# """
-#     norm(mps)
-
-# calculates the norm of a matrix product state `mps` that is to
-# calculate the sqrt of tensor contraction corresponding to ``⟨ψ|ψ⟩``.
-
-# """
-# norm(mps::MatrixProductState) = sqrt(_realwithcheck(overlap(mps, mps)))
-
-# ### useful tools
-# ################
-
-# """
-#     display_matrices(mps, range)
-
-# display all the matrices of the `mps` in `range`. This function is
-# useful for testing or educational purposes.
-
-# """
-# function display_matrices(mps::MatrixProductState{T},
-#                           range::UnitRange{Int64}=1:mps.length) where {T<:RLorCX}
-#     for site=range
-#         for s=1:mps.d
-#             display("Matrix $site $(s-1)")
-#             display(mps.matrices[site][:,s,:])
-#         end
-#     end
-# end
-
-# """
-#     mps_dims_are_consistent(mps)
-
-# check if are dimensions are consistent in an mps. This is made for
-# testing and double checks; in principle all operations must not break
-# the consistency of the bond dimensions of MPS.
-
-# """
-# function mps_dims_are_consistent(mps::MatrixProductState{T}) where {T<:RLorCX}
-#     for n=1:mps.lx-1
-#         dim1 = size(mps.matrices[n])[3]
-#         dim2 = size(mps.matrices[n+1])[1]
-#         if dim1 != dim2 || dim1 != mps.dims[n+1]
-#             return false
-#         end
-#     end
-#     return size(mps.matrices[mps.lx])[3] == mps.dims[mps.lx+1]
-# end
+    A = mps.As[x]
+    @tensor A[l,o,r] := A[l,o',r] * op[o,o']
+    mps.As[x] = A
+    mps
+end

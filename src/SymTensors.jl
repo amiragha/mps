@@ -6,7 +6,7 @@ using Random
 import Base: convert, size, show, isless, isequal, ==, isapprox, *, conj, zero, inv
 import Base: eltype, similar, copyto!
 import Base: fill, fill!, rand, sum
-import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!, svd
+import LinearAlgebra: mul!, rmul!, axpy!, axpby!, dot, norm, normalize!, svd, diag
 import Base.intersect
 
 #using DataStructures

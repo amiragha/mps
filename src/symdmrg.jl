@@ -78,21 +78,21 @@ function dmrg2sitesweep!(mps::MPState{Ys},
         u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
         verbose && println("truncation error = $(1-norm(s))")
         normalize!(s)
-        AA = splitleg(splitleg(u*s*v, 2, AA.space[3:4]), 1, AA.space[1:2])
+        AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
         e = dot(AA, _applymps2site(AA, env[l], env[l+3],
                                    mpo.Ws[l], mpo.Ws[l+1]))
         verbose && println("energy after truncation $e")
         push!(energies, e)
         if verbose
-            values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+            values = diag(s)
             println("Entanglement S1 = $(entropy(values.^2))")
             println()
         end
-        mps.As[l] = splitleg(u, 1, A.space[1:2])
+        mps.As[l] = splitleg(u, 1, space(A)[1:2])
 
         env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
 
-        A = splitleg(s*v, 2, AA.space[3:4])
+        A = splitleg(s*v, 2, space(AA)[3:4])
     end
 
     l = lx-1
@@ -115,22 +115,22 @@ function dmrg2sitesweep!(mps::MPState{Ys},
         u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
         verbose && println("truncation error = $(1-norm(s))")
         normalize!(s)
-        AA = splitleg(splitleg(u*s*v, 2, AA.space[3:4]), 1, AA.space[1:2])
+        AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
         e = dot(AA, _applymps2site(AA, env[l], env[l+3],
                                    mpo.Ws[l], mpo.Ws[l+1]))
         verbose && println("energy after truncation $e")
         push!(energies, e)
 
         if verbose
-            values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+            values = diag(s)
             println("Entanglement S1 = $(entropy(values.^2))")
             println()
         end
 
-        mps.As[l+1] = splitleg(v, 2, AA.space[3:4])
+        mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
         env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
-        A = splitleg(u*s, 1, AA.space[1:2])
+        A = splitleg(u*s, 1, space(AA)[1:2])
         AA = contract(mps.As[l-1], (1,2,-1), A, (-1,3,4))
 
         es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
@@ -149,22 +149,22 @@ function dmrg2sitesweep!(mps::MPState{Ys},
     u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
     verbose && println("truncation error = $(1-norm(s))")
     normalize!(s)
-    AA = splitleg(splitleg(u*s*v, 2, AA.space[3:4]), 1, AA.space[1:2])
+    AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
     e = dot(AA, _applymps2site(AA, env[l], env[l+3],
                                mpo.Ws[l], mpo.Ws[l+1]))
     verbose && println("energy after truncation $e")
     push!(energies, e)
 
     if verbose
-        values = sort(vcat([diag(blk) for (c,blk) in s.blocks]...), rev=true)
+        values = diag(s)
         println("Entanglement S1 = $(entropy(values.^2))")
         println()
     end
 
-    mps.As[l+1] = splitleg(v, 2, AA.space[3:4])
+    mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
 env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
-mps.As[l] = splitleg(u*s, 1, AA.space[1:2])
+mps.As[l] = splitleg(u*s, 1, space(AA)[1:2])
 return energies
 end
 

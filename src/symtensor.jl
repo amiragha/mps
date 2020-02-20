@@ -68,6 +68,8 @@ end
 SymDiagonal{S, T}(c,s,b) where{S,T} = SymDiagonal(c,s,b)
 const U1Diagonal{T} = SymDiagonal{Int, T}
 
+@inline diag(A::SymDiagonal) = sort(vcat([diag(blk) for (c,blk) in A.blocks]...), rev=true)
+
 function SymVector(charge::S, v::Vector{T}, isdual::Bool=false) where {S<:AbstractCharge, T}
     V = VectorSpace{S}([charge => length(v)], isdual)
     SymVector{S, T}(charge, (V,), SortedDict([Sector(charge) => v]))
@@ -104,6 +106,7 @@ end
 
 @inline vtype(::AbstractSymTensor{S, T}) where {S, T} = S
 @inline vtype(::Type{<:AbstractSymTensor{S, T}}) where {S, T} = S
+@inline vtype(::Type{<:Array{T}}) where {T} = Trivial
 
 #@inline size(A::SymVector) = size(nzblks[1])
 
@@ -158,6 +161,7 @@ function fill(x::T, charge::S, space::NTuple{N, VectorSpace{S}}) where {S,T,N}
     blocks = SortedDict([sects[i] => fill(x, sizes[i]) for i in eachindex(sects)])
     SymTensor(charge, space, blocks)
 end
+fill(x::T, space::NTuple{N, TrivialVectorSpace}) where{T, N} = fill(x, dim.(space))
 
 function fill!(A::SymTensor{S,T,N}, x::T) where {S,T,N}
     for b in values(A.blocks)
@@ -329,6 +333,7 @@ function norm(A::AbstractSymTensor)
 end
 
 normalize!(S::SymDiagonal) = rmul!(S, 1/norm(S))
+normalize!(S::LinearAlgebra.Diagonal) = rmul!(S, 1/norm(S))
 
 # function dropdummyleg(A::AbstractSymTensor, l::Int)
 #     isdummy(A.space[l]) || error("space is not dummy!")

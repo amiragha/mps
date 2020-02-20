@@ -4,12 +4,12 @@ sz_half = [0.5 0.0; 0.0 -.5]
 
     # A uniformly chosen random state as MPS
     ketstate = complex.(randn(d^lx), randn(d^lx))
-    randmps = MatrixProductState(lx, d, ketstate)
+    randmps = MPS(lx, d, ketstate)
 
     # The Bethe chain ground state as MPS
     H = xxz_hamiltonian(lx)
     eheis, vheis = eigsolve(H, 1, :SR)
-    mps = MatrixProductState(lx, 2, vheis[1])
+    mps = MPS(lx, 2, vheis[1])
 
     @testset "ketstate to MPS to ketstate" begin
         @test norm(ketstate) ≈ norm(randmps)
@@ -23,21 +23,22 @@ sz_half = [0.5 0.0; 0.0 -.5]
 
     @testset "operator measurements" begin
         sz = spinoperators(1/2)[1]
-        @test measure_1point(mps, sz) ≈ zeros(lx) atol=1.e-12
+        szdata = measure(mps, sz)
+        @test all([isapprox(szdata[i], 0.0, atol=1.e-12) for i=1:lx])
 
         mpo = xxz_mpo(Float64, lx, 2)
-        @test measure_mpo(mps, mpo) ≈ eheis[1]
+        @test measure(mps, mpo)[1] ≈ eheis[1]
     end
 
     @testset "MPS center manipulations" begin
         ### TODO: write more tests for here!
-        move_center!(randmps, lx-1)
-        move_center!(randmps, lx-2)
-        move_center!(randmps, 1)
-        move_center!(randmps, lx)
+        center_at!(randmps, lx-1)
+        center_at!(randmps, lx-2)
+        center_at!(randmps, 1)
+        center_at!(randmps, lx)
         @test mps2ketstate(randmps) ≈ ketstate
 
-        canonicalize_at!(randmps.matrices, lx)
+        center_at!(randmps, lx)
         @test mps2ketstate(randmps) ≈ ketstate
     end
 
@@ -49,15 +50,15 @@ end
 
         H = xxz_hamiltonian(lx)
         eheis, vheis = eigsolve(H, 1, :SR)
-        mps = MatrixProductState(lx, 2, vheis[1])
+        mps = MPS(lx, 2, vheis[1])
 
         mpscopy = deepcopy(mps)
-        move_center!(mps, l)
+        center_at!(mps, l)
         sz = spinoperators(1/2)[1]
-        M = twosite_tensor(sz, sz)
-        apply_2siteoperator!(mps, l, M)
+        M = reshape(kron(sz, sz), 2, 2, 2, 2)
+        apply!(mps, M, l)
 
-        @test mps_dims_are_consistent(mps)
-        @test overlap(mpscopy, mps) ≈ measure_2point(mpscopy, sz, sz, l, l+1)
+        #@test mps_dims_are_consistent(mps)
+        @test overlap(mpscopy, mps) ≈ measure(mpscopy, sz, sz, l, l+1)
     end
 end

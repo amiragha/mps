@@ -182,6 +182,20 @@ function SymMatrix(A::AbstractSymTensor,
     SymMatrix{S,T}(A.charge, space, blocks)
 end
 
+function SymMatrix(A::Array,
+                   rowidxs::Vector{Int},
+                   colidxs::Vector{Int})
+
+    N = ndims(A)
+    idxperm = [rowidxs; colidxs]
+    sort(idxperm) == collect(1:N) ||
+        error("Incorrect index set for conversion to SymMatrix!")
+    length(rowidxs) == 0 && error("empty row for matrix not allowed!")
+    length(colidxs) == 0 && error("empty col for matrix not allowed!")
+    T = eltype(A)
+    reshape(permutedims(A, idxperm), prod(size(A)[rowidxs]), prod(size(A)[colidxs]))
+end
+
 # function SymMatrix(A::AbstractSymTensor,
 #                    rowidxs::Vector{Int},
 #                    colidxs::Vector{Int})
