@@ -368,6 +368,11 @@ function measure(mps::MPS{T},
     end
     values
 end
+function measure(mps::MPS{T1},
+                 op::Matrix{T2}) where {T1,T2}
+    measure(mps, convert(Matrix{T1}, op))
+end
+
 
 function measure(mps::MPS{T},
                  op1::Matrix{T},
@@ -421,6 +426,12 @@ function measure(mps::MPS{T},
         values[x1, lx] = v
     end
     values
+end
+
+function measure(mps::MPS{T1},
+                 op1::Matrix{T2},
+                 op2::Matrix{T3}) where {T1,T2,T3}
+    measure(mps, convert(Matrix{T1}, op1), convert(Matrix{T1}, op2))
 end
 
 function measure(mps::MPS{T},

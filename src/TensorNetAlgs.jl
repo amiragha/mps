@@ -11,7 +11,7 @@ using KrylovKit
 include("apply.jl")
 #include("dmrg.jl")
 #include("idmrg.jl")
-#include("tdvp.jl")
+include("tdvp.jl")
 include("symdmrg.jl")
 #include("periodicdmrg.jl")
 

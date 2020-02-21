@@ -18,11 +18,8 @@ function tdvp1sitesweep!(dt::Float64,
     !(T <: Complex) && error("TDVP only accpets complex MPSs. Convert first!")
 
     lx = length(mps)
-    d = mps.d
 
-    if mps.center != 1
-        center_at!(mps, 1)
-    end
+    center_at!(mps, 1)
 
     A = mps.As[1]
     for l = 1:lx-1
@@ -88,7 +85,7 @@ function tdvp1sitesweep!(dt::Float64,
     end
     mps.As[1] = A
     mps.center = 1
-    return nothing
+    mps
 end
 
 """
@@ -106,20 +103,17 @@ justification of the two-site proposed algorithm.
 
 """
 function tdvp2sitesweep!(dt::Float64,
-                         mps::MatrixProductState{T},
-                         mpo::MatrixProductOperator{T},
+                         mps::MPState{Array{T, 3}},
+                         mpo::MPOperator{Array{T, 4}},
                          env::Vector{Array{T, 3}};
                          maxdim::Int=200,
                          tol::Float64=1.e-14,
                          verbose::Bool=false) where {T<:Number}
 
     !(T <: Complex) && error("TDVP only accpets complex MPSs. Convert first!")
-    lx = mps.lx
-    d = mps.d
+    lx = length(mps)
 
-    if mps.center != 1
-        move_center!(mps, 1)
-    end
+    center_at!(mps, 1)
 
     A = mps.As[1]
     for l = 1:lx-2
@@ -135,13 +129,13 @@ function tdvp2sitesweep!(dt::Float64,
             println("Sweep L2R: mps site $l, $(l+1) -> energy $e")
         end
 
-        U, S, Vt = svdtrunc(reshape(AA, size(AA,1)*d, d*size(AA,4)),
-                            maxdim=maxdim, tol=tol)
-        mps.As[l] = reshape(Matrix(U), (size(AA)[1:2]..., size(S,1)))
+        u,s,v = svdtrunc(reshape(AA, prod(size(AA)[1:2]), prod(size(AA)[3:4])),
+                         maxdim=maxdim, tol=tol)
+        mps.As[l] = reshape(Matrix(u), (size(AA)[1:2]..., size(s,1)))
         env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
 
         # backward evolution of Λ at site l+1
-        Λ = reshape(S*Vt, (size(S,1), size(AA)[3:4]...))
+        Λ = reshape(s*v, (size(s,1), size(AA)[3:4]...))
         Λ, info = exponentiate(v->_applymps1site(v, env[l+1], env[l+3], mpo.Ws[l+1]),
                                +im*dt, Λ)
 
@@ -168,13 +162,13 @@ function tdvp2sitesweep!(dt::Float64,
 
     for l = lx-1:-1:2
 
-        U, S, Vt = svdtrunc(reshape(AA, size(AA,1)*d, d*size(AA,4)),
-                            maxdim=maxdim, tol=tol)
-        mps.As[l+1] = reshape(Vt, (size(S,1),size(AA)[3:4]...))
+        u, s, v = svdtrunc(reshape(AA, prod(size(AA)[1:2]), prod(size(AA)[3:4])),
+                           maxdim=maxdim, tol=tol)
+        mps.As[l+1] = reshape(v, (size(s,1),size(AA)[3:4]...))
         env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
         # backward evolution of Λ at site l
-        Λ = reshape(U*S, (size(AA)[1:2]...,size(S,2)))
+        Λ = reshape(u*s, (size(AA)[1:2]...,size(s,2)))
         Λ, info = exponentiate(v->_applymps1site(v, env[l], env[l+2], mpo.Ws[l]),
                                +im*dt, Λ)
         if verbose
@@ -198,20 +192,19 @@ function tdvp2sitesweep!(dt::Float64,
         end
     end
     l=1
-    U, S, Vt = svdtrunc(reshape(AA, size(AA,1)*d, d*size(AA,4)),
-                        maxdim=maxdim, tol=tol)
-    mps.As[l+1] = reshape(Vt, (size(S,1),size(AA)[3:4]...))
+    u, s, v = svdtrunc(reshape(AA, prod(size(AA)[1:2]), prod(size(AA)[3:4])),
+                       maxdim=maxdim, tol=tol)
+    mps.As[l+1] = reshape(v, (size(s,1),size(AA)[3:4]...))
     env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
 
-    Λ = reshape(U*S, (size(AA)[1:2]...,size(S,2)))
+    Λ = reshape(u*s, (size(AA)[1:2]..., size(s,2)))
     ### (IMPORTANT) QUESTION? do I need a final backward evolution on site 1?
     # Λ, info = exponentiate(v->_applymps1site(v, env[l], env[l+2], mpo.Ws[l]),
     #                        +im*dt, Λ)
 
     mps.As[1] = Λ
-
     mps.center = 1
 
-    return nothing
+    mps
 end

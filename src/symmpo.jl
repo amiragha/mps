@@ -35,6 +35,12 @@ const U1MPO{T} = MPOperator{SymTensor{U1,T,4}}
 const MPO{T} = MPOperator{Array{T,4}}
 
 MPOperator{Y}() where{Y} = MPOperator{Y}(Vector{Y}())
+
+function convert(::Type{MPOperator{Y1}},
+                 mpo::MPOperator{Y2}) where {Y1, Y2}
+    MPOperator{Y1}(convert(Vector{Y1}, mpo.Ws))
+end
+
 "function to explicitly make the xxz mpo (for test and example)"
 function xxz_u1mpo(T::DataType, lx::Int, d::Int, delta::Float64=1.0)
 
