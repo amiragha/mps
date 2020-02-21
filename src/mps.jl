@@ -9,45 +9,45 @@ function MPS{T}(lx::Int, d::Int=2;
     mps
 end
 
-# # constructor with intial configuration vector
-# function MatrixProductState{T}(lx::Int64, d::Int64,
-#                                initconf::Vector{Int64}) where{T<:RLorCX}
-#     @assert all((0 .<= initconf) .& (initconf .< d))
-#     matrices = [ zeros(T, 1, d, 1) for i=1:lx ]
-#     for site=1:lx
-#         matrices[site][1, initconf[site]+1, 1] = 1.
-#     end
-#     dims = ones(Int64, lx+1)
-#     canonicalize_at!(matrices, lx)
-#     MatrixProductState{T}(lx, d, dims, matrices, lx)
-# end
+# constructor with intial configuration vector
+function MPS{T}(lx::Int, d::Int,
+                initconf::Vector{Int}) where {T<:Number}
+    all((0 .<= initconf) .& (initconf .< d)) ||
+        error("conf vector out of bounds!")
 
-# # constructor with intial configuration vector and noise
-# function MatrixProductState{T}(lx::Int64, d::Int64,
-#                                initconf::Vector{Int64},
-#                                maxdim::Int,
-#                                noise::Float64) where{T<:RLorCX}
-#     @assert all((0 .<= initconf) .& (initconf .< d))
+    mps = MPS{T}([zeros(T, 1, d, 1) for i=1:lx ], 0)
+    for site=1:lx
+        mps.As[site][1, initconf[site]+1, 1] = 1.
+    end
+    center_at!(mps, lx)
+    mps
+end
 
-#     dims = ones(Int, lx+1)
-#     ### this can be wrapped into a function itself
-#     for l = 2:lx
-#         dims[l] = min(maxdim, dims[l-1]*d)
-#     end
-#     for l = lx:-1:1
-#         dims[l] = min(dims[l], dims[l+1]*d)
-#     end
-#     ### till here!
+# constructor with intial configuration vector and noise
+function MPS{T}(lx::Int, d::Int,
+                initconf::Vector{Int},
+                maxdim::Int,
+                noise::Float64) where {T<:Number}
+    all((0 .<= initconf) .& (initconf .< d)) ||
+        error("conf vector out of bounds!")
 
-#     matrices = [ noise * randn(T, dims[i], d, dims[i+1]) for i=1:lx ]
+    dims = ones(Int, lx+1)
+    ### this can be wrapped into a function itself
+    for l = 2:lx
+        dims[l] = min(maxdim, dims[l-1]*d)
+    end
+    for l = lx:-1:1
+        dims[l] = min(dims[l], dims[l+1]*d)
+    end
+    ### till here!
 
-#     for site=1:lx
-#         matrices[site][1, initconf[site]+1, 1] = 1.
-#     end
-
-#     canonicalize_at!(matrices, lx)
-#     MatrixProductState{T}(lx, d, dims, matrices, lx)
-# end
+    mps = MPS{T}([ noise * randn(T, dims[i], d, dims[i+1]) for i=1:lx ], 0)
+    for site=1:lx
+        mps.As[site][1, initconf[site]+1, 1] = 1.
+    end
+    center_at!(mps, lx)
+    mps
+end
 
 #constructor from a ketstate given in Ising basis
 function MPS(lx::Int, d::Int,

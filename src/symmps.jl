@@ -153,11 +153,11 @@ function normalize!(mps::MPState)
     if mps.center > div(length(mps), 2)
         u,s,v = _svd_(fuselegs(A, 1, 2, false))
         normalize!(s)
-        mps.As[mps.center] = splitleg(u*s*v, 1, A.space[1:2])
+        mps.As[mps.center] = splitleg(u*s*v, 1, space(A)[1:2])
     else
         u,s,v = _svd_(fuselegs(A, 2, 2, true))
         normalize!(s)
-        mps.As[mps.center] = splitleg(u*s*v, 2, A.space[2:3])
+        mps.As[mps.center] = splitleg(u*s*v, 2, space(A)[2:3])
     end
     mps
 end
