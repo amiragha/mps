@@ -82,19 +82,17 @@ end
 function qitf_mpo(T::DataType, lx::Int64, d::Int64,
                   g::Float64=1.0, J::Float64=-1.0) #where {T<:RLorCX}
 
-    Sp = T[0.  1.; 0.  0.]
-    Sm = T[0.  0.; 1.  0.]
-    Sz = T[1.  0.; 0. -1]
-    Sx = Sp + Sm
-    I2 = I(2)
+    sz, sp ,sm = spinoperators(1/2)
+    X = sp + sm
+    Z = 2 * sz
 
     W = zeros(T, 3, d, 3, d)
-    W[1,:,1,:] = I2
-    W[2,:,1,:] = J * Sz
-    W[3,:,1,:] = g/2. * Sx
+    W[1,:,1,:] = I(2)
+    W[2,:,1,:] = J * Z
+    W[3,:,1,:] = g * X
 
-    W[3,:,2,:] = Sz
-    W[3,:,3,:] = I2
+    W[3,:,2,:] = Z
+    W[3,:,3,:] = I(2)
 
     mpo = MPO{T}()
     push!(mpo, W[3:3,:,:,:])
