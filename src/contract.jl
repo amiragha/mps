@@ -42,10 +42,7 @@ function contract(A     :: AbstractSymTensor{S,T1,N},
     end
 
     _B = SymMatrix(B, consB, remsB)
-    # println(_A)
-    # println(_B)
     return permutelegs(SymTensor(_A * _B, A.space[remsA], B.space[remsB]),
-                       #unfuseleg(unfuseleg(_A * _B, 1, A.legs[remsA]), length(remsA)+1, B.legs[remsB]),
                        invperm([tofinalsA; tofinalsB]))
 end
 
@@ -77,10 +74,6 @@ function contract(A     :: AbstractArray{T1,N},
                            invperm(tofinalsA))
     end
     _B = reshape(permutedims(B, permB), prod(size(B)[consB]), prod(size(B)[remsB]))
-    # println(size(A))
-    # println(permA)
-    # println(size(B))
-    # println(permB)
     permutedims(reshape(_A*_B, size(A)[remsA]..., size(B)[remsB]...),
                 invperm([tofinalsA; tofinalsB]))
 end
@@ -146,16 +139,13 @@ function SymMatrix(A::AbstractSymTensor,
     semits = collect(onlysemitokens(A.blocks))[sperm1][sperm2]
 
     space = (fuse(false, A.space[rowidxs]), fuse(true, A.space[colidxs]))
-    #println(space)
 
     sects, sizes = _allsectorsandsizes(A.charge, space)
 
     blocks = SortedDict{Sector{S, 2}, Matrix{T}}()
     pointer = 1
     for index in 1:length(sects)
-        #println("SymMat for sector $(sects[index])")
         blk = Matrix{T}(undef, sizes[index])
-        #range = [1:m for m in sizes[index]]
 
         rlim, clim = sizes[index]
         pc = 1
@@ -163,7 +153,6 @@ function SymMatrix(A::AbstractSymTensor,
             pr = 1
             fdc = 0
             while pr <= rlim
-                #println("sector $(sectors(A)[sperm1][sperm2][pointer])")
                 Ablk = permutedims(A.blocks[semits[pointer]], idxperm)
                 s = size(Ablk)
                 fdr = prod(s[1:n])
@@ -178,7 +167,6 @@ function SymMatrix(A::AbstractSymTensor,
         sector = sects[index]
         blocks[sector] = blk
     end
-    #SymMatrix(A.charge, space, blocks)
     SymMatrix{S,T}(A.charge, space, blocks)
 end
 
@@ -196,32 +184,14 @@ function SymMatrix(A::Array,
     reshape(permutedims(A, idxperm), prod(size(A)[rowidxs]), prod(size(A)[colidxs]))
 end
 
-# function SymMatrix(A::AbstractSymTensor,
-#                    rowidxs::Vector{Int},
-#                    colidxs::Vector{Int})
-
-#     N = rank(A)
-#     idxperm = [rowidxs; colidxs]
-#     sort(idxperm) == collect(1:N) || error("Incorrect index set for conversion to SymMatrix!")
-#     length(rowidxs) == 0 && error("Zero row for matrix not allowed!")
-#     length(colidxs) == 0 && error("Zero col for matrix not allowed!")
-
-#     pA = permutelegs(A, idxperm)
-#     SymMatrix(fuselegs(
-#         fuselegs(pA, -1, length(rowidxs)+1, length(colidxs)),
-#         +1, 1, length(rowidxs)))
-
-# end
-
 function SymTensor(A     :: SymMatrix,
                    rlegs :: NTuple{N, VectorSpace{S}},
                    clegs :: NTuple{M, VectorSpace{S}}) where {S, N, M}
     T = eltype(A)
-    #sperm = sortperm(A.sects, by=x->x[2])
-    #csects = A.sects[sectperm]
+
     blocks = SortedDict{Sector{S, N+M}, Array{T, N+M}}()
     csects = sectors(A)
-    #    oldcharge = 0
+
     rpats, rsizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
     cpats, csizes = Vector{Sector{S, M}}(), Vector{NTuple{M, Int}}()
     isduals = isdual.(A.space)
@@ -249,7 +219,7 @@ function SymTensor(A     :: SymMatrix,
 
     #TODO: now check to see if the new legs can fuse into the original leg
     space = (rlegs...,clegs...)
-    #SymTensor(A.charge, space, blocks)
+
     SymTensor{S,T,N+M}(A.charge, space, blocks)
 end
 
@@ -305,8 +275,7 @@ function *(A::AbstractSymMatrix,
     bmax = length(semitsB)
     amax = length(semitsA)
     a, b = 1, 1
-    #println(A)
-    #println(B)
+
     for i=1:n_sectors
         c1, c2 = sects[i]
         _c1 = isdual(A.space[1]) ? inv(c1) : c1
@@ -404,45 +373,3 @@ function SymMatrix2(A::AbstractSymTensor{T, N},
         +1, 1, length(rowidxs))
 
 end
-
-# if debug
-#         println(A)
-#         println(remsA, " ", consA)
-#         println(_A)
-#         println(B)
-#         println(remsB, " ", consB)
-#         println(_B)
-#         println(_A*_B)
-#     end
-
-# function contract(A::SymTensor{ComplexF64, N}, idxA::NTuple{N, Int},
-#                   B::SymTensor{Float64, M}, idxB::NTuple{M, Int}) where{N, M}
-#     contract(A, idxA, convert(SymTensor{ComplexF64, M}, B), idxB)
-# end
-# contract A and B using idxA and idxB. Note idxA and idxB are the
-# corresponding leg numbers in each tensor that are to be contracted
-
-# ##TODO: make these conversion more sane!!!
-# function *(sten1::SymTensor{ComplexF64, 2},
-#            sten2::SymTensor{Float64, 2})
-#     *(sten1, convert(SymTensor{ComplexF64, 2}, sten2))
-# end
-
-# function *(sten1::SymTensor{Float64, 2},
-#            sten2::SymTensor{ComplexF64, 2})
-#     *(convert(SymTensor{ComplexF64, 2}, sten1), sten2)
-# end
-
-# function _arecontractible(l1::U1Space, l2::U1Space)
-#     if l1.sign == -l2.sign
-#         # find conciding charges
-#         chrs, idx1, idx2 = intersect(l1, l2)
-#         for c in chrs
-#             getdim(l1, c) != getdim(l2, c) && return false, idx1, idx2
-#         end
-#         return true, idx1, idx2
-#     end
-#     false, Int[], Int[]
-# end
-
-# This function returns the

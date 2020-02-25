@@ -58,7 +58,7 @@ function picklargests(Ss::Vector{Vector{Float64}},
     c = [Ss[i][pointers[i]] for i in eachindex(Ss)]
 
     for n=1:min(maxdim, sum([length(s) for s in Ss]))
-        #println(c, pointers)
+
         m, index = findmax(c)
         if (m < tol)
             n==1 && error("The largest singular value is smaller than tol! $m < $tol")
@@ -66,7 +66,7 @@ function picklargests(Ss::Vector{Vector{Float64}},
         end
         push!(vs[index], Ss[index][pointers[index]])
         if pointers[index] == length(Ss[index])
-            #println("here")
+
             c[index] = 0.0
         else
             pointers[index] += 1
@@ -94,7 +94,7 @@ function truncatedsizes(S::Vector{Vector{Float64}};
 
     c = [S[i][pointers[i]] for i in eachindex(S)]
     for n=1:min(maxdim, sum([length(s) for s in S]))
-        #println(c, pointers)
+
         m, index = findmax(c)
         if (m < tol)
             n==1 && error("The largest singular value is smaller than tol! $m < $tol")
@@ -151,7 +151,6 @@ function svdtrunc(A::AbstractSymTensor;
 
     ns = truncatedsizes(blks_s, maxdim=maxdim, tol=tol)
     indices = findall(x->x>0, ns)
-    #n_sects_new = sum(ns .> 0)
 
     sects_u  = sects_u[indices]
     sects_s  = sects_s[indices]

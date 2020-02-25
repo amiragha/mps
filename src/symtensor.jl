@@ -269,16 +269,6 @@ function mul!(B::T, A::T, α) where {T<:AbstractSymTensor}
     issimilar(A, B) || error("oops")
     semitsA = collect(onlysemitokens(A.blocks))
     semitsB = collect(onlysemitokens(B.blocks))
-    for i in 1:length(semitsA)
-        if length(A.blocks[semitsA[i]]) != length(B.blocks[semitsB[i]])
-            println()
-            println(A.blocks)
-            println(B.blocks)
-            println(A.blocks[semitsA[i]])
-            println(B.blocks[semitsB[i]])
-            println()
-        end
-    end
     for st in onlysemitokens(B.blocks)
         mul!(B.blocks[st], A.blocks[st], α)
     end

@@ -49,7 +49,7 @@
         index2 = count_ones.(nums) .== 2
         index1 = count_ones.(nums) .== 1
         index0 = count_ones.(nums) .== 0
-        println(sectors(h4sym))
+
         @test h4[index0,index0] == h4sym.blocks[Sector(U1(0), U1(0))]
         @test h4[index1,index1] == h4sym.blocks[Sector(U1(1), U1(1))]
         @test h4[index2,index2] == h4sym.blocks[Sector(U1(2), U1(2))]
