@@ -1,112 +1,51 @@
 """
     initialenv(mps, mpo)
 
-initialize and environment for a dmrg algorithm that is about to start
-from left by default! The variable `isometry=:L2R` will initialize
-for a dmrg about to start from right.
+construct and initialize the environment for a dmrg algorithm that is
+about to start at positon `at` (defaulted to `1`)! The environment is
+made from `mps` and `mpo` by the _mpsupdateright function.
 
 """
-function initialenv(mps::MatrixProductState{T},
-                    mpo::MatrixProductOperator{T};
-                    isometry::Symbol=:R) where {T<:Number}
-    lx = mps.lx
-    env = Vector{Array{T, 3}}(undef, lx+2)
-    env[1] = ones(T, 1,1,1)
-    env[lx+2] = ones(T, 1,1,1)
-    if isometry == :R
-        mps.center == 1 || error("MPS center has to be 1")
-        for l = lx:-1:1
-            env[l+1] = _mpsupdateright(env[l+2], mps.matrices[l], mpo.tensors[l])
-        end
-    elseif isometry == :L
-        for l = 1:lx
-            mps.center == lx || error("MPS center has to be $lx")
-            env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
-        end
-    else
-        error("Invalid isometry value $isometry")
+function initialenv(mps::MPState{Ys},
+                    mpo::MPOperator{Yo};
+                    at::Int=1) where {Ys, Yo}
+    vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
+        error("MPS, MPO not the same type!")
+    center(mps) == at || error("MPS center has to be $at")
+
+    lx = length(mps)
+    env = Vector{Ys}(undef, lx+2)
+
+    lVa = leftspace(mps)
+    rVa = rightspace(mps)
+    lVw = leftspace(mpo)
+    rVw = rightspace(mpo)
+
+    T = eltype(Ys)
+    env[1] = fill(one(T), (dual(lVa), dual(lVw), lVa))
+    env[lx+2] = fill(one(T), (rVa, rVw, dual(rVa)))
+
+    for l = lx:-1:at
+        env[l+1] = _mpsupdateright(env[l+2], mps.As[l], mpo.Ws[l])
+    end
+
+    for l = 1:at-1
+        env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
     end
     return env
 end
 
-function initialenv(mps::MatrixProductState{ComplexF64},
-                    mpo::MatrixProductOperator{Float64};
-                    isometry::Symbol=:R)
-    initialenv(mps,
-               convert(MatrixProductOperator{ComplexF64}, mpo),
-               isometry=isometry)
-end
+# function _initialenv(mps::MPState{Y1},
+#                      mpo::MPOperator{Y2};
+#                      at::Int=1) where {Y1, Y2}
+#     Y = promote_type(Y1, Y2)
+#     initialenv(convert(MPState{Y}, mps),
+#                convert(MPOperator{Y}, mpo),
+#                at=at)
+# end
 
 """
-    dmrg1sitesweep!(mps, mpo, env, maxdim [; verbose])
-
-Performs a single sweep (left to right and back) of 1site DMRG on
-`mps` where the hamiltonian is given in `mpo` and environment matrices
-for each step are stored in `env`.
-
-Returns the energy and updates, `mps` and `env`
-"""
-
-function dmrg1sitesweep!(mps::MatrixProductState{T},
-                         mpo::MatrixProductOperator{T},
-                         env::Vector{Array{T, 3}};
-                         verbose::Bool=false) where {T<:Number}
-    lx = mps.lx
-    d = mps.d
-
-    mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
-
-    mat = mps.matrices[1]
-    for l = 1:lx-1
-        es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
-                                mat, 1, :SR, ishermitian=true)
-        v = vs[1]
-        e = es[1]
-        verbose && println("Sweep L2R: site $l -> energy $e")
-        #push!(energies, e)
-
-        Q, Λ = qr(reshape(v, size(mat,1)*d, :))
-
-        ##NOTE: the Matrix function here is needed to return the thin Q!
-        mps.matrices[l] = reshape(Matrix(Q), size(mat))
-        env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
-
-        @tensor mat[l,o,r] := Λ[l,r] * mps.matrices[l+1][m,o,r]
-    end
-
-    l = lx
-    es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
-                            mat, 1, :SR, ishermitian=true)
-    e=es[1]
-    verbose && println("Sweep L2R: site $l -> energy $e")
-    #push!(energies, e)
-
-    for l = lx-1:-1:1
-        Q, Λ = qr(transpose(reshape(mat, size(mat,1), :)))
-
-        ##NOTE: the matrix function here is needed to return the thin Q!
-        Q = transpose(Matrix(Q))
-        Λ = transpose(Λ)
-
-        mps.matrices[l+1] = reshape(Q, size(mat))
-        env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
-        @tensor mat[-1,-2,-3] := mps.matrices[l][-1,-2, 1] * Λ[1,-3]
-
-        es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
-                                mat, 1, :SR, ishermitian=true)
-
-        v = vs[1]
-        e = es[1]
-        verbose && println("Sweep L2R: site $l -> energy $e")
-        #push!(energies, e)
-    end
-    mps.matrices[1] = mat
-
-    return e
-end
-
-"""
-    dmrg2sitesweep!(mps, mpo, env, maxdim [; verbose])
+    dmrg2sitesweep!(mps, mpo, env; [maxdim, tol, verbose, kwargs...])
 
 Performs a single sweep (left to right and back) of 2site DMRG on
 `mps` where the hamiltonian is given in `mpo` and environment matrices
@@ -115,79 +54,151 @@ upto truncation error or up to number of `maxdim`.
 
 Returns the tuple of (energies, truncations) and updates, `mps` and `env`
 """
-function dmrg2sitesweep!(mps::MatrixProductState{T},
-                         mpo::MatrixProductOperator{T},
-                         env::Vector{Array{T, 3}},
-                         maxdim::Int=200,
-                         tol::Float64=1.e-8;
-                         verbose::Bool=false) where {T<:Number}
-    lx = mps.lx
-    d = mps.d
 
+function dmrg2sitesweep!(mps::MPState{Ys},
+                         mpo::MPOperator{Yo},
+                         env::Vector{Ys};
+                         maxdim::Int=200,
+                         tol::Float64=1.e-9,
+                         lanczostol::Float64=1.e-7,
+                         krylovdim::Int=5,
+                         krylovmaxiter::Int=8,
+                         verbose::Bool=false) where {Ys, Yo}
+
+    vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
+        error("MPS, MPO not the same type!")
+    lx = length(mps)
     mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
 
-    mat = mps.matrices[1]
+    energies = Vector{Float64}()
+    A = mps.As[1]
     for l = 1:lx-2
-        @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
-        # display(vmat)
-        # display(_applymps2site(vmat, env[1], env[4], mpo.tensors[1], mpo.tensors[2]))
-        # return
-
+        AA = contract(A, (1,2,-1), mps.As[l+1], (-1,3,4))
         es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
-                                                  mpo.tensors[l], mpo.tensors[l+1]),
-                                vmat, 1, :SR, ishermitian=true)
+                                                  mpo.Ws[l], mpo.Ws[l+1]),
+                                AA, 1, :SR, ishermitian=true,
+                                tol=lanczostol,
+                                krylovdim=krylovdim,
+                                maxiter=krylovmaxiter)
         v = vs[1]
-        e = es[1]
-        verbose && println("Sweep L2R: site $l -> energy $e")
-        #push!(energies, e)
+        #e = es[1]
+        verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $(es[1])")
+        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
 
-        U, S, Vt = svdtrunc(reshape(v, size(v,1)*d, :), maxdim=maxdim, tol=tol)
+        u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+        verbose && println("truncation error = $(1-norm(s))")
+        normalize!(s)
+        AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
+        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                                   mpo.Ws[l], mpo.Ws[l+1]))
+        verbose && println("energy after truncation $e")
+        push!(energies, e)
+        if verbose
+            values = diag(s)
+            println("Entanglement S1 = $(entropy(values.^2))")
+            println()
+        end
+        mps.As[l] = splitleg(u, 1, space(A)[1:2])
 
-        mps.matrices[l] = reshape(U, size(mat,1), d, :)
-        mps.dims[l+1] = size(S, 1)
+        env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
 
-        env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
-
-        mat = reshape(S*Vt, size(S,1), d, size(mps.matrices[l+1],3))
+        A = splitleg(s*v, 2, space(AA)[3:4])
     end
 
     l = lx-1
-    @tensor vmat[-1,-2,-3,-4] := mat[-1,-2,1] * mps.matrices[l+1][1,-3,-4]
+    AA = contract(A, (1,2,-1), mps.As[l+1], (-1,3,4))
     es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
-                                              mpo.tensors[l], mpo.tensors[l+1]),
-                            vmat, 1, :SR, ishermitian=true)
+                                              mpo.Ws[l], mpo.Ws[l+1]),
+                            AA, 1, :SR, ishermitian=true,
+                            tol=lanczostol,
+                            krylovdim=krylovdim,
+                            maxiter=krylovmaxiter)
+
     v = vs[1]
-    e = es[1]
-    verbose && println("Sweep L2R: site $l -> energy $e")
-    #push!(energies, e)
+    #e = es[1]
+    verbose && println("Sweep L2R: bond $l, $(l+1) -> energy $(es[1])")
+    verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
+    # verbose && println("truncation error = 1")
+    # push!(energies, e)
 
     for l = lx-1:-1:2
-        U, S, Vt = svdtrunc(reshape(v, size(v,1)*d, :), maxdim=maxdim, tol=tol)
+        u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+        verbose && println("truncation error = $(1-norm(s))")
+        normalize!(s)
+        AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
+        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                                   mpo.Ws[l], mpo.Ws[l+1]))
+        verbose && println("energy after truncation $e")
+        push!(energies, e)
 
-        mps.matrices[l+1] = reshape(Vt, size(Vt, 1), d, size(v,4))
-        mps.dims[l+1] = size(S, 1)
+        if verbose
+            values = diag(s)
+            println("Entanglement S1 = $(entropy(values.^2))")
+            println()
+        end
 
-        env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+        mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
+        env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
-        mat = reshape(U*S, size(v, 1), d, size(S, 2))
-        @tensor vmat[-1,-2,-3,-4] := mps.matrices[l-1][-1,-2,1] * mat[1,-3,-4]
+        A = splitleg(u*s, 1, space(AA)[1:2])
+        AA = contract(mps.As[l-1], (1,2,-1), A, (-1,3,4))
 
         es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
-                                                  mpo.tensors[l-1], mpo.tensors[l]),
-                                vmat, 1, :SR, ishermitian=true)
+                                                  mpo.Ws[l-1], mpo.Ws[l]),
+                                AA, 1, :SR, ishermitian=true,
+                                tol=lanczostol,
+                                krylovdim=krylovdim,
+                                maxiter=krylovmaxiter)
         v = vs[1]
-        e = es[1]
-        verbose && println("Sweep R2L: site $l -> energy $e")
-        #push!(energies, e)
+        #e = es[1]
+        verbose && println("Sweep R2L: bond $(l-1), $l -> energy $(es[1])")
+        verbose && println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
+        push!(energies, e)
     end
     l = 1
-    U, S, Vt = svdtrunc(reshape(v, size(v,1)*d, :), maxdim=maxdim, tol=tol)
+    u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
+    verbose && println("truncation error = $(1-norm(s))")
+    normalize!(s)
+    AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
+    e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+                               mpo.Ws[l], mpo.Ws[l+1]))
+    verbose && println("energy after truncation $e")
+    push!(energies, e)
 
-    mps.matrices[l+1] = reshape(Vt, size(Vt, 1), d, size(v,4))
-    mps.dims[l+1] = size(S, 1)
-    env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+    if verbose
+        values = diag(s)
+        println("Entanglement S1 = $(entropy(values.^2))")
+        println()
+    end
 
-    mps.matrices[l] = reshape(U*S, size(v, 1), d, size(S, 2))
+    mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
+env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
 
-    return e
+mps.As[l] = splitleg(u*s, 1, space(AA)[1:2])
+return energies
 end
+
+# function dmrg2site!(mps::MPState{S,Tv},
+#                     mpo::MPOperator{Tv};
+#                     infostring::String="",
+#                     finalmeasurements::Vector{Measurement}=[],
+#                     sweepmeasurements::Vector{Measurement}=[],
+#                     n_sweeps::Int=4,
+#                     maxdim::Int=200,
+#                     tol::Float64=1.e-8,
+#                     verbose::Bool=false)
+
+#     n < 1 && return
+
+#     env = initialenv(mps, mpo)
+#     energies = zeros(Float64, 2*mps.lx-3, n_sweeps)
+#     for n in 1:n_sweeps
+#         verbose && println("Starting sweeps ")
+#         energies[:, n] =
+#             dmrg2sitesweep!(mps, mpo, env, maxdim=maxdim, tol=tol, verbose=verbose)
+#         if length(sweepmeasurements) > 0
+#             # do the measurements
+#         end
+#     end
+
+# end

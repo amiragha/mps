@@ -1,20 +1,14 @@
-"""
-    initialenv(mps, mpo)
-
-construct and initialize the environment for a dmrg algorithm that is
-about to start at positon `at` (defaulted to `1`)! The environment is
-made from `mps` and `mpo` by the _mpsupdateright function.
-
-"""
-function initialenv(mps::MPState{Ys},
-                    mpo::MPOperator{Yo};
-                    at::Int=1) where {Ys, Yo}
+# save the environment in files
+function initialenv_asyncio(mps::MPState{Ys},
+                            mpo::MPOperator{Yo};
+                            at::Int=1) where {Ys, Yo}
     vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
         error("MPS, MPO not the same type!")
     center(mps) == at || error("MPS center has to be $at")
 
+    prefixname = "$(Date(now())), temporary_env"
     lx = length(mps)
-    env = Vector{Ys}(undef, lx+2)
+    env = ["$(prefixname)#$n.dat" for n in 1:lx+2]
 
     lVa = leftspace(mps)
     rVa = rightspace(mps)
@@ -22,38 +16,34 @@ function initialenv(mps::MPState{Ys},
     rVw = rightspace(mpo)
 
     T = eltype(Ys)
-    env[1] = fill(one(T), (dual(lVa), dual(lVw), lVa))
-    env[lx+2] = fill(one(T), (rVa, rVw, dual(rVa)))
+
+    envL = fill(one(T), (dual(lVa), dual(lVw), lVa))
+    @save env[1] envL
+
+    envR = fill(one(T), (rVa, rVw, dual(rVa)))
+    @save env[lx+2] envR
 
     for l = lx:-1:at
-        env[l+1] = _mpsupdateright(env[l+2], mps.As[l], mpo.Ws[l])
+        envR = _mpsupdateright(envR, mps.As[l], mpo.Ws[l])
+        @save env[l+1] envR
     end
 
-    for l = 1:at-1
-        env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
+    for l = 2:at-1
+        envL = _mpsupdateleft(envL, mps.As[l], mpo.Ws[l])
+        @save env[l+1] envL
     end
     return env
 end
 
-# function _initialenv(mps::MPState{Y1},
-#                      mpo::MPOperator{Y2};
-#                      at::Int=1) where {Y1, Y2}
-#     Y = promote_type(Y1, Y2)
-#     initialenv(convert(MPState{Y}, mps),
-#                convert(MPOperator{Y}, mpo),
-#                at=at)
-# end
-
-
-function dmrg2sitesweep!(mps::MPState{Ys},
-                         mpo::MPOperator{Yo},
-                         env::Vector{Ys};
-                         maxdim::Int=200,
-                         tol::Float64=1.e-9,
-                         lanczostol::Float64=1.e-7,
-                         krylovdim::Int=5,
-                         krylovmaxiter::Int=8,
-                         verbose::Bool=false) where {Ys, Yo}
+function dmrg2sitesweep_asyncio!(mps::MPState{Ys},
+                                 mpo::MPOperator{Yo},
+                                 env::Vector{String};
+                                 maxdim::Int=200,
+                                 tol::Float64=1.e-9,
+                                 lanczostol::Float64=1.e-7,
+                                 krylovdim::Int=5,
+                                 krylovmaxiter::Int=8,
+                                 verbose::Bool=false) where {Ys, Yo}
 
     vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
         error("MPS, MPO not the same type!")
@@ -62,9 +52,15 @@ function dmrg2sitesweep!(mps::MPState{Ys},
 
     energies = Vector{Float64}()
     A = mps.As[1]
+    @load env[1] envL
+    env_next = load(env[4], "envR")
     for l = 1:lx-2
         AA = contract(A, (1,2,-1), mps.As[l+1], (-1,3,4))
-        es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
+        envR = env_next
+        ## This need to be asynchronous
+        env_next = load(env[l+4], "envR")
+
+        es, vs, info = eigsolve(v->_applymps2site(v, envL, envR,
                                                   mpo.Ws[l], mpo.Ws[l+1]),
                                 AA, 1, :SR, ishermitian=true,
                                 tol=lanczostol,
@@ -90,7 +86,9 @@ function dmrg2sitesweep!(mps::MPState{Ys},
         end
         mps.As[l] = splitleg(u, 1, space(A)[1:2])
 
-        env[l+1] = _mpsupdateleft(env[l], mps.As[l], mpo.Ws[l])
+        envL = _mpsupdateleft(envL, mps.As[l], mpo.Ws[l])
+        # This need to asynchronous
+        save(env[l+1], "envL", envL)
 
         A = splitleg(s*v, 2, space(AA)[3:4])
     end
@@ -191,4 +189,71 @@ end
 #         end
 #     end
 
+# end
+# """
+#     dmrg1sitesweep!(mps, mpo, env, maxdim [; verbose])
+
+# Performs a single sweep (left to right and back) of 1site DMRG on
+# `mps` where the hamiltonian is given in `mpo` and environment matrices
+# for each step are stored in `env`.
+
+# Returns the energy and updates, `mps` and `env`
+# """
+
+# function dmrg1sitesweep!(mps::MatrixProductState{T},
+#                          mpo::MatrixProductOperator{T},
+#                          env::Vector{Array{T, 3}};
+#                          verbose::Bool=false) where {T<:Number}
+#     lx = mps.lx
+#     d = mps.d
+
+#     mps.center == 1 || error("The center of MPS has to be 1 for dmrg L->R->L")
+
+#     mat = mps.matrices[1]
+#     for l = 1:lx-1
+#         es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
+#                                 mat, 1, :SR, ishermitian=true)
+#         v = vs[1]
+#         e = es[1]
+#         verbose && println("Sweep L2R: site $l -> energy $e")
+#         #push!(energies, e)
+
+#         Q, Λ = qr(reshape(v, size(mat,1)*d, :))
+
+#         ##NOTE: the Matrix function here is needed to return the thin Q!
+#         mps.matrices[l] = reshape(Matrix(Q), size(mat))
+#         env[l+1] = _mpsupdateleft(env[l], mps.matrices[l], mpo.tensors[l])
+
+#         @tensor mat[l,o,r] := Λ[l,r] * mps.matrices[l+1][m,o,r]
+#     end
+
+#     l = lx
+#     es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
+#                             mat, 1, :SR, ishermitian=true)
+#     e=es[1]
+#     verbose && println("Sweep L2R: site $l -> energy $e")
+#     #push!(energies, e)
+
+#     for l = lx-1:-1:1
+#         Q, Λ = qr(transpose(reshape(mat, size(mat,1), :)))
+
+#         ##NOTE: the matrix function here is needed to return the thin Q!
+#         Q = transpose(Matrix(Q))
+#         Λ = transpose(Λ)
+
+#         mps.matrices[l+1] = reshape(Q, size(mat))
+#         env[l+2] = _mpsupdateright(env[l+3], mps.matrices[l+1], mpo.tensors[l+1])
+#         @tensor mat[-1,-2,-3] := mps.matrices[l][-1,-2, 1] * Λ[1,-3]
+
+#         es, vs, info = eigsolve(v->_applymps1site(v, env[l], env[l+2], mpo.tensors[l]),
+#                                 mat, 1, :SR, ishermitian=true)
+
+#         v = vs[1]
+#         e = es[1]
+#         verbose && println("Sweep L2R: site $l -> energy $e")
+#         #push!(energies, e)
+#     end
+#     mps.matrices[1] = mat
+
+#     return e
 # end
