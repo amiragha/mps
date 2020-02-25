@@ -166,26 +166,26 @@ end
         A1 = rand(Float64, zero(U1), (V1,V2))
         A2 = rand(Float64, U1(1), (V1,V2))
         A3 = rand(Float64, U1(-1), (V1,V2))
-        u,s,v = svd(A1)
+        u,s,v = _svd_(A1)
         @test u*s*v ≈ A1
-        u,s,v = svd(A2)
+        u,s,v = _svd_(A2)
         @test u*s*v ≈ A2
-        u,s,v = svd(A3)
+        u,s,v = _svd_(A3)
         @test u*s*v ≈ A3
 
         B1 = rand(ComplexF64, zero(U1), (V1,dual(V3)))
         B2 = rand(ComplexF64, U1(1), (V1,dual(V3)))
         B3 = rand(ComplexF64, U1(-1), (V1,dual(V3)))
-        u,s,v = svd(B1)
+        u,s,v = _svd_(B1)
         @test u*s*v ≈ B1
-        u,s,v = svd(B2)
+        u,s,v = _svd_(B2)
         @test u*s*v ≈ B2
-        u,s,v = svd(B3)
+        u,s,v = _svd_(B3)
         @test u*s*v ≈ B3
     end
 
     @testset "svdtrunc" begin
         A1 = SymTensor(rand, ComplexF64, zero(U1), (V1,V2))
-        @test svd(A1) ≈ svdtrunc(A1)
+        @test _svd_(A1) ≈ svdtrunc(A1)
     end
 end

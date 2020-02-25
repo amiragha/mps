@@ -26,7 +26,14 @@ function _generatempo_nosym(model::UnitCellQModel;
     n_sites = prod(model.lattice.sizes)
     T = eltype(model.inters[1])
 
-    allterms = Vector{QInteraction}()
+    sz,sp,sm = spinoperators(1/2)
+    dict = Dict{Symbol, Matrix{T}}()
+    dict[:Z] = sz
+    dict[:P] = sp
+    dict[:M] = sm
+    dict[:I] = I(2)
+
+    allterms = Vector{QTerm{Matrix{T}}}()
     for is in Iterators.product([1:l for l in model.lattice.sizes]...)
         for interaction in model.inters
             ns = interaction.ucidxs
@@ -44,9 +51,12 @@ function _generatempo_nosym(model::UnitCellQModel;
             if isinside
                 perm = sortperm(indexes)
                 verbose && println("Adding $(interaction.amp) between $(indexes[perm])")
-                terms = [term[perm] for term in interaction.terms]
-                push!(allterms,
-                      QInteraction(interaction.amp, Tuple(indexes[perm]), terms))
+                for qaterm in interaction.terms
+                    ops = [dict[qaterm.ops[i]] for i in eachindex(qaterm.ops)]
+                    permutedops = ops[perm]
+                    termops = (permutedops[1:end-1]..., qaterm.amp * interaction.amp * permutedops[end])
+                    push!(allterms, QTerm(Tuple(indexes[perm]), termops))
+                end
             end
         end
     end
@@ -54,19 +64,19 @@ function _generatempo_nosym(model::UnitCellQModel;
 
     dims = ones(Int, n_sites+1)
     pointer=1
-    tensors = Vector{Array{Float64, 4}}(undef, n_sites)
+    mpo = MPO{T}()
     ldim = 1
     n_pcols = 0
-    pterms = Vector{QInteraction}()
-    nextterms = Vector{QInteraction}()
+    pterms = Vector{QTerm}()
+    nextterms = Vector{QTerm}()
     for n in 1:n_sites
-        lterms = Vector{QInteraction}()
-        sterms = Vector{QInteraction}()
+        lterms = Vector{QTerm}()
+        sterms = Vector{QTerm}()
         n_ncols = 0
         while pointer <= length(allterms) && allterms[pointer].sites[1] == n
             if support(allterms[pointer]) > 1
                 push!(sterms, allterms[pointer])
-                n_ncols += length(allterms[pointer].terms)
+                n_ncols += length(allterms[pointer].ops)
             else
                 push!(lterms, allterms[pointer])
             end
@@ -76,7 +86,7 @@ function _generatempo_nosym(model::UnitCellQModel;
         n_pcols = 0
         for pterm in pterms
             if pterm.sites[1] > n || support(pterm) > 1
-                n_pcols += length(pterm.terms)
+                n_pcols += length(pterm.ops)
             end
         end
 
@@ -100,55 +110,44 @@ function _generatempo_nosym(model::UnitCellQModel;
             W[ldim, :, rdim, :] = I(d)
         end
 
-        #W[ldim, :, 1, :] = sum(lterms).terms[1]
         row = 2
         col = 2
         for pterm in pterms
             if pterm.sites[1] == n
                 if support(pterm) == 1
-                    for i in eachindex(pterm.terms)
-                        W[row, :, 1, :] = pterm.amp * pterm.terms[i][1]
+                    W[row, :, 1, :] = pterm.ops[1]
                         row+=1
-                    end
                 else
-                    for i in eachindex(pterm.terms)
-                        W[row, :, col, :] = pterm.terms[i][1]
+                        W[row, :, col, :] = pterm.ops[1]
                         row+=1
                         col+=1
-                    end
                     push!(nextterms, removehead(pterm))
                 end
             else
-                for i in eachindex(pterm.terms)
                     W[row, :, col, :] = I(d)
                     row+=1
                     col+=1
-                end
                 push!(nextterms, pterm)
             end
         end
         n_pcols = col - 2
 
         for lterm in lterms
-            for i in eachindex(lterm.terms)
-                W[ldim, :, 1, :] += lterm.amp * lterm.terms[i][1]
-            end
+                W[ldim, :, 1, :] += lterm.ops[1]
         end
 
         for sterm in sterms
-            for i in eachindex(sterm.terms)
-                W[ldim, :, col, :] = sterm.terms[i][1]
+                W[ldim, :, col, :] = sterm.ops[1]
                 col += 1
-            end
             push!(nextterms, removehead(sterm))
         end
 
-        tensors[n] =  W
+        push!(mpo, W)
         pterms = nextterms
-        nextterms = Vector{QInteraction}()
+        nextterms = Vector{QTerm}()
         ldim = rdim
     end
-    MPOperator(n_sites, d, dims, tensors)
+    mpo
 end
 
 function _generatempo_sym(model::UnitCellQModel;

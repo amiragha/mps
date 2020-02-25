@@ -6,9 +6,9 @@
 
         h2sym = contract(smpo.Ws[1], (1,2,-1,5),
                          smpo.Ws[4], (-1,3,4,6))
-        h2sym = fuselegs(fuselegs(h2sym, 2, 2), 4, 2, true)
-        h2sym = removedummyleg(h2sym, 3)
-        h2sym = removedummyleg(h2sym, 1)
+        h2sym = fuselegs(fuselegs(h2sym, 1, 3), 2, 3, true)
+        # h2sym = dropdummyleg(h2sym, 3)
+        # h2sym = dropdummyleg(h2sym, 1)
 
         h4sym = contract(
             contract(
@@ -17,9 +17,9 @@
                 smpo.Ws[3], (-1,4,5,8)), (1,2,3,4,-1,7,8,9),
             smpo.Ws[4], (-1,5,6,10))
 
-        h4sym = fuselegs(fuselegs(h4sym, 2, 4), 4, 4, true)
-        h4sym = removedummyleg(h4sym, 3)
-        h4sym = removedummyleg(h4sym, 1)
+        h4sym = fuselegs(fuselegs(h4sym, 1, 5), 2, 5, true)
+        # h4sym = dropdummyleg(h4sym, 3)
+        # h4sym = dropdummyleg(h4sym, 1)
 
         @tensor h2[:] :=
             mpo.Ws[1][-1,-2,1,-5] * mpo.Ws[4][1,-3,-4,-6]
@@ -49,11 +49,13 @@
         index2 = count_ones.(nums) .== 2
         index1 = count_ones.(nums) .== 1
         index0 = count_ones.(nums) .== 0
-        @test h4[index0,index0] == h4sym.nzblks[1]
-        @test h4[index1,index1] == h4sym.nzblks[2]
-        @test h4[index2,index2] == h4sym.nzblks[3]
-        @test h4[index3,index3] == h4sym.nzblks[4]
-        @test h4[index4,index4] == h4sym.nzblks[5]
+        println(sectors(h4sym))
+        @test h4[index0,index0] == h4sym.blocks[Sector(U1(0), U1(0))]
+        @test h4[index1,index1] == h4sym.blocks[Sector(U1(1), U1(1))]
+        @test h4[index2,index2] == h4sym.blocks[Sector(U1(2), U1(2))]
+        @test h4[index3,index3] == h4sym.blocks[Sector(U1(3), U1(3))]
+        @test h4[index4,index4] == h4sym.blocks[Sector(U1(4), U1(4))]
+
     end
 
 
@@ -97,7 +99,7 @@ end
         @test mpo2hamiltonian(legacympo) ≈ mpo2hamiltonian(mpo)
 
         tmodel = triangularspinmodel((2, n),
-                                     0.3, 1.0, 1.0, 0.0, 0.0, 0.0,
+                                     j2, j1, j1, 0.0, 0.0, 0.0,
                                      boundary=(:OBC, :OBC))
         tmpo = generatempo(tmodel)
         @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(mpo)
@@ -106,7 +108,7 @@ end
     @testset "j1j2sym" begin
         j1, j2 = 1.0, 0.3
         for lx in [3, 4]
-            smodel = j1j2model(lx, j1, j2, symmetry=:U1)
+            smodel = j1j2model(lx, j1, j2, symmetry=U1)
             smpo = generatempo(smodel)
 
             model = j1j2model(lx, j1, j2)
@@ -118,18 +120,18 @@ end
             nums = collect(0:2^lx-1)
             indexes = [count_ones.(nums) .== m for m in 0:lx]
             for n = 1:lx
-                @test H[indexes[n], indexes[n]] ≈ sH.nzblks[n]
+                @test H[indexes[n], indexes[n]] ≈ sH.blocks[Sector(U1(n-1), -U1(n-1))]
             end
         end
 
         for n in [2, 3]
-            smodel = j1j2model(2*n, j1, j2, symmetry=:U1)
+            smodel = j1j2model(2*n, j1, j2, symmetry=U1)
             smpo = generatempo(smodel)
 
             tmodel = triangularspinmodel((2, n),
                                          0.3, 1.0, 1.0, 0.0, 0.0, 0.0,
                                          boundary=(:OBC, :OBC),
-                                         symmetry=:U1)
+                                         symmetry=U1)
             tmpo = generatempo(tmodel)
             @test mpo2hamiltonian(tmpo) ≈ mpo2hamiltonian(smpo)
         end
@@ -163,7 +165,7 @@ end
     @testset "2legtrianglesym" begin
         j1, j2, j3, k1, k2, k3 = rand(6)
         for n in [2, 3]
-            smodel = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3, symmetry=:U1)
+            smodel = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3, symmetry=U1)
             smpo = generatempo(smodel)
 
             model = triangularspinmodel((2,n), j1, j2, j3, k1, k2, k3)
@@ -177,7 +179,7 @@ end
             nums = collect(0:2^lx-1)
             indexes = [count_ones.(nums) .== m for m in 0:lx]
             for n = 1:lx
-                @test H[indexes[n], indexes[n]] ≈ sH.nzblks[n]
+                @test H[indexes[n], indexes[n]] ≈ sH.blocks[Sector(U1(n-1), -U1(n-1))]
             end
         end
     end

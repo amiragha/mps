@@ -16,7 +16,7 @@ function Base.isapprox(A::Tuple, B::Tuple)
     all(isapprox(A[i],B[i]) for i=1:length(A))
 end
 
-#include("modeltests.jl")
-#include("mpstests.jl")
-#include("mpotests.jl")
+include("modeltests.jl")
+include("mpstests.jl")
+include("mpotests.jl")
 include("symtensortests.jl")
