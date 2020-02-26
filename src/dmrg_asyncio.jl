@@ -1,14 +1,14 @@
 # save the environment in files
 function initialenv_asyncio(mps::MPState{Ys},
                             mpo::MPOperator{Yo};
-                            at::Int=1) where {Ys, Yo}
+                            at::Int=1,
+                            prefix="$(Date(now())), temporary_env") where {Ys, Yo}
     vtype(Ys) == vtype(Yo) && eltype(Ys) == eltype(Yo) ||
         error("MPS, MPO not the same type!")
     center(mps) == at || error("MPS center has to be $at")
 
-    prefixname = "$(Date(now())), temporary_env"
     lx = length(mps)
-    env = ["$(prefixname)#$n.dat" for n in 1:lx+2]
+    env = ["$(prefix)#$n.dat" for n in 1:lx+2]
 
     lVa = leftspace(mps)
     rVa = rightspace(mps)
@@ -75,7 +75,7 @@ function dmrg2sitesweep_asyncio!(mps::MPState{Ys},
         verbose && println("truncation error = $(1-norm(s))")
         normalize!(s)
         AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
-        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+        e = dot(AA, _applymps2site(AA, envL, envR,
                                    mpo.Ws[l], mpo.Ws[l+1]))
         verbose && println("energy after truncation $e")
         push!(energies, e)
@@ -95,7 +95,9 @@ function dmrg2sitesweep_asyncio!(mps::MPState{Ys},
 
     l = lx-1
     AA = contract(A, (1,2,-1), mps.As[l+1], (-1,3,4))
-    es, vs, info = eigsolve(v->_applymps2site(v, env[l], env[l+3],
+    envR = env_next
+    env_next = load(env[l-1], "envL")
+    es, vs, info = eigsolve(v->_applymps2site(v, envL, envR,
                                               mpo.Ws[l], mpo.Ws[l+1]),
                             AA, 1, :SR, ishermitian=true,
                             tol=lanczostol,
@@ -114,7 +116,8 @@ function dmrg2sitesweep_asyncio!(mps::MPState{Ys},
         verbose && println("truncation error = $(1-norm(s))")
         normalize!(s)
         AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
-        e = dot(AA, _applymps2site(AA, env[l], env[l+3],
+        #envR = env_next
+        e = dot(AA, _applymps2site(AA, envL, envR,
                                    mpo.Ws[l], mpo.Ws[l+1]))
         verbose && println("energy after truncation $e")
         push!(energies, e)
@@ -126,12 +129,22 @@ function dmrg2sitesweep_asyncio!(mps::MPState{Ys},
         end
 
         mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
-        env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
+
+        envR = _mpsupdateright(envR, mps.As[l+1], mpo.Ws[l+1])
+
+        #This need to be asynchronous
+        save(env[l+2], "envR", envR)
+
+        envL = env_next
+        ## This need to be asynchronous
+        if l > 2
+            env_next = load(env[l-2], "envL")
+        end
 
         A = splitleg(u*s, 1, space(AA)[1:2])
         AA = contract(mps.As[l-1], (1,2,-1), A, (-1,3,4))
 
-        es, vs, info = eigsolve(v->_applymps2site(v, env[l-1], env[l+2],
+        es, vs, info = eigsolve(v->_applymps2site(v, envL, envR,
                                                   mpo.Ws[l-1], mpo.Ws[l]),
                                 AA, 1, :SR, ishermitian=true,
                                 tol=lanczostol,
@@ -147,20 +160,21 @@ function dmrg2sitesweep_asyncio!(mps::MPState{Ys},
     u,s,v = svdtrunc(SymMatrix(v, [1,2], [3,4]), maxdim=maxdim, tol=tol)
     verbose && println("truncation error = $(1-norm(s))")
     normalize!(s)
-    AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
-    e = dot(AA, _applymps2site(AA, env[l], env[l+3],
-                               mpo.Ws[l], mpo.Ws[l+1]))
-    verbose && println("energy after truncation $e")
-    push!(energies, e)
+AA = splitleg(splitleg(u*s*v, 2, space(AA)[3:4]), 1, space(AA)[1:2])
+e = dot(AA, _applymps2site(AA, envL, envR,
+                           mpo.Ws[l], mpo.Ws[l+1]))
+verbose && println("energy after truncation $e")
+push!(energies, e)
 
-    if verbose
-        values = diag(s)
-        println("Entanglement S1 = $(entropy(values.^2))")
-        println()
-    end
+if verbose
+    values = diag(s)
+    println("Entanglement S1 = $(entropy(values.^2))")
+    println()
+end
 
-    mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
-env[l+2] = _mpsupdateright(env[l+3], mps.As[l+1], mpo.Ws[l+1])
+mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
+#This need to be asynchronous
+save(env[l+2], "envR", envR)
 
 mps.As[l] = splitleg(u*s, 1, space(AA)[1:2])
 return energies
