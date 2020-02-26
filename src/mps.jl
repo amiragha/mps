@@ -1,8 +1,10 @@
 # equal probability constructor
 function MPS{T}(lx::Int, d::Int=2;
-                noise::Float64=0.0) where {T<:Number}
+                noise::Float64=0.0,
+                seed=1911) where {T<:Number}
 
-    As = [ sqrt(1/d) * ones(T, 1, d, 1) + noise * randn(T, 1, d, 1)
+    rng = MersenneTwister(seed);
+    As = [ sqrt(1/d) * ones(T, 1, d, 1) + noise * randn(rng, T, 1, d, 1)
            for i=1:lx ]
     mps = MPS{T}(As, 0)
     center_at!(mps, 1)
@@ -27,7 +29,8 @@ end
 function MPS{T}(lx::Int, d::Int,
                 initconf::Vector{Int},
                 maxdim::Int,
-                noise::Float64) where {T<:Number}
+                noise::Float64;
+                seed=1911) where {T<:Number}
     all((0 .<= initconf) .& (initconf .< d)) ||
         error("conf vector out of bounds!")
 
@@ -41,7 +44,8 @@ function MPS{T}(lx::Int, d::Int,
     end
     ### till here!
 
-    mps = MPS{T}([ noise * randn(T, dims[i], d, dims[i+1]) for i=1:lx ], 0)
+    rng = MersenneTwister(seed);
+    mps = MPS{T}([ noise * randn(rng, T, dims[i], d, dims[i+1]) for i=1:lx ], 0)
     for site=1:lx
         mps.As[site][1, initconf[site]+1, 1] = 1.
     end

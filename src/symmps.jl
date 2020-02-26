@@ -45,11 +45,13 @@ function U1MPS(::Type{T},
                lx::Int,
                d::Int,
                m::U1Charge;
-               noise::T=0.0) where {T}
+               noise::T=0.0,
+               seed=1911) where {T}
 
     mps = U1MPS{T}()
     M = m.charge
 
+    rng = MersenneTwister(1234);
     # Just find all the possible sectors for each site and put one(T)
     # This gives an MPS with a norm of binomial(lx,m) if no noise.
     Vd = U1Space(c=>1 for c in 0:d-1)
@@ -58,7 +60,7 @@ function U1MPS(::Type{T},
         cmin = max(0, M-(d-1)*(lx-site))
         cmax = min(M, (d-1)*site)
         Vr = U1Space(c=>1 for c in cmin:cmax)
-        A = SymTensor((x,y)->ones(x,y) .+ noise .* randn(x,y),
+        A = SymTensor((x,y)->ones(x,y) .+ noise .* randn(rng, x,y),
                       zero(U1), (Vl, Vd, dual(Vr)))
         push!(mps, A)
         Vl = Vr
