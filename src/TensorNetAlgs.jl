@@ -14,16 +14,17 @@ using KrylovKit
 
 include("apply.jl")
 include("dmrg.jl")
-include("dmrg_asyncio.jl")
+include("dmrg_envio.jl")
 #include("idmrg.jl")
 include("tdvp.jl")
 
 export initialenv
-export initialenv_asyncio
+export _initialenv_tempfiles
 
 export dmrg1sitesweep!
 export dmrg2sitesweep!
-export dmrg2sitesweep_asyncio!
+export dmrg2sitesweep_envio!
+export dmrg2sitesweep_envasyncio!
 export idmrg2site
 export tdvp1sitesweep!
 export tdvp2sitesweep!
