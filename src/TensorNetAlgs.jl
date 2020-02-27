@@ -3,6 +3,7 @@ module TensorNetAlgs
 using Dates
 using JLD2
 using FileIO
+#using Distributed
 
 using MatrixProductStateTools
 using SymTensors

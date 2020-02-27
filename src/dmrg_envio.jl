@@ -189,6 +189,7 @@ function dmrg2sitesweep_envasyncio!(mps::MPState{Ys},
             e = dot(AA, _applymps2site(AA, envL, envR,
                                        mpo.Ws[l], mpo.Ws[l+1]))
             push!(energies, e)
+
             if verbose
                 println("Sweep L2R: bond $l, $(l+1) -> energy $(es[1])")
                 println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
@@ -199,18 +200,15 @@ function dmrg2sitesweep_envasyncio!(mps::MPState{Ys},
                 println()
             end
             mps.As[l] = splitleg(u, 1, space(A)[1:2])
-
-            envL = _mpsupdateleft(envL, mps.As[l], mpo.Ws[l])
-
             A = splitleg(s*v, 2, space(AA)[3:4])
         end
+        envL = _mpsupdateleft(envL, mps.As[l], mpo.Ws[l])
     end
     # # saving env[lx-1] which is 1...(lx-2) (no need to save!)
     # save(env[l], "envL", envL)
     envR = env_next
     env_next = envL
     for l = lx-1:-1:1
-        println("$l")
         @sync begin
             @async save(env[l+3], "envR", envR)
             envL = env_next
@@ -219,7 +217,7 @@ function dmrg2sitesweep_envasyncio!(mps::MPState{Ys},
                     env_next = load(env[l-1], "envL")
                 end
             end
-            println("here")
+
             if l == lx-1
                 AA = contract(A, (1,2,-1), mps.As[l+1], (-1,3,4))
             else
@@ -242,7 +240,6 @@ function dmrg2sitesweep_envasyncio!(mps::MPState{Ys},
                                        mpo.Ws[l], mpo.Ws[l+1]))
             push!(energies, e)
 
-            println("here")
             if verbose
                 println("Sweep L2R: bond $l, $(l+1) -> energy $(es[1])")
                 println("normres = $(info.normres[1]), #iterations = $(info.numiter), #applications = $(info.numops)")
@@ -252,17 +249,14 @@ function dmrg2sitesweep_envasyncio!(mps::MPState{Ys},
                 println("Entanglement S1 = $(entropy(values.^2))")
                 println()
             end
-
             mps.As[l+1] = splitleg(v, 2, space(AA)[3:4])
-
-            if l > 1
-                envR = _mpsupdateright(envR, mps.As[l+1], mpo.Ws[l+1])
-                A = splitleg(u*s, 1, space(AA)[1:2])
-                    else
-                mps.As[1] = splitleg(u*s, 1, space(AA)[1:2])
-            end
+            A = splitleg(u*s, 1, space(AA)[1:2])
+        end
+        if l > 1
+            envR = _mpsupdateright(envR, mps.As[l+1], mpo.Ws[l+1])
         end
     end
+    mps.As[1] = A
     return energies
 end
 # function dmrg2site!(mps::MPState{S,Tv},
