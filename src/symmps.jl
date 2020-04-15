@@ -218,7 +218,7 @@ function schmidtvalues(mps::MPState)
     values
 end
 
-entanglementspectrum(mps::MPState) = -1 .* log.(schmidtvalues(mps))
+entanglementspectrum(mps::MPState) = [-1 .* log.(svs) for svs in schmidtvalues(mps)]
 entanglemententropy(mps::MPState) = [entropy(x.^2) for x in schmidtvalues(mps)]
 
 """
